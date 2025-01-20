@@ -24,5 +24,5 @@ Will hopefully figure out how to make this a registered PlatformIO library, so i
 
 ## More Resources
 
-You will be able to find additional guides and components at [my site](https://buymeacoffee.com/ripplebiz), or [join Andy Kirby's Discord] (https://discord.gg/GBxVx2JMAy) for discussions.
+You will be able to find additional guides and components at [my site](https://buymeacoffee.com/ripplebiz), or [join Andy Kirby's Discord](https://discord.gg/GBxVx2JMAy) for discussions.
 

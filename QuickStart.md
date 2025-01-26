@@ -41,7 +41,12 @@ Patched RAK11310
 Patch done, check output if successful
 ```
 
+### Build the T-Deck_hello_world example
+```
+platformio run -e T-Deck_hello_world -t mergebin
+```
+
 ### Flash it to a T-Deck
 ```
-platformio run -e ????
+python3 -m esptool --chip esp32s3 --port /dev/ttyACM0  --baud 921600 --before default_reset --after hard_reset write_flash -z --flash_mode dio --flash_freq 80m 0x0 .pio/build/T-Deck_hello_world/firmware-merged.bin
 ```

@@ -1,0 +1,5 @@
+[tasks.build]
+run = "platformio run -e T-Deck_hello_world -t mergebin"
+
+[tasks.flash]
+run = "python3 -m esptool --chip esp32s3 --port /dev/ttyACM0 --baud 921600 --before default_reset --after hard_reset write_flash -z --flash_mode dio --flash_freq 80m 0x0 .pio/build/T-Deck_hello_world/firmware-merged.bin"

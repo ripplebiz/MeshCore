@@ -53,6 +53,21 @@
   #include <helpers/HeltecV3Board.h>
   #include <helpers/CustomSX1262Wrapper.h>
   static HeltecV3Board board;
+
+  #include <Wire.h>
+  #include <Adafruit_GFX.h>
+  #include <Adafruit_SSD1306.h>
+
+  #define SDA_OLED 17
+  #define SCL_OLED 18
+  #define Vext 36
+
+  #define SCREEN_WIDTH 128 // OLED display width, in pixels
+  #define SCREEN_HEIGHT 64 // OLED display height, in pixels
+
+  #define OLED_RESET     21 // Reset pin # (or -1 if sharing Arduino reset pin)
+  #define SCREEN_ADDRESS 0x3C ///< See datasheet for Address; 0x3D for 128x64, 0x3C for 128x32
+  Adafruit_SSD1306 display(SCREEN_WIDTH, SCREEN_HEIGHT, &Wire, OLED_RESET);
 #elif defined(ARDUINO_XIAO_ESP32C3)
   #include <helpers/XiaoC3Board.h>
   #include <helpers/CustomSX1262Wrapper.h>
@@ -251,6 +266,14 @@ protected:
     Serial.printf("(%s) MSG -> from %s\n", path_len == 0xFF ? "DIRECT" : "FLOOD", from.name);
     Serial.printf("   %s\n", text);
 
+  #if defined(HELTEC_LORA_V3)
+    display.clearDisplay();
+    display.setCursor(0,0);
+    display.printf("(%s) -> %s\n", path_len == 0xFF ? "DIRECT" : "FLOOD", from.name);
+    display.printf("%s\n", text);
+    display.display();
+  #endif
+
     if (strcmp(text, "clock sync") == 0) {  // special text command
       setClock(sender_timestamp + 1);
     }
@@ -263,13 +286,21 @@ protected:
       Serial.printf("PUBLIC CHANNEL MSG -> (Flood) hops %d\n", in_path_len);
     }
     Serial.printf("   %s\n", text);
+
+  #if defined(HELTEC_LORA_V3)
+    display.clearDisplay();
+    display.setCursor(0,0);
+    display.printf("(%s) -> Channel\n", in_path_len == 0xFF ? "DIRECT" : "FLOOD");
+    display.printf("%s\n", text);
+    display.display();
+  #endif
   }
 
   uint32_t calcFloodTimeoutMillisFor(uint32_t pkt_airtime_millis) const override {
     return SEND_TIMEOUT_BASE_MILLIS + (FLOOD_SEND_TIMEOUT_FACTOR * pkt_airtime_millis);
   }
   uint32_t calcDirectTimeoutMillisFor(uint32_t pkt_airtime_millis, uint8_t path_len) const override {
-    return SEND_TIMEOUT_BASE_MILLIS + 
+    return SEND_TIMEOUT_BASE_MILLIS +
          ( (pkt_airtime_millis*DIRECT_SEND_PERHOP_FACTOR + DIRECT_SEND_PERHOP_EXTRA_MILLIS) * (path_len + 1));
   }
 
@@ -509,7 +540,7 @@ public:
     int len = strlen(command);
     while (Serial.available() && len < sizeof(command)-1) {
       char c = Serial.read();
-      if (c != '\n') { 
+      if (c != '\n') {
         command[len++] = c;
         command[len] = 0;
       }
@@ -548,6 +579,29 @@ void setup() {
   Serial.begin(115200);
 
   board.begin();
+
+#if defined(HELTEC_LORA_V3)
+  Wire.begin(SDA_OLED, SCL_OLED);
+
+  pinMode(Vext,OUTPUT);
+  digitalWrite(Vext, LOW);
+  delay(100);
+
+  // SSD1306_SWITCHCAPVCC = generate display voltage from 3.3V internally
+  if(!display.begin(SSD1306_SWITCHCAPVCC, SCREEN_ADDRESS)) {
+    Serial.println(F("SSD1306 allocation failed"));
+    for(;;); // Don't proceed, loop forever
+  }
+
+  display.clearDisplay();
+
+  display.setTextSize(1);      // Normal 1:1 pixel scale
+  display.setTextColor(SSD1306_WHITE); // Draw white text
+  display.setCursor(0, 0);     // Start at top-left corner
+  display.cp437(true);         // Use full 256 char 'Code Page 437' font
+  display.display();
+#endif
+
 #ifdef SX126X_DIO3_TCXO_VOLTAGE
   float tcxo = SX126X_DIO3_TCXO_VOLTAGE;
 #else

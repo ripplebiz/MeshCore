@@ -235,6 +235,7 @@ public:
 
   void begin(FILESYSTEM& fs, mesh::RNG& trng);
   const char* getNodeName() { return _prefs.node_name; }
+  int getUnreadMsgNb() {return offline_queue_len;}
   void startInterface(BaseSerialInterface& serial);
   void savePrefs();
   void handleCmdFrame(size_t len);

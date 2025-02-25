@@ -25,17 +25,7 @@ protected:
   uint8_t startup_reason;
 
 public:
-  void begin() {
-    // for future use, sub-classes SHOULD call this from their begin()
-    startup_reason = BD_STARTUP_NORMAL;
-
-//    pinMode(PIN_VBAT_READ, INPUT);
-
-// Doesn't seem to be a pwr en pin ...
-//    pinMode(LR1110_POWER_EN, OUTPUT);
-//    digitalWrite(LR1110_POWER_EN, HIGH);
-    delay(10);   // give sx1262 some time to power up
-  }
+  void begin();
 
   uint16_t getBattMilliVolts() override {
     return 0;

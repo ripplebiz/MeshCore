@@ -19,6 +19,9 @@ uint32_t Mesh::getRetransmitDelay(const mesh::Packet* packet) {
 
   return _rng->nextInt(0, 5)*t;
 }
+uint32_t Mesh::getDirectRetransmitDelay(const Packet* packet) {
+  return 0;  // by default, no delay
+}
 
 int Mesh::searchPeersByHash(const uint8_t* hash) {
   return 0;  // not found
@@ -41,7 +44,9 @@ DispatcherAction Mesh::onRecvPacket(Packet* pkt) {
       // remove our hash from 'path', then re-broadcast
       pkt->path_len -= PATH_HASH_SIZE;
       memcpy(pkt->path, &pkt->path[PATH_HASH_SIZE], pkt->path_len);
-      return ACTION_RETRANSMIT(0);   // Routed traffic is HIGHEST priority (and NO per-hop delay)
+
+      uint32_t d = getDirectRetransmitDelay(pkt);
+      return ACTION_RETRANSMIT_DELAYED(0, d);  // Routed traffic is HIGHEST priority 
     }
     return ACTION_RELEASE;   // this node is NOT the next hop (OR this packet has already been forwarded), so discard.
   }

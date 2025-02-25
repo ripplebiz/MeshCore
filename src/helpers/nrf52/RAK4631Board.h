@@ -25,17 +25,7 @@ protected:
   uint8_t startup_reason;
 
 public:
-  void begin() {
-    // for future use, sub-classes SHOULD call this from their begin()
-    startup_reason = BD_STARTUP_NORMAL;
-
-    pinMode(PIN_VBAT_READ, INPUT);
-
-    pinMode(SX126X_POWER_EN, OUTPUT);
-    digitalWrite(SX126X_POWER_EN, HIGH);
-    delay(10);   // give sx1262 some time to power up
-  }
-
+  void begin();
   uint8_t getStartupReason() const override { return startup_reason; }
 
   #define BATTERY_SAMPLES 8

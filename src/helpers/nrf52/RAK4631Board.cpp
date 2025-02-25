@@ -20,6 +20,23 @@ static void disconnect_callback(uint16_t conn_handle, uint8_t reason)
     MESH_DEBUG_PRINTLN("BLE client disconnected");
 }
 
+void RAK4631Board::begin() {
+  // for future use, sub-classes SHOULD call this from their begin()
+  startup_reason = BD_STARTUP_NORMAL;
+
+  pinMode(PIN_VBAT_READ, INPUT);
+
+#if defined(PIN_BOARD_SDA) && defined(PIN_BOARD_SCL)
+  Wire.begin(PIN_BOARD_SDA, PIN_BOARD_SCL);
+#else
+  Wire.begin();
+#endif
+
+  pinMode(SX126X_POWER_EN, OUTPUT);
+  digitalWrite(SX126X_POWER_EN, HIGH);
+  delay(10);   // give sx1262 some time to power up
+}
+
 bool RAK4631Board::startOTAUpdate() {
     // Config the peripheral connection with maximum bandwidth
     // more SRAM required by SoftDevice

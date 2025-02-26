@@ -226,6 +226,7 @@ size_t SerialBLEInterface::checkRecvFrame(uint8_t dest[]) {
   }
 
   if (checkAdvRestart) {
+    delay(1000); // need to wait a bit for device to disconnect, otherwise advertising wont start again
     if (pServer->getConnectedCount() == 0) {
       BLE_DEBUG_PRINTLN("SerialBLEInterface -> re-starting advertising");
       pServer->getAdvertising()->start();  // re-Start advertising

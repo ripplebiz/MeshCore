@@ -1,12 +1,20 @@
 #include <Arduino.h>
 #include "T1000eBoard.h"
-
-#include <bluefruit.h>
 #include <Wire.h>
 
-void T1000eBoard::begin() {
+#include <bluefruit.h>
+
+void T1000eBoard::begin()
+  {
   // for future use, sub-classes SHOULD call this from their begin()
   startup_reason = BD_STARTUP_NORMAL;
+  btn_prev_state = HIGH;
+
+#ifdef BUTTON_PIN
+  pinMode(BATTERY_PIN, INPUT);
+  pinMode(BUTTON_PIN, INPUT);
+  pinMode(LED_PIN, OUTPUT);
+#endif
 
 #if defined(PIN_BOARD_SDA) && defined(PIN_BOARD_SCL)
   Wire.begin(PIN_BOARD_SDA, PIN_BOARD_SCL);
@@ -14,12 +22,7 @@ void T1000eBoard::begin() {
   Wire.begin();
 #endif
 
-  //    pinMode(PIN_VBAT_READ, INPUT);
-
-  // Doesn't seem to be a pwr en pin ...
-  //    pinMode(LR1110_POWER_EN, OUTPUT);
-  //    digitalWrite(LR1110_POWER_EN, HIGH);
-    delay(10);   // give sx1262 some time to power up
+  delay(10);   // give sx1262 some time to power up
 }
 
 #if 0

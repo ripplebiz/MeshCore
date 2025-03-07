@@ -1272,7 +1272,13 @@ void setup() {
 
 #ifdef BLE_PIN_CODE
   char dev_name[32+10];
-  sprintf(dev_name, "MeshCore-%s", the_mesh.getNodeName());
+  const char* prefix = 
+  #ifdef BLE_NAME_PREFIX
+      BLE_NAME_PREFIX;
+  #else
+      "MeshCore-";
+  #endif
+  sprintf(dev_name, "%s%s", prefix, the_mesh.getNodeName());
   serial_interface.begin(dev_name, the_mesh.getBLEPin());
 #else
   pinMode(WB_IO2, OUTPUT);
@@ -1288,7 +1294,13 @@ void setup() {
   serial_interface.begin(TCP_PORT);
 #elif defined(BLE_PIN_CODE)
   char dev_name[32+10];
-  sprintf(dev_name, "MeshCore-%s", the_mesh.getNodeName());
+  const char* prefix = 
+  #ifdef BLE_NAME_PREFIX
+      BLE_NAME_PREFIX;
+  #else
+      "MeshCore-";
+  #endif
+  sprintf(dev_name, "%s%s", prefix, the_mesh.getNodeName());
   serial_interface.begin(dev_name, the_mesh.getBLEPin());
 #else
   serial_interface.begin(Serial);

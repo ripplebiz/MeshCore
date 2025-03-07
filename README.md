@@ -42,13 +42,20 @@ Monitor & Communicate using the Serial Monitor (e.g., Serial USB Terminal on And
 ## 🛠 Hardware Compatibility
 
 MeshCore is designed for use with:
-* Heltec V3 LoRa Boards
-* RAK4631
-* XiaoS3 WIO (sx1262 combo)
-* XiaoC3 (plus external sx126x module)
-* LilyGo T3S3
-* Heltec T114
-* Station G2
+* Heltec V3 LoRa Boards (ESP32)
+* RAK Wireless WisBlock / WisMesh (RAK 4631) (NRF52)
+* Seeed Studio Xiao S3 WIO (SX1262 combo) (ESP32)
+* Seeed Studio Xiao C3 (plus external SX126x module) (ESP32)
+* Lilygo T3 S3 (ESP32)
+* Heltec T114 (NRF52)
+* UnitEng Station G2 (ESP32)
+* Lilygo T-Deck (ESP32)
+* Lilygo T5 E-Paper S3 Pro (ESP32)
+* Lilygo T-Echo (NRF52)
+* Lilygo LoRa32 V2.1_1.6 (ESP32)
+* Heltec v2 (ESP32)
+* Heltec WSL3 (ESP32)
+* Seeed Studio SenseCAP T1000-E (NRF52)
 
 ## 📜 License
 MeshCore is open-source software released under the MIT License. You are free to use, modify, and distribute it for personal and commercial projects.

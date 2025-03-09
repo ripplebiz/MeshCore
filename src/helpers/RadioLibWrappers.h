@@ -10,6 +10,7 @@ protected:
   uint32_t n_recv, n_sent;
 
   void idle();
+  void startRecv();
   float packetScoreInt(float snr, int sf, int packet_len);
 
 public:

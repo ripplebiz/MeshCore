@@ -27,6 +27,12 @@ public:
     pinMode(P_LORA_TX_LED, OUTPUT);
     digitalWrite(P_LORA_TX_LED, LOW);
   #endif
+
+  #if defined(PIN_BOARD_SDA) && defined(PIN_BOARD_SCL)
+    Wire.begin(PIN_BOARD_SDA, PIN_BOARD_SCL);
+  #else
+    Wire.begin();
+  #endif
   }
 
   uint8_t getStartupReason() const override { return startup_reason; }

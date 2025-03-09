@@ -11,4 +11,5 @@ class StrHelper {
 public:
   static void strncpy(char* dest, const char* src, size_t buf_sz);
   static void strzcpy(char* dest, const char* src, size_t buf_sz);   // pads with trailing nulls
+  static const char* ftoa(float f);
 };

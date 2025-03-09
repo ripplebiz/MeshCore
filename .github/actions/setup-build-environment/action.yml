@@ -1,0 +1,29 @@
+name: Setup Build Environment
+runs:
+  using: "composite"
+  steps:
+
+    - name: Init Cache
+      uses: actions/cache@v4
+      with:
+        path: |
+          ~/.cache/pip
+          ~/.platformio/.cache
+        key: ${{ runner.os }}-pio
+
+    - name: Install Python
+      uses: actions/setup-python@v5
+      with:
+        python-version: '3.11'
+
+    - name: Install PlatformIO
+      shell: bash
+      run: |
+        pip install --upgrade platformio
+
+    # a git tag of "room-server-v1.2.3" should set "v1.2.3" as GIT_TAG_VERSION
+    - name: Extract Version from Git Tag
+      shell: bash
+      run: |
+        GIT_TAG_NAME="${GITHUB_REF#refs/tags/}"
+        echo "GIT_TAG_VERSION=${GIT_TAG_NAME##*-}" >> $GITHUB_ENV

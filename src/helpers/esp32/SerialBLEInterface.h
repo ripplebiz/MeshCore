@@ -12,10 +12,10 @@ class SerialBLEInterface : public BaseSerialInterface, BLESecurityCallbacks, BLE
   BLECharacteristic * pTxCharacteristic;
   bool deviceConnected;
   bool oldDeviceConnected;
-  bool checkAdvRestart;
   bool _isEnabled;
   uint32_t _pin_code;
   unsigned long _last_write;
+  unsigned long adv_restart_time;
 
   struct Frame {
     uint8_t len;
@@ -53,7 +53,7 @@ public:
     pService = NULL;
     deviceConnected = false;
     oldDeviceConnected = false;
-    checkAdvRestart = false;
+    adv_restart_time = 0;
     _isEnabled = false;
     _last_write = 0;
     send_queue_len = recv_queue_len = 0;

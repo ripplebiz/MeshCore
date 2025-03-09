@@ -13,13 +13,21 @@
 #include <helpers/StaticPoolPacketManager.h>
 #include <helpers/SimpleMeshTables.h>
 #include <helpers/IdentityStore.h>
+#include <helpers/AutoDiscoverRTCClock.h>
 #include <helpers/AdvertDataHelpers.h>
 #include <helpers/TxtDataHelpers.h>
+#include <helpers/CommonCLI.h>
 #include <RTClib.h>
 
 /* ------------------------------ Config -------------------------------- */
 
-#define FIRMWARE_VER_TEXT   "v4 (build: 17 Feb 2025)"
+#ifndef FIRMWARE_BUILD_DATE
+  #define FIRMWARE_BUILD_DATE   "7 Mar 2025"
+#endif
+
+#ifndef FIRMWARE_VERSION
+  #define FIRMWARE_VERSION   "v1.2.1"
+#endif
 
 #ifndef LORA_FREQ
   #define LORA_FREQ   915.0
@@ -59,9 +67,6 @@
   #define MAX_UNSYNCED_POSTS    16
 #endif
 
-#define MIN_LOCAL_ADVERT_INTERVAL   8
-
-
 #if defined(HELTEC_LORA_V3)
   #include <helpers/HeltecV3Board.h>
   #include <helpers/CustomSX1262Wrapper.h>
@@ -75,6 +80,10 @@
   #include <helpers/ESP32Board.h>
   #include <helpers/CustomSX1262Wrapper.h>
   static ESP32Board board;
+#elif defined(LILYGO_TLORA)
+  #include <helpers/LilyGoTLoraBoard.h>
+  #include <helpers/CustomSX1276Wrapper.h>
+  static LilyGoTLoraBoard board;
 #elif defined(RAK_4631)
   #include <helpers/nrf52/RAK4631Board.h>
   #include <helpers/CustomSX1262Wrapper.h>
@@ -83,17 +92,16 @@
   #error "need to provide a 'board' object"
 #endif
 
-/* ------------------------------ Code -------------------------------- */
+#ifdef DISPLAY_CLASS
+  #include <helpers/ui/SSD1306Display.h>
 
-// Believe it or not, this std C function is busted on some platforms!
-static uint32_t _atoi(const char* sp) {
-  uint32_t n = 0;
-  while (*sp && *sp >= '0' && *sp <= '9') {
-    n *= 10;
-    n += (*sp++ - '0');
-  }
-  return n;
-}
+  static DISPLAY_CLASS  display;
+
+  #include "UITask.h"
+  static UITask ui_task(display);
+#endif
+
+/* ------------------------------ Code -------------------------------- */
 
 struct ClientInfo {
   mesh::Identity id;
@@ -128,31 +136,19 @@ struct PostInfo {
 
 #define CLIENT_KEEP_ALIVE_SECS   128
 
-#define REQ_TYPE_KEEP_ALIVE   1
+#define REQ_TYPE_GET_STATUS      0x01   // same as _GET_STATS
+#define REQ_TYPE_KEEP_ALIVE      0x02
 
 #define RESP_SERVER_LOGIN_OK      0   // response to ANON_REQ
 
-struct NodePrefs {  // persisted to file
-  float airtime_factor;
-  char node_name[32];
-  double node_lat, node_lon;
-  char password[16];
-  float freq;
-  uint8_t tx_power_dbm;
-  uint8_t disable_fwd;
-  uint8_t advert_interval;   // minutes
-  uint8_t unused;
-  float rx_delay_base;
-  float tx_delay_factor;
-  char guest_password[16];
-};
-
-class MyMesh : public mesh::Mesh {
+class MyMesh : public mesh::Mesh, public CommonCLICallbacks {
   RadioLibWrapper* my_radio;
   FILESYSTEM* _fs;
+  RADIO_CLASS* _phy;
   mesh::MainBoard* _board;
   unsigned long next_local_advert;
   NodePrefs _prefs;
+  CommonCLI _cli;
   uint8_t reply_data[MAX_PACKET_PAYLOAD];
   int num_clients;
   ClientInfo known_clients[MAX_CLIENTS];
@@ -217,7 +213,7 @@ class MyMesh : public mesh::Mesh {
     memcpy(&reply_data[len], post.text, text_len); len += text_len;
 
     // calc expected ACK reply
-    mesh::Utils::sha256((uint8_t *)&client->pending_ack, 4, reply_data, len, self_id.pub_key, PUB_KEY_SIZE);
+    mesh::Utils::sha256((uint8_t *)&client->pending_ack, 4, reply_data, len, client->id.pub_key, PUB_KEY_SIZE);
     client->push_post_timestamp = post.post_timestamp;
 
     auto reply = createDatagram(PAYLOAD_TYPE_TXT_MSG, client->id, client->secret, reply_data, len);
@@ -246,20 +242,6 @@ class MyMesh : public mesh::Mesh {
       }
     }
     return false;
-  }
-
-  void checkAdvertInterval() {
-    if (_prefs.advert_interval < MIN_LOCAL_ADVERT_INTERVAL) {
-      _prefs.advert_interval = 0;  // turn it off, now that device has been manually configured
-    }
-  }
-
-  void updateAdvertTimer() {
-    if (_prefs.advert_interval > 0) {  // schedule local advert timer
-      next_local_advert = futureMillis(_prefs.advert_interval * 60 * 1000);
-    } else {
-      next_local_advert = 0;  // stop the timer
-    }
   }
 
   mesh::Packet* createSelfAdvert() {
@@ -295,6 +277,10 @@ protected:
     uint32_t t = (_radio->getEstAirtimeFor(packet->path_len + packet->payload_len + 2) * _prefs.tx_delay_factor);
     return getRNG()->nextInt(0, 6)*t;
   }
+  uint32_t getDirectRetransmitDelay(const mesh::Packet* packet) override {
+    uint32_t t = (_radio->getEstAirtimeFor(packet->path_len + packet->payload_len + 2) * _prefs.direct_tx_delay_factor);
+    return getRNG()->nextInt(0, 6)*t;
+  }
 
   bool allowPacketForward(const mesh::Packet* packet) override {
     return !_prefs.disable_fwd;
@@ -307,12 +293,12 @@ protected:
       memcpy(&sender_sync_since, &data[4], 4);  // sender's "sync messags SINCE x" timestamp
 
       bool is_admin;
-      if (memcmp(&data[8], _prefs.password, strlen(_prefs.password)) == 0) {  // check for valid admin password
+      data[len] = 0;  // ensure null terminator
+      if (strcmp((char *) &data[8], _prefs.password) == 0) {  // check for valid admin password
         is_admin = true;
       } else {
         is_admin = false;
-        int len = strlen(_prefs.guest_password);
-        if (len > 0 && memcmp(&data[8], _prefs.guest_password, len) != 0) {  // check the room/public password
+        if (strcmp((char *) &data[8], _prefs.guest_password) != 0) {  // check the room/public password
           MESH_DEBUG_PRINTLN("Incorrect room password");
           return;   // no response. Client will timeout
         }
@@ -339,7 +325,7 @@ protected:
       // TODO: maybe reply with count of messages waiting to be synced for THIS client?
       reply_data[4] = RESP_SERVER_LOGIN_OK;
       reply_data[5] = (CLIENT_KEEP_ALIVE_SECS >> 4);  // NEW: recommended keep-alive interval (secs / 16)
-      reply_data[6] = 0;  // FUTURE: reserved
+      reply_data[6] = is_admin ? 1 : 0;
       reply_data[7] = 0;  // FUTURE: reserved
       memcpy(&reply_data[8], "OK", 2);  // REVISIT: not really needed
 
@@ -399,7 +385,8 @@ protected:
 
       if (!(flags == TXT_TYPE_PLAIN || flags == TXT_TYPE_CLI_DATA)) {
         MESH_DEBUG_PRINTLN("onPeerDataRecv: unsupported command flags received: flags=%02x", (uint32_t)flags);
-      } else if (sender_timestamp > client->last_timestamp) {  // prevent replay attacks 
+      } else if (sender_timestamp >= client->last_timestamp) {  // prevent replay attacks, but send Acks for retries
+        bool is_retry = (sender_timestamp == client->last_timestamp);
         client->last_timestamp = sender_timestamp;
 
         uint32_t now = getRTCClock()->getCurrentTimeUnique();
@@ -416,18 +403,26 @@ protected:
         bool send_ack;
         if (flags == TXT_TYPE_CLI_DATA) {
           if (client->is_admin) {
-            handleAdminCommand(sender_timestamp, (const char *) &data[5], (char *) &temp[5]);
-            send_ack = true;
+            if (is_retry) {
+              temp[5] = 0;  // no reply
+            } else {
+              _cli.handleCommand(sender_timestamp, (const char *) &data[5], (char *) &temp[5]);
+              temp[4] = (TXT_TYPE_CLI_DATA << 2);  // attempt and flags,  (NOTE: legacy was: TXT_TYPE_PLAIN)
+            }
+            send_ack = false;
           } else {
             temp[5] = 0;  // no reply
             send_ack = false;  // and no ACK...  user shoudn't be sending these
           }
         } else {   // TXT_TYPE_PLAIN
-          addPost(client, (const char *) &data[5]);
+          if (!is_retry) {
+            addPost(client, (const char *) &data[5]);
+          }
           temp[5] = 0;  // no reply (ACK is enough)
           send_ack = true;
         }
 
+        uint32_t delay_millis;
         if (send_ack) {
           mesh::Packet* ack = createAck(ack_hash);
           if (ack) {
@@ -437,6 +432,9 @@ protected:
               sendDirect(ack, client->out_path, client->out_path_len);
             }
           }
+          delay_millis = REPLY_DELAY_MILLIS;
+        } else {
+          delay_millis = 0;
         }
 
         int text_len = strlen((char *) &temp[5]);
@@ -446,7 +444,6 @@ protected:
             now++;
           }
           memcpy(temp, &now, 4);   // mostly an extra blob to help make packet_hash unique
-          temp[4] = (TXT_TYPE_PLAIN << 2);  // attempt and flags
 
           // calc expected ACK reply
           //mesh::Utils::sha256((uint8_t *)&expected_ack_crc, 4, temp, 5 + text_len, self_id.pub_key, PUB_KEY_SIZE);
@@ -454,9 +451,9 @@ protected:
           auto reply = createDatagram(PAYLOAD_TYPE_TXT_MSG, client->id, secret, temp, 5 + text_len);
           if (reply) {
             if (client->out_path_len < 0) {
-              sendFlood(reply, REPLY_DELAY_MILLIS);
+              sendFlood(reply, delay_millis);
             } else {
-              sendDirect(reply, client->out_path, client->out_path_len, REPLY_DELAY_MILLIS);
+              sendDirect(reply, client->out_path, client->out_path_len, delay_millis);
             }
           }
         }
@@ -470,12 +467,11 @@ protected:
         uint32_t forceSince = 0;
         if (len >= 9) {   // optional - last post_timestamp client received
           memcpy(&forceSince, &data[5], 4);    // NOTE: this may be 0, if part of decrypted PADDING!
+        } else {
+          memcpy(&data[5], &forceSince, 4);  // make sure there are zeroes in payload (for ack_hash calc below)
         }
         if (forceSince > 0) { 
           client->sync_since = forceSince;    // force-update the 'sync since'
-          len = 9;   // for ACK hash calc below
-        } else {
-          len = 5;   // for ACK hash calc below
         }
 
         uint32_t now = getRTCClock()->getCurrentTime();
@@ -489,7 +485,7 @@ protected:
         // RULE: only send keep_alive response DIRECT!
         if (client->out_path_len >= 0) {
           uint32_t ack_hash;    // calc ACK to prove to sender that we got request
-          mesh::Utils::sha256((uint8_t *) &ack_hash, 4, data, len, client->id.pub_key, PUB_KEY_SIZE);
+          mesh::Utils::sha256((uint8_t *) &ack_hash, 4, data, 9, client->id.pub_key, PUB_KEY_SIZE);
 
           auto reply = createAck(ack_hash);
           if (reply) {
@@ -528,8 +524,9 @@ protected:
   }
 
 public:
-  MyMesh(mesh::MainBoard& board, RadioLibWrapper& radio, mesh::MillisecondClock& ms, mesh::RNG& rng, mesh::RTCClock& rtc, mesh::MeshTables& tables)
-     : mesh::Mesh(radio, ms, rng, rtc, *new StaticPoolPacketManager(32), tables), _board(&board)
+  MyMesh(RADIO_CLASS& phy, mesh::MainBoard& board, RadioLibWrapper& radio, mesh::MillisecondClock& ms, mesh::RNG& rng, mesh::RTCClock& rtc, mesh::MeshTables& tables)
+     : mesh::Mesh(radio, ms, rng, rtc, *new StaticPoolPacketManager(32), tables), 
+        _phy(&phy), _board(&board), _cli(board, this, &_prefs, this)
   {
     my_radio = &radio;
     next_local_advert = 0;
@@ -544,9 +541,12 @@ public:
     _prefs.node_lon = ADVERT_LON;
     StrHelper::strncpy(_prefs.password, ADMIN_PASSWORD, sizeof(_prefs.password));
     _prefs.freq = LORA_FREQ;
+    _prefs.sf = LORA_SF;
+    _prefs.bw = LORA_BW;
+    _prefs.cr = LORA_CR;
     _prefs.tx_power_dbm = LORA_TX_POWER;
     _prefs.disable_fwd = 1;
-    _prefs.advert_interval = 2;  // default to 2 minutes for NEW installs
+    _prefs.advert_interval = 1;  // default to 2 minutes for NEW installs
   #ifdef ROOM_PASSWORD
     StrHelper::strncpy(_prefs.guest_password, ROOM_PASSWORD, sizeof(_prefs.guest_password));
   #endif
@@ -558,38 +558,43 @@ public:
     memset(posts, 0, sizeof(posts));
   }
 
-  float getFreqPref() const { return _prefs.freq; }
-  uint8_t getTxPowerPref() const { return _prefs.tx_power_dbm; }
+  CommonCLI* getCLI() { return &_cli; }
 
   void begin(FILESYSTEM* fs) {
     mesh::Mesh::begin();
     _fs = fs;
     // load persisted prefs
-    if (_fs->exists("/node_prefs")) {
-      File file = _fs->open("/node_prefs");
-      if (file) {
-        file.read((uint8_t *) &_prefs, sizeof(_prefs));
-        file.close();
-      }
-    }
+    _cli.loadPrefs(_fs);
+
+    _phy->setFrequency(_prefs.freq);
+    _phy->setSpreadingFactor(_prefs.sf);
+    _phy->setBandwidth(_prefs.bw);
+    _phy->setCodingRate(_prefs.cr);
+    _phy->setOutputPower(_prefs.tx_power_dbm);
 
     updateAdvertTimer();
   }
 
-  void savePrefs() {
-#if defined(NRF52_PLATFORM)
-    File file = _fs->open("/node_prefs", FILE_O_WRITE);
-    if (file) { file.seek(0); file.truncate(); }
-#else
-    File file = _fs->open("/node_prefs", "w", true);
-#endif
-    if (file) {
-      file.write((const uint8_t *)&_prefs, sizeof(_prefs));
-      file.close();
-    }
+  const char* getFirmwareVer() override { return FIRMWARE_VERSION; }
+  const char* getBuildDate() override { return FIRMWARE_BUILD_DATE; }
+  const char* getNodeName() { return _prefs.node_name; }
+
+  void savePrefs() override {
+    _cli.savePrefs(_fs);
   }
 
-  void sendSelfAdvertisement(int delay_millis) {
+  bool formatFileSystem() override {
+    #if defined(NRF52_PLATFORM)
+      return InternalFS.format();
+    #elif defined(ESP32)
+      return SPIFFS.format();
+    #else
+      #error "need to implement file system erase"
+      return false;
+    #endif
+  }
+    
+  void sendSelfAdvertisement(int delay_millis) override {
     mesh::Packet* pkt = createSelfAdvert();
     if (pkt) {
       sendFlood(pkt, delay_millis);
@@ -598,118 +603,20 @@ public:
     }
   }
 
-  void handleAdminCommand(uint32_t sender_timestamp, const char* command, char reply[]) {
-    while (*command == ' ') command++;   // skip leading spaces
-
-    if (memcmp(command, "reboot", 6) == 0) {
-      board.reboot();  // doesn't return
-    } else if (memcmp(command, "advert", 6) == 0) {
-      sendSelfAdvertisement(400);
-      strcpy(reply, "OK - Advert sent");
-    } else if (memcmp(command, "clock sync", 10) == 0) {
-      uint32_t curr = getRTCClock()->getCurrentTime();
-      if (sender_timestamp > curr) {
-        getRTCClock()->setCurrentTime(sender_timestamp + 1);
-        strcpy(reply, "OK - clock set");
-      } else {
-        strcpy(reply, "ERR: clock cannot go backwards");
-      }
-    } else if (memcmp(command, "start ota", 9) == 0) {
-      if (_board->startOTAUpdate()) {
-        strcpy(reply, "OK");
-      } else {
-        strcpy(reply, "Error");
-      }
-    } else if (memcmp(command, "clock", 5) == 0) {
-      uint32_t now = getRTCClock()->getCurrentTime();
-      DateTime dt = DateTime(now);
-      sprintf(reply, "%02d:%02d - %d/%d/%d UTC", dt.hour(), dt.minute(), dt.day(), dt.month(), dt.year());
-    } else if (memcmp(command, "time ", 5) == 0) {  // set time (to epoch seconds)
-      uint32_t secs = _atoi(&command[5]);
-      uint32_t curr = getRTCClock()->getCurrentTime();
-      if (secs > curr) {
-        getRTCClock()->setCurrentTime(secs);
-        strcpy(reply, "(OK - clock set!)");
-      } else {
-        strcpy(reply, "(ERR: clock cannot go backwards)");
-      }
-    } else if (memcmp(command, "password ", 9) == 0) {
-      // change admin password
-      StrHelper::strncpy(_prefs.password, &command[9], sizeof(_prefs.password));
-      savePrefs();
-      sprintf(reply, "password now: %s", _prefs.password);   // echo back just to let admin know for sure!!
-    } else if (memcmp(command, "set ", 4) == 0) {
-      const char* config = &command[4];
-      if (memcmp(config, "af ", 3) == 0) {
-        _prefs.airtime_factor = atof(&config[3]);
-        savePrefs();
-        strcpy(reply, "OK");
-      } else if (memcmp(config, "advert.interval ", 16) == 0) {
-        int mins = _atoi(&config[16]);
-        if (mins > 0 && mins < MIN_LOCAL_ADVERT_INTERVAL) {
-          sprintf(reply, "Error: min is %d mins", MIN_LOCAL_ADVERT_INTERVAL);
-        } else if (mins > 120) {
-          strcpy(reply, "Error: max is 120 mins");
-        } else {
-          _prefs.advert_interval = (uint8_t)mins;
-          updateAdvertTimer();
-          savePrefs();
-          strcpy(reply, "OK");
-        }
-      } else if (memcmp(config, "guest.password ", 15) == 0) {
-        StrHelper::strncpy(_prefs.guest_password, &config[15], sizeof(_prefs.guest_password));
-        savePrefs();
-        strcpy(reply, "OK");
-      } else if (memcmp(config, "name ", 5) == 0) {
-        StrHelper::strncpy(_prefs.node_name, &config[5], sizeof(_prefs.node_name));
-        savePrefs();
-        strcpy(reply, "OK");
-      } else if (memcmp(config, "repeat ", 7) == 0) {
-        _prefs.disable_fwd = memcmp(&config[7], "off", 3) == 0;
-        savePrefs();
-        strcpy(reply, _prefs.disable_fwd ? "OK - repeat is now OFF" : "OK - repeat is now ON");
-      } else if (memcmp(config, "lat ", 4) == 0) {
-        _prefs.node_lat = atof(&config[4]);
-        savePrefs();
-        strcpy(reply, "OK");
-      } else if (memcmp(config, "lon ", 4) == 0) {
-        _prefs.node_lon = atof(&config[4]);
-        savePrefs();
-        strcpy(reply, "OK");
-      } else if (memcmp(config, "rxdelay ", 8) == 0) {
-        float db = atof(&config[8]);
-        if (db >= 0) {
-          _prefs.rx_delay_base = db;
-          savePrefs();
-          strcpy(reply, "OK");
-        } else {
-          strcpy(reply, "Error, cannot be negative");
-        }
-      } else if (memcmp(config, "txdelay ", 8) == 0) {
-        float f = atof(&config[8]);
-        if (f >= 0) {
-          _prefs.tx_delay_factor = f;
-          savePrefs();
-          strcpy(reply, "OK");
-        } else {
-          strcpy(reply, "Error, cannot be negative");
-        }
-      } else if (memcmp(config, "tx ", 3) == 0) {
-        _prefs.tx_power_dbm = atoi(&config[3]);
-        savePrefs();
-        strcpy(reply, "OK - reboot to apply");
-      } else if (sender_timestamp == 0 && memcmp(config, "freq ", 5) == 0) {
-        _prefs.freq = atof(&config[5]);
-        savePrefs();
-        strcpy(reply, "OK - reboot to apply");
-      } else {
-        sprintf(reply, "unknown config: %s", config);
-      }
-    } else if (memcmp(command, "ver", 3) == 0) {
-      strcpy(reply, FIRMWARE_VER_TEXT);
+  void updateAdvertTimer() override {
+    if (_prefs.advert_interval > 0) {  // schedule local advert timer
+      next_local_advert = futureMillis((uint32_t)_prefs.advert_interval * 2 * 60 * 1000);
     } else {
-      strcpy(reply, "?");   // unknown command
+      next_local_advert = 0;  // stop the timer
     }
+  }
+
+  void setLoggingOn(bool enable) override { /* no-op */ }
+  void eraseLogFile() override { /* no-op */ }
+  void dumpLogFile() override { /* no-op */ }
+
+  void setTxPower(uint8_t power_dbm) override {
+    _phy->setOutputPower(power_dbm);
   }
 
   void loop() {
@@ -756,12 +663,19 @@ public:
       updateAdvertTimer();   // schedule next local advert
     }
 
+  #ifdef DISPLAY_CLASS
+    ui_task.loop();
+  #endif
+
     // TODO: periodically check for OLD/inactive entries in known_clients[], and evict
   }
 };
 
 #if defined(NRF52_PLATFORM)
 RADIO_CLASS radio = new Module(P_LORA_NSS, P_LORA_DIO_1, P_LORA_RESET, P_LORA_BUSY, SPI);
+#elif defined(LILYGO_TLORA)
+SPIClass spi;
+RADIO_CLASS radio = new Module(P_LORA_NSS, P_LORA_DIO_0, P_LORA_RESET, P_LORA_DIO_1, spi);
 #elif defined(P_LORA_SCLK)
 SPIClass spi;
 RADIO_CLASS radio = new Module(P_LORA_NSS, P_LORA_DIO_1, P_LORA_RESET, P_LORA_BUSY, spi);
@@ -772,12 +686,13 @@ StdRNG fast_rng;
 SimpleMeshTables tables;
 
 #ifdef ESP32
-ESP32RTCClock rtc_clock;
+ESP32RTCClock fallback_clock;
 #else
-VolatileRTCClock rtc_clock; 
+VolatileRTCClock fallback_clock; 
 #endif
+AutoDiscoverRTCClock rtc_clock(fallback_clock);
 
-MyMesh the_mesh(board, *new WRAPPER_CLASS(radio, board), *new ArduinoMillis(), fast_rng, rtc_clock, tables);
+MyMesh the_mesh(radio, board, *new WRAPPER_CLASS(radio, board), *new ArduinoMillis(), fast_rng, rtc_clock, tables);
 
 void halt() {
   while (1) ;
@@ -791,8 +706,9 @@ void setup() {
 
   board.begin();
 #ifdef ESP32
-  rtc_clock.begin();
+  fallback_clock.begin();
 #endif
+  rtc_clock.begin(Wire);
 
 #ifdef SX126X_DIO3_TCXO_VOLTAGE
   float tcxo = SX126X_DIO3_TCXO_VOLTAGE;
@@ -851,12 +767,10 @@ void setup() {
 
   the_mesh.begin(fs);
 
-  if (LORA_FREQ != the_mesh.getFreqPref()) {
-    radio.setFrequency(the_mesh.getFreqPref());
-  }
-  if (LORA_TX_POWER != the_mesh.getTxPowerPref()) {
-    radio.setOutputPower(the_mesh.getTxPowerPref());
-  }
+#ifdef DISPLAY_CLASS
+  display.begin();
+  ui_task.begin(the_mesh.getNodeName(), FIRMWARE_BUILD_DATE);
+#endif
 
   // send out initial Advertisement to the mesh
   the_mesh.sendSelfAdvertisement(2000);
@@ -879,7 +793,7 @@ void loop() {
   if (len > 0 && command[len - 1] == '\r') {  // received complete line
     command[len - 1] = 0;  // replace newline with C string null terminator
     char reply[160];
-    the_mesh.handleAdminCommand(0, command, reply);  // NOTE: there is no sender_timestamp via serial!
+    the_mesh.getCLI()->handleCommand(0, command, reply);  // NOTE: there is no sender_timestamp via serial!
     if (reply[0]) {
       Serial.print("  -> "); Serial.println(reply);
     }

@@ -35,6 +35,15 @@ void RadioLibWrapper::idle() {
   state = STATE_IDLE;   // need another startReceive()
 }
 
+void RadioLibWrapper::startRecv() {
+  int err = _radio->startReceive();
+  if (err == RADIOLIB_ERR_NONE) {
+    state = STATE_RX;
+  } else {
+    MESH_DEBUG_PRINTLN("RadioLibWrapper: error: startReceive(%d)", err);
+  }
+}
+
 int RadioLibWrapper::recvRaw(uint8_t* bytes, int sz) {
   if (state & STATE_INT_READY) {
     int len = _radio->getPacketLength();
@@ -54,10 +63,11 @@ int RadioLibWrapper::recvRaw(uint8_t* bytes, int sz) {
 
   if (state != STATE_RX) {
     int err = _radio->startReceive();
-    if (err != RADIOLIB_ERR_NONE) {
+    if (err == RADIOLIB_ERR_NONE) {
+      state = STATE_RX;
+    } else {
       MESH_DEBUG_PRINTLN("RadioLibWrapper: error: startReceive(%d)", err);
     }
-    state = STATE_RX;
   }
   return 0;
 }

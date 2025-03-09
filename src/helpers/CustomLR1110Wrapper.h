@@ -12,8 +12,11 @@ public:
     idle();  // put sx126x into standby
     // do some basic CAD (blocks for ~12780 micros (on SF 10)!)
     bool activity = (((CustomLR1110 *)_radio)->scanChannel() == RADIOLIB_LORA_DETECTED);
-    idle();
-
+    if (activity) {
+      startRecv();
+    } else {
+      idle();
+    }
     return activity;
   }
 

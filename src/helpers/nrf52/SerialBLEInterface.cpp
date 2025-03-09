@@ -10,6 +10,7 @@ void SerialBLEInterface::begin(const char* device_name, uint32_t pin_code) {
   Bluefruit.setTxPower(4);    // Check bluefruit.h for supported values
   Bluefruit.setName(device_name);
 
+  Bluefruit.Security.setMITM(true);
   Bluefruit.Security.setPIN(charpin);
 
   // To be consistent OTA DFU should be added first if it exists
@@ -52,6 +53,7 @@ void SerialBLEInterface::enable() {
   clearBuffers();
 
   // Configure and start the BLE Uart service
+  bleuart.setPermission(SECMODE_ENC_WITH_MITM, SECMODE_ENC_WITH_MITM);
   bleuart.begin();
 
   // Start advertising

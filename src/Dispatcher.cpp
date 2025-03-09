@@ -26,6 +26,10 @@ int Dispatcher::calcRxDelay(float score, uint32_t air_time) const {
   return (int) ((pow(10, 0.85f - score) - 1.0) * air_time);
 }
 
+uint32_t Dispatcher::getCADFailRetryDelay() const {
+  return 200;
+}
+
 void Dispatcher::loop() {
   if (outbound) {  // waiting for outbound send to be completed
     if (_radio->isSendComplete()) {
@@ -165,7 +169,10 @@ void Dispatcher::processRecvPacket(Packet* pkt) {
 void Dispatcher::checkSend() {
   if (_mgr->getOutboundCount() == 0) return;  // nothing waiting to send
   if (!millisHasNowPassed(next_tx_time)) return;   // still in 'radio silence' phase (from airtime budget setting)
-  if (_radio->isReceiving()) return;  // LBT - check if radio is currently mid-receive, or if channel activity
+  if (_radio->isReceiving()) {   // LBT - check if radio is currently mid-receive, or if channel activity
+    next_tx_time = futureMillis(getCADFailRetryDelay());
+    return; 
+  }
 
   outbound = _mgr->getNextOutbound(_ms->getMillis());
   if (outbound) {

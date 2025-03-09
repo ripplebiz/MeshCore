@@ -12,8 +12,11 @@ public:
     idle();  // put sx126x into standby
     // do some basic CAD (blocks for ~12780 micros (on SF 10)!)
     bool activity = (((CustomSX1268 *)_radio)->scanChannel() == RADIOLIB_LORA_DETECTED);
-    idle();
-
+    if (activity) {
+      startRecv();
+    } else {
+      idle();
+    }
     return activity;
   }
   float getLastRSSI() const override { return ((CustomSX1268 *)_radio)->getRSSI(); }

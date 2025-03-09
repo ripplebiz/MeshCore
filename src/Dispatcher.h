@@ -124,6 +124,7 @@ protected:
 
   virtual float getAirtimeBudgetFactor() const;
   virtual int calcRxDelay(float score, uint32_t air_time) const;
+  virtual uint32_t getCADFailRetryDelay() const;
 
 public:
   void begin();

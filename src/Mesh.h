@@ -58,6 +58,8 @@ class Mesh : public Dispatcher {
 protected:
   DispatcherAction onRecvPacket(Packet* pkt) override;
 
+  virtual uint32_t getCADFailRetryDelay() const override;
+
   /**
    * \brief  Decide what to do with received packet, ie. discard, forward, or hold
    */
@@ -73,6 +75,11 @@ protected:
    * \returns  number of milliseconds delay to apply to retransmitting the given packet.
    */
   virtual uint32_t getRetransmitDelay(const Packet* packet);
+
+  /**
+   * \returns  number of milliseconds delay to apply to retransmitting the given packet, for DIRECT mode.
+   */
+  virtual uint32_t getDirectRetransmitDelay(const Packet* packet);
 
   /**
    * \brief  Perform search of local DB of peers/contacts.

@@ -25,10 +25,11 @@ MeshCore provides the ability to create wireless mesh networks, similar to Mesht
 
 ## 🚀 How to Get Started
 
-Flash the Firmware: Download the pre-built firmware binary for Heltec V3 and flash it using Adafruit ESPTool.
-Install [PlatformIO](https://docs.platformio.org) in Visual Studio Code (optional for developers who want to modify the firmware).
+Andy Kirby has published a very useful [intro video](https://www.youtube.com/watch?v=t1qne8uJBAc) which explains the steps for beginners.
+
+For developers, install [PlatformIO](https://docs.platformio.org) in Visual Studio Code.
 Download & Open the MeshCore repository.
-Select a Sample Application: Choose from chat, ping, repeater, or admin test tools.
+Select a Sample Application: Choose from chat, repeater, other example app.
 Monitor & Communicate using the Serial Monitor (e.g., Serial USB Terminal on Android).
 
 📁 Included Example Applications
@@ -36,8 +37,6 @@ Monitor & Communicate using the Serial Monitor (e.g., Serial USB Terminal on And
 * 📡 Simple Repeater: Extends network coverage by relaying messages.
 * 📡 Companion Radio: For use with an external chat app, over BLE or USB.
 * 📡 Room Server: A simple BBS server for shared Posts.
-* 📡 Ping Client, Ping Server & Client: Basic client/server example.
-* 📡 Test Admin: Monitors and manages repeaters remotely.
 
 ## 🛠 Hardware Compatibility
 
@@ -49,6 +48,9 @@ MeshCore is designed for use with:
 * LilyGo T3S3
 * Heltec T114
 * Station G2
+* Sensecap T1000e
+* Heltec V2
+* LilyGo TLora32 v1.6
 
 ## 📜 License
 MeshCore is open-source software released under the MIT License. You are free to use, modify, and distribute it for personal and commercial projects.

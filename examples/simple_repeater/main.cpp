@@ -13,13 +13,21 @@
 #include <helpers/StaticPoolPacketManager.h>
 #include <helpers/SimpleMeshTables.h>
 #include <helpers/IdentityStore.h>
+#include <helpers/AutoDiscoverRTCClock.h>
 #include <helpers/AdvertDataHelpers.h>
 #include <helpers/TxtDataHelpers.h>
+#include <helpers/CommonCLI.h>
 #include <RTClib.h>
 
 /* ------------------------------ Config -------------------------------- */
 
-#define FIRMWARE_VER_TEXT   "v4 (build: 17 Feb 2025)"
+#ifndef FIRMWARE_BUILD_DATE
+  #define FIRMWARE_BUILD_DATE   "7 Mar 2025"
+#endif
+
+#ifndef FIRMWARE_VERSION
+  #define FIRMWARE_VERSION   "v1.2.1"
+#endif
 
 #ifndef LORA_FREQ
   #define LORA_FREQ   915.0
@@ -51,8 +59,6 @@
   #define  ADMIN_PASSWORD  "password"
 #endif
 
-#define MIN_LOCAL_ADVERT_INTERVAL   60
-
 #if defined(HELTEC_LORA_V3)
   #include <helpers/HeltecV3Board.h>
   #include <helpers/CustomSX1262Wrapper.h>
@@ -70,29 +76,42 @@
   #include <helpers/ESP32Board.h>
   #include <helpers/CustomSX1262Wrapper.h>
   static ESP32Board board;
+  #elif defined(LILYGO_TLORA)
+  #include <helpers/LilyGoTLoraBoard.h>
+  #include <helpers/CustomSX1276Wrapper.h>
+  static LilyGoTLoraBoard board;
 #elif defined(RAK_4631)
   #include <helpers/nrf52/RAK4631Board.h>
   #include <helpers/CustomSX1262Wrapper.h>
   static RAK4631Board board;
+#elif defined(HELTEC_T114)
+  #include <helpers/nrf52/T114Board.h>
+  #include <helpers/CustomSX1262Wrapper.h>
+  static T114Board board;
+#elif defined(LILYGO_TECHO)
+  #include <helpers/nrf52/TechoBoard.h>
+  #include <helpers/CustomSX1262Wrapper.h>
+  static TechoBoard board;
 #else
   #error "need to provide a 'board' object"
+#endif
+
+#ifdef DISPLAY_CLASS
+  #include <helpers/ui/SSD1306Display.h>
+
+  static DISPLAY_CLASS  display;
+
+  #include "UITask.h"
+  static UITask ui_task(display);
 #endif
 
 #define PACKET_LOG_FILE  "/packet_log"
 
 /* ------------------------------ Code -------------------------------- */
 
-// Believe it or not, this std C function is busted on some platforms!
-static uint32_t _atoi(const char* sp) {
-  uint32_t n = 0;
-  while (*sp && *sp >= '0' && *sp <= '9') {
-    n *= 10;
-    n += (*sp++ - '0');
-  }
-  return n;
-}
+#define CMD_GET_STATUS      0x01
 
-#define CMD_GET_STATS      0x01
+#define RESP_SERVER_LOGIN_OK      0   // response to ANON_REQ
 
 struct RepeaterStats {
   uint16_t batt_milli_volts;
@@ -105,13 +124,14 @@ struct RepeaterStats {
   uint32_t total_up_time_secs;
   uint32_t n_sent_flood, n_sent_direct;
   uint32_t n_recv_flood, n_recv_direct;
-  uint32_t n_full_events;
+  uint16_t n_full_events;
+  int16_t  last_snr;   // x 4
   uint16_t n_direct_dups, n_flood_dups;
 };
 
 struct ClientInfo {
   mesh::Identity id;
-  uint32_t last_timestamp;
+  uint32_t last_timestamp, last_activity;
   uint8_t secret[PUB_KEY_SIZE];
   bool    is_admin;
   int8_t  out_path_len;
@@ -123,53 +143,42 @@ struct ClientInfo {
 // NOTE: need to space the ACK and the reply text apart (in CLI)
 #define CLI_REPLY_DELAY_MILLIS  1500
 
-struct NodePrefs {  // persisted to file
-  float airtime_factor;
-  char node_name[32];
-  double node_lat, node_lon;
-  char password[16];
-  float freq;
-  uint8_t tx_power_dbm;
-  uint8_t disable_fwd;
-  uint8_t advert_interval;   // minutes / 2
-  uint8_t unused;
-  float rx_delay_base;
-  float tx_delay_factor;
-  char guest_password[16];
-};
-
-class MyMesh : public mesh::Mesh {
+class MyMesh : public mesh::Mesh, public CommonCLICallbacks {
   RadioLibWrapper* my_radio;
   FILESYSTEM* _fs;
+  RADIO_CLASS* _phy;
   mesh::MainBoard* _board;
   unsigned long next_local_advert;
   bool _logging;
   NodePrefs _prefs;
+  CommonCLI _cli;
   uint8_t reply_data[MAX_PACKET_PAYLOAD];
-  int num_clients;
   ClientInfo known_clients[MAX_CLIENTS];
 
   ClientInfo* putClient(const mesh::Identity& id) {
-    for (int i = 0; i < num_clients; i++) {
+    uint32_t min_time = 0xFFFFFFFF;
+    ClientInfo* oldest = &known_clients[0];
+    for (int i = 0; i < MAX_CLIENTS; i++) {
+      if (known_clients[i].last_activity < min_time) {
+        oldest = &known_clients[i];
+        min_time = oldest->last_activity;
+      }
       if (id.matches(known_clients[i].id)) return &known_clients[i];  // already known
     }
-    if (num_clients < MAX_CLIENTS) {
-      auto newClient = &known_clients[num_clients++];
-      newClient->id = id;
-      newClient->out_path_len = -1;  // initially out_path is unknown
-      newClient->last_timestamp = 0;
-      self_id.calcSharedSecret(newClient->secret, id);   // calc ECDH shared secret
-      return newClient;
-    }
-    return NULL;  // table is full
+
+    oldest->id = id;
+    oldest->out_path_len = -1;  // initially out_path is unknown
+    oldest->last_timestamp = 0;
+    self_id.calcSharedSecret(oldest->secret, id);   // calc ECDH shared secret
+    return oldest;
   }
 
-  int handleRequest(ClientInfo* sender, uint8_t* payload, size_t payload_len) { 
+  int handleRequest(ClientInfo* sender, uint8_t* payload, size_t payload_len) {
     uint32_t now = getRTCClock()->getCurrentTimeUnique();
     memcpy(reply_data, &now, 4);   // response packets always prefixed with timestamp
 
     switch (payload[0]) {
-      case CMD_GET_STATS: {   // guests can also access this now
+      case CMD_GET_STATUS: {   // guests can also access this now
         RepeaterStats stats;
         stats.batt_milli_volts = board.getBattMilliVolts();
         stats.curr_tx_queue_len = _mgr->getOutboundCount();
@@ -184,6 +193,7 @@ class MyMesh : public mesh::Mesh {
         stats.n_recv_flood = getNumRecvFlood();
         stats.n_recv_direct = getNumRecvDirect();
         stats.n_full_events = getNumFullEvents();
+        stats.last_snr = (int16_t)(my_radio->getLastSNR() * 4);
         stats.n_direct_dups = ((SimpleMeshTables *)getTables())->getNumDirectDups();
         stats.n_flood_dups = ((SimpleMeshTables *)getTables())->getNumFloodDups();
 
@@ -194,20 +204,6 @@ class MyMesh : public mesh::Mesh {
     }
     // unknown command
     return 0;  // reply_len
-  }
-
-  void checkAdvertInterval() {
-    if (_prefs.advert_interval * 2 < MIN_LOCAL_ADVERT_INTERVAL) {
-      _prefs.advert_interval = 0;  // turn it off, now that device has been manually configured
-    }
-  }
-
-  void updateAdvertTimer() {
-    if (_prefs.advert_interval > 0) {  // schedule local advert timer
-      next_local_advert = futureMillis((uint32_t)_prefs.advert_interval * 2 * 60 * 1000);
-    } else {
-      next_local_advert = 0;  // stop the timer
-    }
   }
 
   mesh::Packet* createSelfAdvert() {
@@ -238,7 +234,7 @@ protected:
     return !_prefs.disable_fwd;
   }
 
-  const char* getLogDateTime() override { 
+  const char* getLogDateTime() override {
     static char tmp[32];
     uint32_t now = getRTCClock()->getCurrentTime();
     DateTime dt = DateTime(now);
@@ -270,7 +266,7 @@ protected:
       File f = openAppend(PACKET_LOG_FILE);
       if (f) {
         f.print(getLogDateTime());
-        f.printf(": TX, len=%d (type=%d, route=%s, payload_len=%d)", 
+        f.printf(": TX, len=%d (type=%d, route=%s, payload_len=%d)",
           len, pkt->getPayloadType(), pkt->isRouteDirect() ? "D" : "F", pkt->payload_len);
 
         if (pkt->getPayloadType() == PAYLOAD_TYPE_PATH || pkt->getPayloadType() == PAYLOAD_TYPE_REQ
@@ -288,7 +284,7 @@ protected:
       File f = openAppend(PACKET_LOG_FILE);
       if (f) {
         f.print(getLogDateTime());
-        f.printf(": TX FAIL!, len=%d (type=%d, route=%s, payload_len=%d)\n", 
+        f.printf(": TX FAIL!, len=%d (type=%d, route=%s, payload_len=%d)\n",
           len, pkt->getPayloadType(), pkt->isRouteDirect() ? "D" : "F", pkt->payload_len);
         f.close();
       }
@@ -304,6 +300,10 @@ protected:
     uint32_t t = (_radio->getEstAirtimeFor(packet->path_len + packet->payload_len + 2) * _prefs.tx_delay_factor);
     return getRNG()->nextInt(0, 6)*t;
   }
+  uint32_t getDirectRetransmitDelay(const mesh::Packet* packet) override {
+    uint32_t t = (_radio->getEstAirtimeFor(packet->path_len + packet->payload_len + 2) * _prefs.direct_tx_delay_factor);
+    return getRNG()->nextInt(0, 6)*t;
+  }
 
   void onAnonDataRecv(mesh::Packet* packet, uint8_t type, const mesh::Identity& sender, uint8_t* data, size_t len) override {
     if (type == PAYLOAD_TYPE_ANON_REQ) {  // received an initial request by a possible admin client (unknown at this stage)
@@ -311,39 +311,48 @@ protected:
       memcpy(&timestamp, data, 4);
 
       bool is_admin;
-      if (memcmp(&data[4], _prefs.password, strlen(_prefs.password)) == 0) {  // check for valid password
+      data[len] = 0;  // ensure null terminator
+      if (strcmp((char *) &data[4], _prefs.password) == 0) {  // check for valid password
         is_admin = true;
-      } else if (memcmp(&data[4], _prefs.guest_password, strlen(_prefs.guest_password)) == 0) {  // check guest password
+      } else if (strcmp((char *) &data[4], _prefs.guest_password) == 0) {  // check guest password
         is_admin = false;
       } else {
     #if MESH_DEBUG
-        data[len] = 0;  // ensure null terminator
         MESH_DEBUG_PRINTLN("Invalid password: %s", &data[4]);
     #endif
         return;
       }
 
       auto client = putClient(sender);  // add to known clients (if not already known)
-      if (client == NULL || timestamp <= client->last_timestamp) {
-        MESH_DEBUG_PRINTLN("Client table full, or replay attack!");
-        return;  // FATAL: client table is full -OR- replay attack 
+      if (timestamp <= client->last_timestamp) {
+        MESH_DEBUG_PRINTLN("Possible login replay attack!");
+        return;  // FATAL: client table is full -OR- replay attack
       }
 
       MESH_DEBUG_PRINTLN("Login success!");
       client->last_timestamp = timestamp;
+      client->last_activity = getRTCClock()->getCurrentTime();
       client->is_admin = is_admin;
 
       uint32_t now = getRTCClock()->getCurrentTimeUnique();
       memcpy(reply_data, &now, 4);   // response packets always prefixed with timestamp
-      memcpy(&reply_data[4], "OK", 2);
+    #if 0
+      memcpy(&reply_data[4], "OK", 2);   // legacy response
+    #else
+      reply_data[4] = RESP_SERVER_LOGIN_OK;
+      reply_data[5] = 0;  // NEW: recommended keep-alive interval (secs / 16)
+      reply_data[6] = is_admin ? 1 : 0;
+      reply_data[7] = 0;  // FUTURE: reserved
+      getRNG()->random(&reply_data[8], 4);   // random blob to help packet-hash uniqueness
+  #endif
 
       if (packet->isRouteFlood()) {
         // let this sender know path TO here, so they can use sendDirect(), and ALSO encode the response
         mesh::Packet* path = createPathReturn(sender, client->secret, packet->path, packet->path_len,
-                                              PAYLOAD_TYPE_RESPONSE, reply_data, 4 + 2);
+                                              PAYLOAD_TYPE_RESPONSE, reply_data, 12);
         if (path) sendFlood(path);
       } else {
-        mesh::Packet* reply = createDatagram(PAYLOAD_TYPE_RESPONSE, sender, client->secret, reply_data, 4 + 2);
+        mesh::Packet* reply = createDatagram(PAYLOAD_TYPE_RESPONSE, sender, client->secret, reply_data, 12);
         if (reply) {
           if (client->out_path_len >= 0) {  // we have an out_path, so send DIRECT
             sendDirect(reply, client->out_path, client->out_path_len);
@@ -359,7 +368,7 @@ protected:
 
   int searchPeersByHash(const uint8_t* hash) override {
     int n = 0;
-    for (int i = 0; i < num_clients; i++) {
+    for (int i = 0; i < MAX_CLIENTS; i++) {
       if (known_clients[i].id.isHashMatch(hash)) {
         matching_peer_indexes[n++] = i;  // store the INDEXES of matching contacts (for subsequent 'peer' methods)
       }
@@ -369,7 +378,7 @@ protected:
 
   void getPeerSharedSecret(uint8_t* dest_secret, int peer_idx) override {
     int i = matching_peer_indexes[peer_idx];
-    if (i >= 0 && i < num_clients) {
+    if (i >= 0 && i < MAX_CLIENTS) {
       // lookup pre-calculated shared_secret
       memcpy(dest_secret, known_clients[i].secret, PUB_KEY_SIZE);
     } else {
@@ -379,7 +388,7 @@ protected:
 
   void onPeerDataRecv(mesh::Packet* packet, uint8_t type, int sender_idx, const uint8_t* secret, uint8_t* data, size_t len) override {
     int i = matching_peer_indexes[sender_idx];
-    if (i < 0 || i >= num_clients) {  // get from our known_clients table (sender SHOULD already be known in this context)
+    if (i < 0 || i >= MAX_CLIENTS) {  // get from our known_clients table (sender SHOULD already be known in this context)
       MESH_DEBUG_PRINTLN("onPeerDataRecv: invalid peer idx: %d", i);
       return;
     }
@@ -388,11 +397,12 @@ protected:
       uint32_t timestamp;
       memcpy(&timestamp, data, 4);
 
-      if (timestamp > client->last_timestamp) {  // prevent replay attacks 
+      if (timestamp > client->last_timestamp) {  // prevent replay attacks
         int reply_len = handleRequest(client, &data[4], len - 4);
         if (reply_len == 0) return;  // invalid command
 
         client->last_timestamp = timestamp;
+        client->last_activity = getRTCClock()->getCurrentTime();
 
         if (packet->isRouteFlood()) {
           // let this sender know path TO here, so they can use sendDirect(), and ALSO encode the response
@@ -419,26 +429,34 @@ protected:
 
       if (!(flags == TXT_TYPE_PLAIN || flags == TXT_TYPE_CLI_DATA)) {
         MESH_DEBUG_PRINTLN("onPeerDataRecv: unsupported text type received: flags=%02x", (uint32_t)flags);
-      } else if (sender_timestamp > client->last_timestamp) {  // prevent replay attacks 
+      } else if (sender_timestamp >= client->last_timestamp) {  // prevent replay attacks
+        bool is_retry = (sender_timestamp == client->last_timestamp);
         client->last_timestamp = sender_timestamp;
+        client->last_activity = getRTCClock()->getCurrentTime();
 
         // len can be > original length, but 'text' will be padded with zeroes
         data[len] = 0; // need to make a C string again, with null terminator
 
-        uint32_t ack_hash;    // calc truncated hash of the message timestamp + text + sender pub_key, to prove to sender that we got it
-        mesh::Utils::sha256((uint8_t *) &ack_hash, 4, data, 5 + strlen((char *)&data[5]), client->id.pub_key, PUB_KEY_SIZE);
+        if (flags == TXT_TYPE_PLAIN) {  // for legacy CLI, send Acks
+          uint32_t ack_hash;    // calc truncated hash of the message timestamp + text + sender pub_key, to prove to sender that we got it
+          mesh::Utils::sha256((uint8_t *) &ack_hash, 4, data, 5 + strlen((char *)&data[5]), client->id.pub_key, PUB_KEY_SIZE);
 
-        mesh::Packet* ack = createAck(ack_hash);
-        if (ack) {
-          if (client->out_path_len < 0) {
-            sendFlood(ack);
-          } else {
-            sendDirect(ack, client->out_path, client->out_path_len);
+          mesh::Packet* ack = createAck(ack_hash);
+          if (ack) {
+            if (client->out_path_len < 0) {
+              sendFlood(ack);
+            } else {
+              sendDirect(ack, client->out_path, client->out_path_len);
+            }
           }
         }
 
         uint8_t temp[166];
-        handleCommand(sender_timestamp, (const char *) &data[5], (char *) &temp[5]);
+        if (is_retry) {
+          temp[0] = 0;
+        } else {
+          _cli.handleCommand(sender_timestamp, (const char *) &data[5], (char *) &temp[5]);
+        }
         int text_len = strlen((char *) &temp[5]);
         if (text_len > 0) {
           uint32_t timestamp = getRTCClock()->getCurrentTimeUnique();
@@ -447,10 +465,7 @@ protected:
             timestamp++;
           }
           memcpy(temp, &timestamp, 4);   // mostly an extra blob to help make packet_hash unique
-          temp[4] = (TXT_TYPE_PLAIN << 2);   // TODO: change this to TXT_TYPE_CLI_DATA soon
-
-          // calc expected ACK reply
-          //mesh::Utils::sha256((uint8_t *)&expected_ack_crc, 4, temp, 5 + text_len, self_id.pub_key, PUB_KEY_SIZE);
+          temp[4] = (TXT_TYPE_CLI_DATA << 2);   // NOTE: legacy was: TXT_TYPE_PLAIN
 
           auto reply = createDatagram(PAYLOAD_TYPE_TXT_MSG, client->id, secret, temp, 5 + text_len);
           if (reply) {
@@ -471,7 +486,7 @@ protected:
     // TODO: prevent replay attacks
     int i = matching_peer_indexes[sender_idx];
 
-    if (i >= 0 && i < num_clients) {  // get from our known_clients table (sender SHOULD already be known in this context)
+    if (i >= 0 && i < MAX_CLIENTS) {  // get from our known_clients table (sender SHOULD already be known in this context)
       MESH_DEBUG_PRINTLN("PATH to client, path_len=%d", (uint32_t) path_len);
       auto client = &known_clients[i];
       memcpy(client->out_path, path, client->out_path_len = path_len);  // store a copy of path, for sendDirect()
@@ -484,11 +499,12 @@ protected:
   }
 
 public:
-  MyMesh(mesh::MainBoard& board, RadioLibWrapper& radio, mesh::MillisecondClock& ms, mesh::RNG& rng, mesh::RTCClock& rtc, SimpleMeshTables& tables)
-     : mesh::Mesh(radio, ms, rng, rtc, *new StaticPoolPacketManager(32), tables), _board(&board)
+  MyMesh(RADIO_CLASS& phy, mesh::MainBoard& board, RadioLibWrapper& radio, mesh::MillisecondClock& ms, mesh::RNG& rng, mesh::RTCClock& rtc, SimpleMeshTables& tables)
+     : mesh::Mesh(radio, ms, rng, rtc, *new StaticPoolPacketManager(32), tables),
+        _phy(&phy), _board(&board), _cli(board, this, &_prefs, this)
   {
     my_radio = &radio;
-    num_clients = 0;
+    memset(known_clients, 0, sizeof(known_clients));
     next_local_advert = 0;
     _logging = false;
 
@@ -502,48 +518,86 @@ public:
     _prefs.node_lon = ADVERT_LON;
     StrHelper::strncpy(_prefs.password, ADMIN_PASSWORD, sizeof(_prefs.password));
     _prefs.freq = LORA_FREQ;
+    _prefs.sf = LORA_SF;
+    _prefs.bw = LORA_BW;
+    _prefs.cr = LORA_CR;
     _prefs.tx_power_dbm = LORA_TX_POWER;
     _prefs.advert_interval = 1;  // default to 2 minutes for NEW installs
   }
 
-  float getFreqPref() const { return _prefs.freq; }
-  uint8_t getTxPowerPref() const { return _prefs.tx_power_dbm; }
+  CommonCLI* getCLI() { return &_cli; }
 
   void begin(FILESYSTEM* fs) {
     mesh::Mesh::begin();
     _fs = fs;
     // load persisted prefs
-    if (_fs->exists("/node_prefs")) {
-      File file = _fs->open("/node_prefs");
-      if (file) {
-        file.read((uint8_t *) &_prefs, sizeof(_prefs));
-        file.close();
-      }
-    }
+    _cli.loadPrefs(_fs);
+
+    _phy->setFrequency(_prefs.freq);
+    _phy->setSpreadingFactor(_prefs.sf);
+    _phy->setBandwidth(_prefs.bw);
+    _phy->setCodingRate(_prefs.cr);
+    _phy->setOutputPower(_prefs.tx_power_dbm);
 
     updateAdvertTimer();
   }
 
-  void savePrefs() {
-#if defined(NRF52_PLATFORM)
-    File file = _fs->open("/node_prefs", FILE_O_WRITE);
-    if (file) { file.seek(0); file.truncate(); }
-#else
-    File file = _fs->open("/node_prefs", "w", true);
-#endif
-    if (file) {
-      file.write((const uint8_t *)&_prefs, sizeof(_prefs));
-      file.close();
-    }
+  const char* getFirmwareVer() override { return FIRMWARE_VERSION; }
+  const char* getBuildDate() override { return FIRMWARE_BUILD_DATE; }
+  const char* getNodeName() { return _prefs.node_name; }
+
+  void savePrefs() override {
+    _cli.savePrefs(_fs);
   }
 
-  void sendSelfAdvertisement(int delay_millis) {
+  bool formatFileSystem() override {
+#if defined(NRF52_PLATFORM)
+    return InternalFS.format();
+#elif defined(ESP32)
+    return SPIFFS.format();
+#else
+  #error "need to implement file system erase"
+    return false;
+#endif
+  }
+
+  void sendSelfAdvertisement(int delay_millis) override {
     mesh::Packet* pkt = createSelfAdvert();
     if (pkt) {
       sendFlood(pkt, delay_millis);
     } else {
       MESH_DEBUG_PRINTLN("ERROR: unable to create advertisement packet!");
     }
+  }
+
+  void updateAdvertTimer() override {
+    if (_prefs.advert_interval > 0) {  // schedule local advert timer
+      next_local_advert = futureMillis((uint32_t)_prefs.advert_interval * 2 * 60 * 1000);
+    } else {
+      next_local_advert = 0;  // stop the timer
+    }
+  }
+
+  void setLoggingOn(bool enable) override { _logging = enable; }
+
+  void eraseLogFile() override {
+    _fs->remove(PACKET_LOG_FILE);
+  }
+
+  void dumpLogFile() override {
+    File f = _fs->open(PACKET_LOG_FILE);
+    if (f) {
+      while (f.available()) {
+        int c = f.read();
+        if (c < 0) break;
+        Serial.print((char)c);
+      }
+      f.close();
+    }
+  }
+
+  void setTxPower(uint8_t power_dbm) override {
+    _phy->setOutputPower(power_dbm);
   }
 
   void loop() {
@@ -557,158 +611,17 @@ public:
 
       updateAdvertTimer();   // schedule next local advert
     }
-  }
-
-  void handleCommand(uint32_t sender_timestamp, const char* command, char reply[]) {
-    while (*command == ' ') command++;   // skip leading spaces
-
-    if (memcmp(command, "reboot", 6) == 0) {
-      board.reboot();  // doesn't return
-    } else if (memcmp(command, "advert", 6) == 0) {
-      sendSelfAdvertisement(400);
-      strcpy(reply, "OK - Advert sent");
-    } else if (memcmp(command, "clock sync", 10) == 0) {
-      uint32_t curr = getRTCClock()->getCurrentTime();
-      if (sender_timestamp > curr) {
-        getRTCClock()->setCurrentTime(sender_timestamp + 1);
-        strcpy(reply, "OK - clock set");
-      } else {
-        strcpy(reply, "ERR: clock cannot go backwards");
-      }
-    } else if (memcmp(command, "start ota", 9) == 0) {
-      if (_board->startOTAUpdate()) {
-        strcpy(reply, "OK");
-      } else {
-        strcpy(reply, "Error");
-      }
-    } else if (memcmp(command, "clock", 5) == 0) {
-      uint32_t now = getRTCClock()->getCurrentTime();
-      DateTime dt = DateTime(now);
-      sprintf(reply, "%02d:%02d - %d/%d/%d UTC", dt.hour(), dt.minute(), dt.day(), dt.month(), dt.year());
-    } else if (memcmp(command, "time ", 5) == 0) {  // set time (to epoch seconds)
-      uint32_t secs = _atoi(&command[5]);
-      uint32_t curr = getRTCClock()->getCurrentTime();
-      if (secs > curr) {
-        getRTCClock()->setCurrentTime(secs);
-        strcpy(reply, "(OK - clock set!)");
-      } else {
-        strcpy(reply, "(ERR: clock cannot go backwards)");
-      }
-    } else if (memcmp(command, "password ", 9) == 0) {
-      // change admin password
-      StrHelper::strncpy(_prefs.password, &command[9], sizeof(_prefs.password));
-      checkAdvertInterval();
-      savePrefs();
-      sprintf(reply, "password now: %s", _prefs.password);   // echo back just to let admin know for sure!!
-    } else if (memcmp(command, "set ", 4) == 0) {
-      const char* config = &command[4];
-      if (memcmp(config, "af ", 3) == 0) {
-        _prefs.airtime_factor = atof(&config[3]);
-        savePrefs();
-        strcpy(reply, "OK");
-      } else if (memcmp(config, "advert.interval ", 16) == 0) {
-        int mins = _atoi(&config[16]);
-        if (mins > 0 && mins < MIN_LOCAL_ADVERT_INTERVAL) {
-          sprintf(reply, "Error: min is %d mins", MIN_LOCAL_ADVERT_INTERVAL);
-        } else if (mins > 240) {
-          strcpy(reply, "Error: max is 240 mins");
-        } else {
-          _prefs.advert_interval = (uint8_t)(mins / 2);
-          updateAdvertTimer();
-          savePrefs();
-          strcpy(reply, "OK");
-        }
-      } else if (memcmp(config, "guest.password ", 15) == 0) {
-        StrHelper::strncpy(_prefs.guest_password, &config[15], sizeof(_prefs.guest_password));
-        savePrefs();
-        strcpy(reply, "OK");
-      } else if (memcmp(config, "name ", 5) == 0) {
-        StrHelper::strncpy(_prefs.node_name, &config[5], sizeof(_prefs.node_name));
-        checkAdvertInterval();
-        savePrefs();
-        strcpy(reply, "OK");
-      } else if (memcmp(config, "repeat ", 7) == 0) {
-        _prefs.disable_fwd = memcmp(&config[7], "off", 3) == 0;
-        savePrefs();
-        strcpy(reply, _prefs.disable_fwd ? "OK - repeat is now OFF" : "OK - repeat is now ON");
-      } else if (memcmp(config, "lat ", 4) == 0) {
-        _prefs.node_lat = atof(&config[4]);
-        checkAdvertInterval();
-        savePrefs();
-        strcpy(reply, "OK");
-      } else if (memcmp(config, "lon ", 4) == 0) {
-        _prefs.node_lon = atof(&config[4]);
-        checkAdvertInterval();
-        savePrefs();
-        strcpy(reply, "OK");
-      } else if (memcmp(config, "rxdelay ", 8) == 0) {
-        float db = atof(&config[8]);
-        if (db >= 0) {
-          _prefs.rx_delay_base = db;
-          savePrefs();
-          strcpy(reply, "OK");
-        } else {
-          strcpy(reply, "Error, cannot be negative");
-        }
-      } else if (memcmp(config, "txdelay ", 8) == 0) {
-        float f = atof(&config[8]);
-        if (f >= 0) {
-          _prefs.tx_delay_factor = f;
-          savePrefs();
-          strcpy(reply, "OK");
-        } else {
-          strcpy(reply, "Error, cannot be negative");
-        }
-      } else if (memcmp(config, "tx ", 3) == 0) {
-        _prefs.tx_power_dbm = atoi(&config[3]);
-        savePrefs();
-        strcpy(reply, "OK - reboot to apply");
-      } else if (sender_timestamp == 0 && memcmp(config, "freq ", 5) == 0) {
-        _prefs.freq = atof(&config[5]);
-        savePrefs();
-        strcpy(reply, "OK - reboot to apply");
-      } else {
-        sprintf(reply, "unknown config: %s", config);
-      }
-    } else if (sender_timestamp == 0 && strcmp(command, "erase") == 0) {
-  #if defined(NRF52_PLATFORM)
-      bool s = InternalFS.format();
-  #elif defined(ESP32)
-      bool s = SPIFFS.format();
-  #else
-    #error "need to implement file system erase"
+  #ifdef DISPLAY_CLASS
+    ui_task.loop();
   #endif
-      sprintf(reply, "File system erase: %s", s ? "OK" : "Err");
-    } else if (memcmp(command, "ver", 3) == 0) {
-      strcpy(reply, FIRMWARE_VER_TEXT);
-    } else if (memcmp(command, "log start", 9) == 0) {
-      _logging = true;
-      strcpy(reply, "   logging on");
-    } else if (memcmp(command, "log stop", 8) == 0) {
-      _logging = false;
-      strcpy(reply, "   logging off");
-    } else if (memcmp(command, "log erase", 9) == 0) {
-      _fs->remove(PACKET_LOG_FILE);
-      strcpy(reply, "   log erased");
-    } else if (sender_timestamp == 0 && memcmp(command, "log", 3) == 0) {
-      File f = _fs->open(PACKET_LOG_FILE);
-      if (f) {
-        while (f.available()) {
-          int c = f.read();
-          if (c < 0) break;
-          Serial.print((char)c);
-        }
-        f.close();
-      }
-      strcpy(reply, "   EOF");
-    } else {
-      sprintf(reply, "Unknown: %s (commands: reboot, advert, clock, set, ver, password, start ota)", command);
-    }
   }
 };
 
 #if defined(NRF52_PLATFORM)
 RADIO_CLASS radio = new Module(P_LORA_NSS, P_LORA_DIO_1, P_LORA_RESET, P_LORA_BUSY, SPI);
+#elif defined(LILYGO_TLORA)
+SPIClass spi;
+RADIO_CLASS radio = new Module(P_LORA_NSS, P_LORA_DIO_0, P_LORA_RESET, P_LORA_DIO_1, spi);
 #elif defined(P_LORA_SCLK)
 SPIClass spi;
 RADIO_CLASS radio = new Module(P_LORA_NSS, P_LORA_DIO_1, P_LORA_RESET, P_LORA_BUSY, spi);
@@ -719,12 +632,13 @@ StdRNG fast_rng;
 SimpleMeshTables tables;
 
 #ifdef ESP32
-ESP32RTCClock rtc_clock;
+ESP32RTCClock fallback_clock;
 #else
-VolatileRTCClock rtc_clock; 
+VolatileRTCClock fallback_clock;
 #endif
+AutoDiscoverRTCClock rtc_clock(fallback_clock);
 
-MyMesh the_mesh(board, *new WRAPPER_CLASS(radio, board), *new ArduinoMillis(), fast_rng, rtc_clock, tables);
+MyMesh the_mesh(radio, board, *new WRAPPER_CLASS(radio, board), *new ArduinoMillis(), fast_rng, rtc_clock, tables);
 
 void halt() {
   while (1) ;
@@ -738,15 +652,16 @@ void setup() {
 
   board.begin();
 #ifdef ESP32
-  rtc_clock.begin();
+  fallback_clock.begin();
 #endif
+  rtc_clock.begin(Wire);
 
 #ifdef SX126X_DIO3_TCXO_VOLTAGE
   float tcxo = SX126X_DIO3_TCXO_VOLTAGE;
 #else
   float tcxo = 1.6f;
 #endif
-  
+
 #if defined(NRF52_PLATFORM)
   SPI.setPins(P_LORA_MISO, P_LORA_SCLK, P_LORA_MOSI);
   SPI.begin();
@@ -799,12 +714,10 @@ void setup() {
 
   the_mesh.begin(fs);
 
-  if (LORA_FREQ != the_mesh.getFreqPref()) {
-    radio.setFrequency(the_mesh.getFreqPref());
-  }
-  if (LORA_TX_POWER != the_mesh.getTxPowerPref()) {
-    radio.setOutputPower(the_mesh.getTxPowerPref());
-  }
+#ifdef DISPLAY_CLASS
+  display.begin();
+  ui_task.begin(the_mesh.getNodeName(), FIRMWARE_BUILD_DATE);
+#endif
 
   // send out initial Advertisement to the mesh
   the_mesh.sendSelfAdvertisement(2000);
@@ -814,7 +727,7 @@ void loop() {
   int len = strlen(command);
   while (Serial.available() && len < sizeof(command)-1) {
     char c = Serial.read();
-    if (c != '\n') { 
+    if (c != '\n') {
       command[len++] = c;
       command[len] = 0;
     }
@@ -827,7 +740,7 @@ void loop() {
   if (len > 0 && command[len - 1] == '\r') {  // received complete line
     command[len - 1] = 0;  // replace newline with C string null terminator
     char reply[160];
-    the_mesh.handleCommand(0, command, reply);  // NOTE: there is no sender_timestamp via serial!
+    the_mesh.getCLI()->handleCommand(0, command, reply);  // NOTE: there is no sender_timestamp via serial!
     if (reply[0]) {
       Serial.print("  -> "); Serial.println(reply);
     }
@@ -836,6 +749,4 @@ void loop() {
   }
 
   the_mesh.loop();
-
-  // TODO: periodically check for OLD/inactive entries in known_clients[], and evict
 }

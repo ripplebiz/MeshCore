@@ -1253,15 +1253,15 @@ public:
 #endif
 
 #if defined(NRF52_PLATFORM)
-RADIO_CLASS radio = new Module(P_LORA_NSS, P_LORA_DIO_1, P_LORA_RESET, P_LORA_BUSY, SPI);
-#elif defined(LILYGO_TLORA)
-SPIClass spi;
-RADIO_CLASS radio = new Module(P_LORA_NSS, P_LORA_DIO_0, P_LORA_RESET, P_LORA_DIO_1, spi);
+  RADIO_CLASS radio = new Module(P_LORA_NSS, P_LORA_DIO_1, P_LORA_RESET, P_LORA_BUSY, SPI);
+#elif defined(LILYGO_TLORA) || defined(ESP8285)
+  SPIClass spi;
+  RADIO_CLASS radio = new Module(P_LORA_NSS, P_LORA_DIO_0, P_LORA_RESET, P_LORA_DIO_1, spi);
 #elif defined(P_LORA_SCLK)
-SPIClass spi;
-RADIO_CLASS radio = new Module(P_LORA_NSS, P_LORA_DIO_1, P_LORA_RESET, P_LORA_BUSY, spi);
+  SPIClass spi;
+  RADIO_CLASS radio = new Module(P_LORA_NSS, P_LORA_DIO_1, P_LORA_RESET, P_LORA_BUSY, spi);
 #else
-RADIO_CLASS radio = new Module(P_LORA_NSS, P_LORA_DIO_1, P_LORA_RESET, P_LORA_BUSY);
+  RADIO_CLASS radio = new Module(P_LORA_NSS, P_LORA_DIO_1, P_LORA_RESET, P_LORA_BUSY);
 #endif
 StdRNG fast_rng;
 SimpleMeshTables tables;
@@ -1273,6 +1273,7 @@ void halt() {
 
 void setup() {
   Serial.begin(115200);
+  
 
   board.begin();
 #ifdef SX126X_DIO3_TCXO_VOLTAGE
@@ -1284,6 +1285,8 @@ void setup() {
 #if defined(NRF52_PLATFORM)
   SPI.setPins(P_LORA_MISO, P_LORA_SCLK, P_LORA_MOSI);
   SPI.begin();
+#elif defined(ESP8285)
+  spi.begin();
 #elif defined(P_LORA_SCLK)
   spi.begin(P_LORA_SCLK, P_LORA_MISO, P_LORA_MOSI);
 #endif

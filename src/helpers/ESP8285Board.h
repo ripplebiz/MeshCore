@@ -35,9 +35,9 @@ public:
     adcAttachPin(PIN_VBAT_READ);
   #endif
 
-  #ifdef P_LORA_TX_LED
-    pinMode(P_LORA_TX_LED, OUTPUT);
-    digitalWrite(P_LORA_TX_LED, LOW);
+  #ifdef PIN_LED_BUILTIN
+    pinMode(PIN_LED_BUILTIN, OUTPUT);
+    digitalWrite(PIN_LED_BUILTIN, LOW);
   #endif
 
   #if defined(PIN_BOARD_SDA) && defined(PIN_BOARD_SCL)
@@ -49,12 +49,12 @@ public:
 
   uint8_t getStartupReason() const override { return startup_reason; }
 
-#if defined(P_LORA_TX_LED)
+#if defined(PIN_LED_BUILTIN)
   void onBeforeTransmit() override {
-    digitalWrite(P_LORA_TX_LED, HIGH);   // turn TX LED on
+    digitalWrite(PIN_LED_BUILTIN, HIGH);   // turn TX LED on
   }
   void onAfterTransmit() override {
-    digitalWrite(P_LORA_TX_LED, LOW);   // turn TX LED off
+    digitalWrite(PIN_LED_BUILTIN, LOW);   // turn TX LED off
   }
 #endif
 
@@ -63,7 +63,7 @@ public:
   }
 
   const char* getManufacturerName() const override {
-    return "Generic ESP8285";
+    return "Generic ESP8285 ELRS Receiver";
   }
 
   void reboot() override {

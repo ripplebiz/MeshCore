@@ -1231,11 +1231,11 @@ public:
   #endif
 #elif defined(ESP8285)
   #ifdef WIFI_SSID
-    #include <helpers/esp32/SerialWifiInterface.h>
-    SerialWifiInterface serial_interface;
     #ifndef TCP_PORT
       #define TCP_PORT 5000
     #endif
+    #include <helpers/esp8285/SerialWifiInterface.h>
+    SerialWifiInterface serial_interface(TCP_PORT); // Pass TCP_PORT to the constructor
   #else
     #include <helpers/ArduinoSerialInterface.h>
     ArduinoSerialInterface serial_interface;
@@ -1273,7 +1273,7 @@ void halt() {
 
 void setup() {
   Serial.begin(115200);
-  
+
 
   board.begin();
 #ifdef SX126X_DIO3_TCXO_VOLTAGE

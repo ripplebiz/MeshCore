@@ -1,5 +1,5 @@
 #include "SerialWifiInterface.h"
-#include <WiFi.h>
+#include <ESP8266WiFi.h>
 
 void SerialWifiInterface::begin(int port) {
   // wifi setup is handled outside of this class, only starts the server

@@ -1,7 +1,7 @@
 #pragma once
 
 #include "../BaseSerialInterface.h"
-#include <WiFi.h>
+#include <ESP8266WiFi.h>
 
 class SerialWifiInterface : public BaseSerialInterface {
   bool deviceConnected;
@@ -28,7 +28,7 @@ class SerialWifiInterface : public BaseSerialInterface {
 protected:
 
 public:
-  SerialWifiInterface() : server(WiFiServer()), client(WiFiClient()) {
+  SerialWifiInterface(uint16_t port) : server(port), client(WiFiClient()) {
     deviceConnected = false;
     _isEnabled = false;
     _last_write = 0;

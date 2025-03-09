@@ -91,6 +91,10 @@ static XiaoC3Board board;
 #include <helpers/ESP32Board.h>
 #include <helpers/CustomSX1262Wrapper.h>
 static ESP32Board board;
+#elif defined(LILYGO_TLORA)
+#include <helpers/LilyGoTLoraBoard.h>
+#include <helpers/CustomSX1276Wrapper.h>
+static LilyGoTLoraBoard board;
 #elif defined(RAK_4631)
 #include <helpers/nrf52/RAK4631Board.h>
 #include <helpers/CustomSX1262Wrapper.h>
@@ -99,8 +103,25 @@ static RAK4631Board board;
 #include <helpers/nrf52/T1000eBoard.h>
 #include <helpers/CustomLR1110Wrapper.h>
 static T1000eBoard board;
+#elif defined(HELTEC_T114)
+#include <helpers/nrf52/T114Board.h>
+#include <helpers/CustomSX1262Wrapper.h>
+static T114Board board;
+#elif defined(LILYGO_TECHO)
+#include <helpers/nrf52/TechoBoard.h>
+#include <helpers/CustomSX1262Wrapper.h>
+static TechoBoard board;
 #else
 #error "need to provide a 'board' object"
+#endif
+
+#ifdef DISPLAY_CLASS
+#include <helpers/ui/SSD1306Display.h>
+
+static DISPLAY_CLASS display;
+
+#include "UITask.h"
+static UITask ui_task(display);
 #endif
 
 // Believe it or not, this std C function is busted on some platforms!
@@ -117,8 +138,15 @@ static uint32_t _atoi(const char *sp)
 
 /*------------ Frame Protocol --------------*/
 
-#define FIRMWARE_VER_CODE 1
-#define FIRMWARE_BUILD_DATE "19 Feb 2025"
+#define FIRMWARE_VER_CODE 2
+
+#ifndef FIRMWARE_BUILD_DATE
+#define FIRMWARE_BUILD_DATE "7 Mar 2025"
+#endif
+
+#ifndef FIRMWARE_VERSION
+#define FIRMWARE_VERSION "v1.2.1"
+#endif
 
 #define CMD_APP_START 1
 #define CMD_SEND_TXT_MSG 2
@@ -145,6 +173,11 @@ static uint32_t _atoi(const char *sp)
 #define CMD_EXPORT_PRIVATE_KEY 23
 #define CMD_IMPORT_PRIVATE_KEY 24
 #define CMD_SEND_RAW_DATA 25
+#define CMD_SEND_LOGIN 26
+#define CMD_SEND_STATUS_REQ 27
+#define CMD_HAS_CONNECTION 28
+#define CMD_LOGOUT 29 // 'Disconnect'
+#define CMD_GET_CONTACT_BY_KEY 30
 
 #define RESP_CODE_OK 0
 #define RESP_CODE_ERR 1
@@ -169,6 +202,9 @@ static uint32_t _atoi(const char *sp)
 #define PUSH_CODE_SEND_CONFIRMED 0x82
 #define PUSH_CODE_MSG_WAITING 0x83
 #define PUSH_CODE_RAW_DATA 0x84
+#define PUSH_CODE_LOGIN_SUCCESS 0x85
+#define PUSH_CODE_LOGIN_FAIL 0x86
+#define PUSH_CODE_STATUS_RESPONSE 0x87
 
 /* -------------------------------------------------------------------------------------- */
 
@@ -186,6 +222,7 @@ struct NodePrefs
 	uint8_t tx_power_dbm;
 	uint8_t unused[3];
 	float rx_delay_base;
+	uint32_t ble_pin;
 };
 
 class MyMesh : public BaseChatMesh
@@ -195,12 +232,15 @@ class MyMesh : public BaseChatMesh
 	IdentityStore *_identity_store;
 	NodePrefs _prefs;
 	uint32_t expected_ack_crc; // TODO: keep table of expected ACKs
+	uint32_t pending_login;
+	uint32_t pending_status;
 	mesh::GroupChannel *_public;
 	BaseSerialInterface *_serial;
 	unsigned long last_msg_sent;
 	ContactsIterator _iter;
 	uint32_t _iter_filter_since;
 	uint32_t _most_recent_lastmod;
+	uint32_t _active_ble_pin;
 	bool _iter_started;
 	uint8_t app_target_ver;
 	uint8_t cmd_frame[MAX_FRAME_SIZE + 1];
@@ -518,19 +558,24 @@ protected:
 			expected_ack_crc = 0; // reset our expected hash, now that we have received ACK
 			return true;
 		}
-		return false;
+		return checkConnectionsAck(data);
 	}
 
-	void onMessageRecv(const ContactInfo &from, uint8_t path_len, uint32_t sender_timestamp, const char *text) override
+	void queueMessage(const ContactInfo &from, uint8_t txt_type, uint8_t path_len, uint32_t sender_timestamp, const uint8_t *extra, int extra_len, const char *text)
 	{
 		int i = 0;
 		out_frame[i++] = RESP_CODE_CONTACT_MSG_RECV;
 		memcpy(&out_frame[i], from.id.pub_key, 6);
 		i += 6; // just 6-byte prefix
 		out_frame[i++] = path_len;
-		out_frame[i++] = TXT_TYPE_PLAIN;
+		out_frame[i++] = txt_type;
 		memcpy(&out_frame[i], &sender_timestamp, 4);
 		i += 4;
+		if (extra_len > 0)
+		{
+			memcpy(&out_frame[i], extra, extra_len);
+			i += extra_len;
+		}
 		int tlen = strlen(text); // TODO: UTF-8 ??
 		if (i + tlen > MAX_FRAME_SIZE)
 		{
@@ -550,6 +595,28 @@ protected:
 		{
 			soundBuzzer();
 		}
+#ifdef DISPLAY_CLASS
+		ui_task.showMsgPreview(path_len, from.name, text);
+#endif
+	}
+
+	void onMessageRecv(const ContactInfo &from, uint8_t path_len, uint32_t sender_timestamp, const char *text) override
+	{
+		markConnectionActive(from); // in case this is from a server, and we have a connection
+		queueMessage(from, TXT_TYPE_PLAIN, path_len, sender_timestamp, NULL, 0, text);
+	}
+
+	void onCommandDataRecv(const ContactInfo &from, uint8_t path_len, uint32_t sender_timestamp, const char *text) override
+	{
+		markConnectionActive(from); // in case this is from a server, and we have a connection
+		queueMessage(from, TXT_TYPE_CLI_DATA, path_len, sender_timestamp, NULL, 0, text);
+	}
+
+	void onSignedMessageRecv(const ContactInfo &from, uint8_t path_len, uint32_t sender_timestamp, const uint8_t *sender_prefix, const char *text) override
+	{
+		markConnectionActive(from);
+		saveContacts(); // from.sync_since change needs to be persisted
+		queueMessage(from, TXT_TYPE_SIGNED_PLAIN, path_len, sender_timestamp, sender_prefix, 4, text);
 	}
 
 	void onChannelMessageRecv(const mesh::GroupChannel &channel, int in_path_len, uint32_t timestamp, const char *text) override
@@ -580,12 +647,60 @@ protected:
 		{
 			soundBuzzer();
 		}
+#ifdef DISPLAY_CLASS
+		ui_task.showMsgPreview(in_path_len < 0 ? 0xFF : in_path_len, "Public", text);
+#endif
 	}
 
 	void onContactResponse(const ContactInfo &contact, const uint8_t *data, uint8_t len) override
 	{
-		// TODO: check for login response
-		// TODO: check for Get Stats response
+		uint32_t sender_timestamp;
+		memcpy(&sender_timestamp, data, 4);
+
+		if (pending_login && memcmp(&pending_login, contact.id.pub_key, 4) == 0)
+		{ // check for login response
+			// yes, is response to pending sendLogin()
+			pending_login = 0;
+
+			int i = 0;
+			if (memcmp(&data[4], "OK", 2) == 0)
+			{ // legacy Repeater login OK response
+				out_frame[i++] = PUSH_CODE_LOGIN_SUCCESS;
+				out_frame[i++] = 0; // legacy: is_admin = false
+			}
+			else if (data[4] == RESP_SERVER_LOGIN_OK)
+			{ // new login response
+				uint16_t keep_alive_secs = ((uint16_t)data[5]) * 16;
+				if (keep_alive_secs > 0)
+				{
+					startConnection(contact, keep_alive_secs);
+				}
+				out_frame[i++] = PUSH_CODE_LOGIN_SUCCESS;
+				out_frame[i++] = data[6]; // permissions (eg. is_admin)
+			}
+			else
+			{
+				out_frame[i++] = PUSH_CODE_LOGIN_FAIL;
+				out_frame[i++] = 0; // reserved
+			}
+			memcpy(&out_frame[i], contact.id.pub_key, 6);
+			i += 6; // pub_key_prefix
+			_serial->writeFrame(out_frame, i);
+		}
+		else if (len > 4 && pending_status && memcmp(&pending_status, contact.id.pub_key, 4) == 0)
+		{ // check for status response
+			// yes, is response to pending sendStatusRequest()
+			pending_status = 0;
+
+			int i = 0;
+			out_frame[i++] = PUSH_CODE_STATUS_RESPONSE;
+			out_frame[i++] = 0; // reserved
+			memcpy(&out_frame[i], contact.id.pub_key, 6);
+			i += 6; // pub_key_prefix
+			memcpy(&out_frame[i], &data[4], len - 4);
+			i += (len - 4);
+			_serial->writeFrame(out_frame, i);
+		}
 	}
 
 	void onRawDataRecv(mesh::Packet *packet) override
@@ -630,6 +745,7 @@ public:
 		offline_queue_len = 0;
 		app_target_ver = 0;
 		_identity_store = NULL;
+		pending_login = pending_status = 0;
 
 		// defaults
 		memset(&_prefs, 0, sizeof(_prefs));
@@ -663,10 +779,54 @@ public:
 			File file = _fs->open("/node_prefs");
 			if (file)
 			{
-				file.read((uint8_t *)&_prefs, sizeof(_prefs));
+				uint8_t pad[8];
+
+				file.read((uint8_t *)&_prefs.airtime_factor, sizeof(float));			   // 0
+				file.read((uint8_t *)_prefs.node_name, sizeof(_prefs.node_name));		   // 4
+				file.read(pad, 4);														   // 36
+				file.read((uint8_t *)&_prefs.node_lat, sizeof(_prefs.node_lat));		   // 40
+				file.read((uint8_t *)&_prefs.node_lon, sizeof(_prefs.node_lon));		   // 48
+				file.read((uint8_t *)&_prefs.freq, sizeof(_prefs.freq));				   // 56
+				file.read((uint8_t *)&_prefs.sf, sizeof(_prefs.sf));					   // 60
+				file.read((uint8_t *)&_prefs.cr, sizeof(_prefs.cr));					   // 61
+				file.read((uint8_t *)&_prefs.reserved1, sizeof(_prefs.reserved1));		   // 62
+				file.read((uint8_t *)&_prefs.reserved2, sizeof(_prefs.reserved2));		   // 63
+				file.read((uint8_t *)&_prefs.bw, sizeof(_prefs.bw));					   // 64
+				file.read((uint8_t *)&_prefs.tx_power_dbm, sizeof(_prefs.tx_power_dbm));   // 68
+				file.read((uint8_t *)_prefs.unused, sizeof(_prefs.unused));				   // 69
+				file.read((uint8_t *)&_prefs.rx_delay_base, sizeof(_prefs.rx_delay_base)); // 72
+				file.read(pad, 4);														   // 76
+				file.read((uint8_t *)&_prefs.ble_pin, sizeof(_prefs.ble_pin));			   // 80
+
+				// sanitise bad pref values
+				_prefs.rx_delay_base = constrain(_prefs.rx_delay_base, 0, 20.0f);
+				_prefs.airtime_factor = constrain(_prefs.airtime_factor, 0, 9.0f);
+				_prefs.freq = constrain(_prefs.freq, 400.0f, 2500.0f);
+				_prefs.bw = constrain(_prefs.bw, 62.5f, 500.0f);
+				_prefs.sf = constrain(_prefs.sf, 7, 12);
+				_prefs.cr = constrain(_prefs.cr, 5, 8);
+				_prefs.tx_power_dbm = constrain(_prefs.tx_power_dbm, 1, MAX_LORA_TX_POWER);
+
 				file.close();
 			}
 		}
+
+#ifdef BLE_PIN_CODE
+		if (_prefs.ble_pin == 0)
+		{
+#ifdef DISPLAY_CLASS
+			_active_ble_pin = trng.nextInt(100000, 999999); // random pin each session
+#else
+			_active_ble_pin = BLE_PIN_CODE; // otherwise static pin
+#endif
+		}
+		else
+		{
+			_active_ble_pin = _prefs.ble_pin;
+		}
+#else
+		_active_ble_pin = 0;
+#endif
 
 		// init 'blob store' support
 		_fs->mkdir("/bl");
@@ -682,6 +842,7 @@ public:
 	}
 
 	const char *getNodeName() { return _prefs.node_name; }
+	uint32_t getBLEPin() { return _active_ble_pin; }
 
 	void startInterface(BaseSerialInterface &serial)
 	{
@@ -703,7 +864,26 @@ public:
 #endif
 		if (file)
 		{
-			file.write((const uint8_t *)&_prefs, sizeof(_prefs));
+			uint8_t pad[8];
+			memset(pad, 0, sizeof(pad));
+
+			file.write((uint8_t *)&_prefs.airtime_factor, sizeof(float));				// 0
+			file.write((uint8_t *)_prefs.node_name, sizeof(_prefs.node_name));			// 4
+			file.write(pad, 4);															// 36
+			file.write((uint8_t *)&_prefs.node_lat, sizeof(_prefs.node_lat));			// 40
+			file.write((uint8_t *)&_prefs.node_lon, sizeof(_prefs.node_lon));			// 48
+			file.write((uint8_t *)&_prefs.freq, sizeof(_prefs.freq));					// 56
+			file.write((uint8_t *)&_prefs.sf, sizeof(_prefs.sf));						// 60
+			file.write((uint8_t *)&_prefs.cr, sizeof(_prefs.cr));						// 61
+			file.write((uint8_t *)&_prefs.reserved1, sizeof(_prefs.reserved1));			// 62
+			file.write((uint8_t *)&_prefs.reserved2, sizeof(_prefs.reserved2));			// 63
+			file.write((uint8_t *)&_prefs.bw, sizeof(_prefs.bw));						// 64
+			file.write((uint8_t *)&_prefs.tx_power_dbm, sizeof(_prefs.tx_power_dbm));	// 68
+			file.write((uint8_t *)_prefs.unused, sizeof(_prefs.unused));				// 69
+			file.write((uint8_t *)&_prefs.rx_delay_base, sizeof(_prefs.rx_delay_base)); // 72
+			file.write(pad, 4);															// 76
+			file.write((uint8_t *)&_prefs.ble_pin, sizeof(_prefs.ble_pin));				// 80
+
 			file.close();
 		}
 	}
@@ -722,10 +902,10 @@ public:
 			memset(&out_frame[i], 0, 12);
 			strcpy((char *)&out_frame[i], FIRMWARE_BUILD_DATE);
 			i += 12;
-			const char *name = board.getManufacturerName();
-			int tlen = strlen(name);
-			memcpy(&out_frame[i], name, tlen);
-			i += tlen;
+			StrHelper::strzcpy((char *)&out_frame[i], board.getManufacturerName(), 40);
+			i += 40;
+			StrHelper::strzcpy((char *)&out_frame[i], FIRMWARE_VERSION, 20);
+			i += 20;
 			_serial->writeFrame(out_frame, i);
 		}
 		else if (cmd_frame[0] == CMD_APP_START && len >= 8)
@@ -779,13 +959,22 @@ public:
 			uint8_t *pub_key_prefix = &cmd_frame[i];
 			i += 6;
 			ContactInfo *recipient = lookupContactByPubKey(pub_key_prefix, 6);
-			if (recipient && attempt < 4 && txt_type == TXT_TYPE_PLAIN)
+			if (recipient && attempt < 4 && (txt_type == TXT_TYPE_PLAIN || txt_type == TXT_TYPE_CLI_DATA))
 			{
 				char *text = (char *)&cmd_frame[i];
 				int tlen = len - i;
 				uint32_t est_timeout;
 				text[tlen] = 0; // ensure null
-				int result = sendMessage(*recipient, msg_timestamp, attempt, text, expected_ack_crc, est_timeout);
+				int result;
+				if (txt_type == TXT_TYPE_CLI_DATA)
+				{
+					result = sendCommandData(*recipient, msg_timestamp, attempt, text, est_timeout);
+					expected_ack_crc = 0; // no Ack expected
+				}
+				else
+				{
+					result = sendMessage(*recipient, msg_timestamp, attempt, text, expected_ack_crc, est_timeout);
+				}
 				// TODO: add expected ACK to table
 				if (result == MSG_SEND_FAILED)
 				{
@@ -1000,6 +1189,19 @@ public:
 				writeErrFrame(); // not found, or unable to send
 			}
 		}
+		else if (cmd_frame[0] == CMD_GET_CONTACT_BY_KEY)
+		{
+			uint8_t *pub_key = &cmd_frame[1];
+			ContactInfo *contact = lookupContactByPubKey(pub_key, PUB_KEY_SIZE);
+			if (contact)
+			{
+				writeContactRespFrame(RESP_CODE_CONTACT, *contact);
+			}
+			else
+			{
+				writeErrFrame(); // not found
+			}
+		}
 		else if (cmd_frame[0] == CMD_EXPORT_CONTACT)
 		{
 			if (len < 1 + PUB_KEY_SIZE)
@@ -1184,6 +1386,82 @@ public:
 				writeErrFrame(); // flood, not supported (yet)
 			}
 		}
+		else if (cmd_frame[0] == CMD_SEND_LOGIN && len >= 1 + PUB_KEY_SIZE)
+		{
+			uint8_t *pub_key = &cmd_frame[1];
+			ContactInfo *recipient = lookupContactByPubKey(pub_key, PUB_KEY_SIZE);
+			char *password = (char *)&cmd_frame[1 + PUB_KEY_SIZE];
+			cmd_frame[len] = 0; // ensure null terminator in password
+			if (recipient)
+			{
+				uint32_t est_timeout;
+				int result = sendLogin(*recipient, password, est_timeout);
+				if (result == MSG_SEND_FAILED)
+				{
+					writeErrFrame();
+				}
+				else
+				{
+					pending_status = 0;
+					memcpy(&pending_login, recipient->id.pub_key, 4); // match this to onContactResponse()
+					out_frame[0] = RESP_CODE_SENT;
+					out_frame[1] = (result == MSG_SEND_SENT_FLOOD) ? 1 : 0;
+					memcpy(&out_frame[2], &pending_login, 4);
+					memcpy(&out_frame[6], &est_timeout, 4);
+					_serial->writeFrame(out_frame, 10);
+				}
+			}
+			else
+			{
+				writeErrFrame(); // contact not found
+			}
+		}
+		else if (cmd_frame[0] == CMD_SEND_STATUS_REQ && len >= 1 + PUB_KEY_SIZE)
+		{
+			uint8_t *pub_key = &cmd_frame[1];
+			ContactInfo *recipient = lookupContactByPubKey(pub_key, PUB_KEY_SIZE);
+			if (recipient)
+			{
+				uint32_t est_timeout;
+				int result = sendStatusRequest(*recipient, est_timeout);
+				if (result == MSG_SEND_FAILED)
+				{
+					writeErrFrame();
+				}
+				else
+				{
+					pending_login = 0;
+					memcpy(&pending_status, recipient->id.pub_key, 4); // match this to onContactResponse()
+					out_frame[0] = RESP_CODE_SENT;
+					out_frame[1] = (result == MSG_SEND_SENT_FLOOD) ? 1 : 0;
+					memcpy(&out_frame[2], &pending_status, 4);
+					memcpy(&out_frame[6], &est_timeout, 4);
+					_serial->writeFrame(out_frame, 10);
+				}
+			}
+			else
+			{
+				writeErrFrame(); // contact not found
+			}
+		}
+		else if (cmd_frame[0] == CMD_HAS_CONNECTION && len >= 1 + PUB_KEY_SIZE)
+		{
+			uint8_t *pub_key = &cmd_frame[1];
+			if (hasConnectionTo(pub_key))
+			{
+				writeOKFrame();
+			}
+			else
+			{
+				writeErrFrame();
+			}
+		}
+		else if (cmd_frame[0] == CMD_LOGOUT && len >= 1 + PUB_KEY_SIZE)
+		{
+			uint8_t *pub_key = &cmd_frame[1];
+			stopConnection(pub_key);
+			writeOKFrame();
+		}
 		else
 		{
 			writeErrFrame();
@@ -1224,6 +1502,15 @@ public:
 				_iter_started = false;
 			}
 		}
+		else if (!_serial->isWriteBusy())
+		{
+			checkConnections();
+		}
+
+#ifdef DISPLAY_CLASS
+		ui_task.setHasConnection(_serial->isConnected());
+		ui_task.loop();
+#endif
 
 		// prepare sensor packet if ready to send
 		if (g_sensor_ready)

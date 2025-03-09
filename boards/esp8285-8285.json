@@ -2,8 +2,7 @@
     "comment": "esp8285 variant for ExpressLRS that uses variant=esp8285 instead of variant=generic",
     "build": {
       "arduino": {
-        "ldscript": "eagle.flash.1m256.ld",
-        "memory_type": "qio_qspi"
+        "ldscript": "eagle.flash.1m256.ld"
       },
       "core": "esp8266",
       "extra_flags": "-DESP8266 -DESP8285 -DARDUINO_ARCH_ESP8266 -DARDUINO_ESP8266_ESP01",

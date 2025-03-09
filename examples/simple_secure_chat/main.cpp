@@ -566,6 +566,11 @@ void setup() {
   Serial.begin(115200);
 
   board.begin();
+
+#ifdef ESP32_CPU_FREQ
+  setCpuFrequencyMhz(ESP32_CPU_FREQ);
+#endif
+
 #ifdef SX126X_DIO3_TCXO_VOLTAGE
   float tcxo = SX126X_DIO3_TCXO_VOLTAGE;
 #else

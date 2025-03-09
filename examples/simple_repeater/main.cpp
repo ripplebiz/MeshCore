@@ -664,6 +664,10 @@ void setup() {
   delay(1000);
 
   board.begin();
+
+#ifdef ESP32_CPU_FREQ
+  setCpuFrequencyMhz(ESP32_CPU_FREQ);
+#endif
 #ifdef ESP32
   fallback_clock.begin();
 #endif

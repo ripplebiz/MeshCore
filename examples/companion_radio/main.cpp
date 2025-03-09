@@ -3,8 +3,10 @@
 
 #if defined(NRF52_PLATFORM)
   #include <InternalFileSystem.h>
-#elif defined(ESP32)
+#elif defined(ESP32) 
   #include <SPIFFS.h>
+#elif defined(ESP8285) || defined(ESP866)
+  #include <FS.h>
 #endif
 
 #define RADIOLIB_STATIC_ONLY 1
@@ -92,6 +94,10 @@
   #include <helpers/nrf52/TechoBoard.h>
   #include <helpers/CustomSX1262Wrapper.h>
   static TechoBoard board;
+#elif defined(ESP8285)
+  #include <helpers/ESP8285Board.h>
+  #include <helpers/CustomSX1276Wrapper.h>
+  static ESP8285Board board;
 #else
   #error "need to provide a 'board' object"
 #endif
@@ -243,7 +249,12 @@ class MyMesh : public BaseChatMesh {
 
   void loadContacts() {
     if (_fs->exists("/contacts3")) {
-      File file = _fs->open("/contacts3");
+      
+      #if defined(ESP8285)
+        File file = _fs->open("/contacts3", "r");
+      #else
+        File file = _fs->open("/contacts3");
+      #endif
       if (file) {
         bool full = false;
         while (!full) {
@@ -279,7 +290,11 @@ class MyMesh : public BaseChatMesh {
     File file = _fs->open("/contacts3", FILE_O_WRITE);
     if (file) { file.seek(0); file.truncate(); }
 #else
+  #if defined(ESP8285)
+    File file = _fs->open("/contacts3", "w");
+  #else
     File file = _fs->open("/contacts3", "w", true);
+  #endif
 #endif
     if (file) {
       ContactsIterator iter;
@@ -315,7 +330,11 @@ class MyMesh : public BaseChatMesh {
     sprintf(path, "/bl/%s", fname);
 
     if (_fs->exists(path)) {
-      File f = _fs->open(path);
+      #if defined(ESP8285)
+        File f = _fs->open(path, "r");
+      #else
+        File f = _fs->open(path);
+      #endif
       if (f) {
         int len = f.read(dest_buf, 255);  // currently MAX 255 byte blob len supported!!
         f.close();
@@ -337,7 +356,11 @@ class MyMesh : public BaseChatMesh {
     File f = _fs->open(path, FILE_O_WRITE);
     if (f) { f.seek(0); f.truncate(); }
   #else
+    #if defined(ESP8285)
+    File f = _fs->open(path, "w");
+  #else
     File f = _fs->open(path, "w", true);
+  #endif
   #endif
     if (f) {
       int n = f.write(src_buf, len);
@@ -644,7 +667,11 @@ public:
 
     // load persisted prefs
     if (_fs->exists("/node_prefs")) {
-      File file = _fs->open("/node_prefs");
+      #if defined(ESP8285)
+        File file = _fs->open("/node_prefs", "r");
+      #else
+        File file = _fs->open("/node_prefs");
+      #endif
       if (file) {
         uint8_t pad[8];
 
@@ -718,7 +745,11 @@ public:
     File file = _fs->open("/node_prefs", FILE_O_WRITE);
     if (file) { file.seek(0); file.truncate(); }
 #else
+  #if defined(ESP8285)
+    File file = _fs->open("/node_prefs", "w");
+  #else
     File file = _fs->open("/node_prefs", "w", true);
+  #endif
 #endif
     if (file) {
       uint8_t pad[8];
@@ -1198,6 +1229,17 @@ public:
     #include <helpers/ArduinoSerialInterface.h>
     ArduinoSerialInterface serial_interface;
   #endif
+#elif defined(ESP8285)
+  #ifdef WIFI_SSID
+    #include <helpers/esp32/SerialWifiInterface.h>
+    SerialWifiInterface serial_interface;
+    #ifndef TCP_PORT
+      #define TCP_PORT 5000
+    #endif
+  #else
+    #include <helpers/ArduinoSerialInterface.h>
+    ArduinoSerialInterface serial_interface;
+  #endif
 #elif defined(NRF52_PLATFORM)
   #ifdef BLE_PIN_CODE
     #include <helpers/nrf52/SerialBLEInterface.h>
@@ -1270,18 +1312,24 @@ void setup() {
   InternalFS.begin();
   the_mesh.begin(InternalFS, trng);
 
-#ifdef BLE_PIN_CODE
-  char dev_name[32+10];
-  sprintf(dev_name, "MeshCore-%s", the_mesh.getNodeName());
-  serial_interface.begin(dev_name, the_mesh.getBLEPin());
-#else
-  pinMode(WB_IO2, OUTPUT);
-  serial_interface.begin(Serial);
-#endif
-  the_mesh.startInterface(serial_interface);
+  #ifdef BLE_PIN_CODE
+    char dev_name[32+10];
+    sprintf(dev_name, "MeshCore-%s", the_mesh.getNodeName());
+    serial_interface.begin(dev_name, the_mesh.getBLEPin());
+  #else
+    pinMode(WB_IO2, OUTPUT);
+    serial_interface.begin(Serial);
+  #endif
+    the_mesh.startInterface(serial_interface);
+
 #elif defined(ESP32)
   SPIFFS.begin(true);
   the_mesh.begin(SPIFFS, trng);
+
+#elif defined(ESP8285)
+  SPIFFS.begin();
+  the_mesh.begin(SPIFFS, trng);
+
 
 #ifdef WIFI_SSID
   WiFi.begin(WIFI_SSID, WIFI_PWD);

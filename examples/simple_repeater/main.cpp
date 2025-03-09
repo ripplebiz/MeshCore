@@ -3,7 +3,7 @@
 
 #if defined(NRF52_PLATFORM)
   #include <InternalFileSystem.h>
-#elif defined(ESP32)
+#elif defined(ESP32) || defined(ESP8285) || defined(ESP866)
   #include <SPIFFS.h>
 #endif
 
@@ -92,6 +92,10 @@
   #include <helpers/nrf52/TechoBoard.h>
   #include <helpers/CustomSX1262Wrapper.h>
   static TechoBoard board;
+#elif defined(ESP8285)
+  #include <helpers/ESP8285Board.h>
+  #include <helpers/CustomSX1276Wrapper.h>
+  static ESP8285Board board;
 #else
   #error "need to provide a 'board' object"
 #endif

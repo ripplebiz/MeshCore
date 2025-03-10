@@ -1,6 +1,9 @@
 # MeshCore-FAQ
 A list of frequently-asked questions and answers for MeshCore
 
+The current version of this MeshCore FAQ is at https://github.com/ripplebiz/MeshCore/blob/main/docs/faq.md.  
+This MeshCore FAQ is also mirrored at https://github.com/LitBomb/MeshCore-FAQ and might have newer updates if pull requests on Scott's MeshCore repo are not approved yet.
+
 author: https://github.com/LitBomb
 ---
 
@@ -25,8 +28,9 @@ Anyone is able to build anything they like on top of MeshCore without paying any
  Firmware Flasher: https://flasher.meshcore.co.uk/
  Phone Client Applications: https://meshcore.co.uk/apps.html
  MeshCore Fimrware Github: https://github.com/ripplebiz/MeshCore
- 
+
  NOTE: Andy Kirby has a very useful [intro video](https://www.youtube.com/watch?v=t1qne8uJBAc) for beginners.
+ 
 
  You need LoRa hardware devices to run MeshCore firmware as clients or server (repeater and room server).
 
@@ -95,7 +99,7 @@ The T-Deck firmware is free to download and most features are available without 
 - Australia and New Zealand are using **915.8MHz**
 - UK and EU are gravitating toward **867.5MHz**
 - There are discussions on discord for UK to move to 869.525MHz (https://discord.com/channels/826570251612323860/1330643963501351004/1342554454498742374)
-- USA is gravitating toward **910.525MHz**
+- Canada and USA is on **910.525MHz**
 
 the rest of the radio settings are the same for all frequencies:  
 - Spread Factor (SF): 10  
@@ -127,11 +131,11 @@ MeshCore clients only advertise themselves when the user initiates it. A repeate
 
 ### Q: How do you configure a repeater or a room server?
 **A:** One of these servers can be administered with one of the options below:
-- Connect the server device through a USB serial connection to a computer running Chrome on this site:  
-  <https://googlechromelabs.github.io/serial-terminal/>
+- Connect the server device using a USB cable to a computer running Chrome on https://flasher.meshcore.co.uk/, then use the `console` feature to connect to the device
+	- this is necessary to set the server device's frequency if it doesn't match the frequency for your local region or country
+- MeshCore smart device clients have the ability to remotely administer servers.
 - A T-Deck running unlocked/registered MeshCore firmware. Remote server administration is enabled through registering your T-Deck with Ripple Radios. It is one of the ways to support MeshCore development. You can register your T-Deck at:  
   <https://buymeacoffee.com/ripplebiz/e/249834>
-- MeshCore smart device clients may have the ability to remotely administer servers in the future.
 
 ### Q: Do I need to set the location for a repeater?
 **A:** With location set for a repeater, it can show up on a MeshCore map in the future. Set location with the following commands:
@@ -232,7 +236,11 @@ things network is mainly focused on LoRaWAN, but the LoRa low-level stuff still 
 - Firmware repo: <https://github.com/ripplebiz/MeshCore>  
 
 ### Q: How can I support MeshCore?
-**A:** Provide your honest feedback on GitHub and on AndyKirby's Discord server <http://discord.com/invite/H62Re4DCeD>. Spread the word of MeshCore to your friends and communities; help them get started with MeshCore. Support MeshCore development at <https://buymeacoffee.com/ripplebiz>.
+**A:** Provide your honest feedback on GitHub and on AndyKirby's Discord server <http://discord.com/invite/H62Re4DCeD>. Spread the word of MeshCore to your friends and communities; help them get started with MeshCore. Support Scott's MeshCore development at <https://buymeacoffee.com/ripplebiz>.
+
+Support Liam Cottle's smartphone client development by unlocking the server administration wait gate with in-app purchase
+
+Support Rastislav Vysoky (recrof)'s flasher web site and the map web site development through [PayPal](https://www.paypal.com/donate/?business=DREHF5HM265ES&no_recurring=0&item_name=If+you+enjoy+my+work%2C+you+can+support+me+here%3A&currency_code=EUR) or [Revolut](https://revolut.me/recrof)
 
 ### Q: How do I build MeshCore firmware from source?
 **A:** See instructions here:  
@@ -251,6 +259,12 @@ Javascript: https://github.com/liamcottle/meshcore.js
 
 ### Q: Does MeshCore support ATAK
 **A:** ATAK is not currently on MeshCore's roadmap.
+
+### Q: How do I add a node to the [MeshCore Map]([url](https://meshcore.co.uk/map.html))
+**A:** From the smartphone app, connect to a BLE Companion radio
+- To add the BLE Companion radio your smartphone is connected to to the map, tap the `advert` icon, then tap `Advert (To Clipboard)`.  
+- To add a Repeater or Room Server to the map, tap the 3 dots next to the Repeater or Room Server you want to add to the map, then tap `Share (To Clipboard)`.  
+- Go to the [MeshCore Map web site]([url](https://meshcore.co.uk/map.html)), tap the plus sign on the lower right corner and paste in the meshcore://... blob, then tap `Add Node`
     
 ---
 
@@ -274,6 +288,74 @@ You can get the epoch time on <https://www.epochconverter.com/> and use it to se
 ### Q: My Heltec V3 keeps disconnecting from my smartphone.  It can't hold a solid Bluetooth connection.
 
 **A:** Heltec V3 has a very small coil antenna on its PCB for WiFi and Bluetooth connectivty.  It has a very short range, only a few feet.  It is possible to remove the coil antenna  and replace it with a 31mm wire.  The BT range is much improved with the modification.
+
+---
+## Other Questions:
+### Q: How to  Update repeater and room server firmware over the air?
+
+**A:** Only nRF-based RAK4631 and Heltec T114 OTA firmware update are verified using nRF smartphone app.  Lilygo T-Echo doesn't work currently.
+You can update repeater and room server firmware with a bluetooth connection between your smartphone and your LoRa radio using the nRF app.
+
+1. Download the ZIP file for the specific node from the web flasher to your smartphone
+2. On the phone client, log on to the repeater as administrator (default password is `password`) to issue the `start ota`command to the repeater or room server to get the device into OTA DFU mode
+   
+![image](https://github.com/user-attachments/assets/889bb81b-7214-4a1c-955a-396b5a05d8ad)
+	1. `start ota` can be initiated from USB serial console on the web flasher page or a T-Deck
+4. On the smartphone, download and run the nRF app and scan for Bluetooth devices
+5. Connect to the repeater/room server node you want to update
+	1. nRF app is available on both Android and iOS
+
+**Android continues after the iOS section:**
+
+**iOS continues here:**
+5. Once connected successfully, a `DFU` icon ![Pasted image 20250309173039](https://github.com/user-attachments/assets/af7a9f78-8739-4946-b734-02bade9c8e71)
+ appears in the top right corner of the app![Pasted image 20250309171919](https://github.com/user-attachments/assets/08007ec8-4924-49c1-989f-ca2611e78793)
+
+6. Scroll down to change the `PRN(s)` number:
+
+![Pasted image 20250309190158](https://github.com/user-attachments/assets/11f69cdd-12f3-4696-a6fc-14a78c85fe32)
+
+- For the T114, change the number of packets `(PRN(s)` to 8
+- For RAK, it can be 10, but it also works on 8.
+
+7. Click the `DFU` icon ![Pasted image 20250309173039](https://github.com/user-attachments/assets/af7a9f78-8739-4946-b734-02bade9c8e71), select the type of file to upload (choose ZIP), then select the ZIP file that was downloaded earlier  from the web flasher
+8. The upload process will start now. If everything goes well, the node resets and is flashed successfully.
+![Pasted image 20250309190342](https://github.com/user-attachments/assets/a60e25d0-33b8-46cf-af90-20a7d8ac2adb)
+
+
+
+**Android steps continues below:**
+1. on the top left corner of the nRF Connect app on Android, tap the 3-bar hamburger menu, then `Settings`, then `nRF5 DFU Options`
+
+![Android nRF Hamberger](https://github.com/user-attachments/assets/ea6dfeef-9367-4830-bd70-1441d517c706)
+
+![Android nRF Settings](https://github.com/user-attachments/assets/c63726bf-cecd-4987-be68-afb6358c7190)
+
+![Android nRF DFU Options](https://github.com/user-attachments/assets/b20e872f-5122-41d9-90df-0215cff5fbc9)
+
+2. Change `Number of packets` to `10` for RAK, `8` for Heltec T114
+
+![Android nRF Number of Packets](https://github.com/user-attachments/assets/c092adaf-4cb3-460b-b7ef-8d7f450d602b)
+
+3. Go back to the main screen
+4. Your LoRa device should already ben in DFU mode from previous steps
+5. tap `SCANNER` and then `SCAN` to find the device you want to update, tap `CONNECT`
+
+![Android nRF Scanner Scan Connect](https://github.com/user-attachments/assets/37218717-f167-48b6-a6ca-93d132ef77ca)
+
+6. On the top left corner of the nRF Connect app, tap the `DFU` icon next to the three dots
+
+![Android nRF DFU](https://github.com/user-attachments/assets/1ec3b818-bf0c-461f-8fdf-37c41a63cafa)
+
+7. Choose `Distribution packet (ZIP)` and then `OK`
+
+![Android nRF Distribution Packet (ZIP)](https://github.com/user-attachments/assets/e65f5616-9793-44f5-95c0-a3eb15aa7152)
+
+8. Choose the firmware file in ZIP formate that you downloaded earlier from the MeshCore web flasher, update will start as soon as you tap the file
+
+![Android nRF FW Updating](https://github.com/user-attachments/assets/0814d123-85ce-4c87-90a7-e1a25dc71900)
+
+9. When the update process is done, the device will disconnect from nRF app and the LoRa device is updated
 
 
 ---

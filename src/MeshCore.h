@@ -40,6 +40,7 @@ public:
   virtual void onBeforeTransmit() { }
   virtual void onAfterTransmit() { }
   virtual void reboot() = 0;
+  virtual void powerOff() { while (1) { }}; // hope it's overriden or never called ;)
   virtual uint8_t getStartupReason() const = 0;
   virtual bool startOTAUpdate() { return false; }   // not supported
 };

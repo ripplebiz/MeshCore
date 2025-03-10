@@ -67,6 +67,10 @@ public:
     esp_deep_sleep_start();   // CPU halts here and never returns!
   }
 
+  void powerOff() override {
+    enterDeepSleep(0);
+  }
+
   uint16_t getBattMilliVolts() override {
     analogReadResolution(10);
     digitalWrite(PIN_ADC_CTRL, PIN_ADC_CTRL_ACTIVE);

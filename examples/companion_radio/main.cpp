@@ -97,12 +97,16 @@
 #endif
 
 #ifdef DISPLAY_CLASS
+  #include "UITask.h"
   #include <helpers/ui/SSD1306Display.h>
 
   static DISPLAY_CLASS  display;
-
+  static UITask ui_task(&board, &display);
+  #define HAS_UI
+#elif defined(HAS_UI)
   #include "UITask.h"
-  static UITask ui_task(display);
+
+  static UITask ui_task(&board, NULL);
 #endif
 
 // Believe it or not, this std C function is busted on some platforms!
@@ -508,8 +512,8 @@ protected:
     } else {
       soundBuzzer();
     }
-  #ifdef DISPLAY_CLASS
-    ui_task.showMsgPreview(path_len, from.name, text);
+  #ifdef HAS_UI
+    ui_task.newMsg(path_len, from.name, text, offline_queue_len);
   #endif
   }
 
@@ -550,8 +554,8 @@ protected:
     } else {
       soundBuzzer();
     }
-  #ifdef DISPLAY_CLASS
-    ui_task.showMsgPreview(in_path_len < 0 ? 0xFF : in_path_len, "Public", text);
+  #ifdef HAS_UI
+    ui_task.newMsg(in_path_len < 0 ? 0xFF : in_path_len, "Public", text, offline_queue_len);
   #endif
   }
 
@@ -1010,6 +1014,9 @@ public:
       int out_len;
       if ((out_len = getFromOfflineQueue(out_frame)) > 0) {
         _serial->writeFrame(out_frame, out_len);
+        #ifdef HAS_UI
+          ui_task.msgRead(offline_queue_len);
+        #endif
       } else {
         out_frame[0] = RESP_CODE_NO_MORE_MESSAGES;
         _serial->writeFrame(out_frame, 1);
@@ -1190,7 +1197,7 @@ public:
       checkConnections();
     }
 
-  #ifdef DISPLAY_CLASS
+  #ifdef HAS_UI
     ui_task.setHasConnection(_serial->isConnected());
     ui_task.loop();
   #endif
@@ -1315,6 +1322,8 @@ void setup() {
 
 #ifdef DISPLAY_CLASS
   display.begin();
+#endif
+#ifdef HAS_UI
   ui_task.begin(the_mesh.getNodeName(), FIRMWARE_BUILD_DATE, the_mesh.getBLEPin());
 #endif
 }

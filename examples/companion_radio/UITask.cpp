@@ -4,6 +4,10 @@
 
 #define AUTO_OFF_MILLIS   15000   // 15 seconds
 
+#ifndef USER_BTN_PRESSED
+#define USER_BTN_PRESSED LOW
+#endif
+
 // 'meshcore', 128x13px
 static const uint8_t meshcore_logo [] PROGMEM = {
     0x3c, 0x01, 0xe3, 0xff, 0xc7, 0xff, 0x8f, 0x03, 0x87, 0xfe, 0x1f, 0xfe, 0x1f, 0xfe, 0x1f, 0xfe, 
@@ -28,7 +32,16 @@ void UITask::begin(const char* node_name, const char* build_date, uint32_t pin_c
   _node_name = node_name;
   _build_date = build_date;
   _pin_code = pin_code;
-  _display->turnOn();
+  if (_display != NULL) {
+    _display->turnOn();
+  }
+}
+
+void UITask::msgRead(int msgcount) {
+  _msgcount = msgcount;
+  if (msgcount == 0) {
+    clearMsgPreview();
+  }
 }
 
 void UITask::clearMsgPreview() {
@@ -36,7 +49,9 @@ void UITask::clearMsgPreview() {
   _msg[0] = 0;
 }
 
-void UITask::showMsgPreview(uint8_t path_len, const char* from_name, const char* text) {
+void UITask::newMsg(uint8_t path_len, const char* from_name, const char* text, int msgcount) {
+  _msgcount = msgcount;
+
   if (path_len == 0xFF) {
     sprintf(_origin, "(F) %s", from_name);
   } else {
@@ -44,67 +59,121 @@ void UITask::showMsgPreview(uint8_t path_len, const char* from_name, const char*
   }
   StrHelper::strncpy(_msg, text, sizeof(_msg));
 
-  if (!_display->isOn()) _display->turnOn();
-  _auto_off = millis() + AUTO_OFF_MILLIS;  // extend the auto-off timer
+  if (_display != NULL) {
+    if (!_display->isOn()) _display->turnOn();
+    _auto_off = millis() + AUTO_OFF_MILLIS;  // extend the auto-off timer
+  }
 }
 
 void UITask::renderCurrScreen() {
-  char tmp[80];
-  if (_origin[0] && _msg[0]) {
-    // render message preview
-    _display->setCursor(0, 0);
-    _display->setTextSize(1);
-    _display->print(_node_name);
+  if (_display != NULL) {
+    char tmp[80];
+    if (_origin[0] && _msg[0]) {
+      // render message preview
+      _display->setCursor(0, 0);
+      _display->setTextSize(1);
+      _display->print(_node_name);
 
-    _display->setCursor(0, 12);
-    _display->print(_origin);
-    _display->setCursor(0, 24);
-    _display->print(_msg);
+      _display->setCursor(0, 12);
+      _display->print(_origin);
+      _display->setCursor(0, 24);
+      _display->print(_msg);
 
-    //_display->setCursor(100, 9);   TODO
-    //_display->setTextSize(2);
-    //_display->printf("%d", msgs);
-  } else {
-    // render 'home' screen
-    _display->drawXbm(0, 0, meshcore_logo, 128, 13);
-    _display->setCursor(0, 20);
-    _display->setTextSize(1);
-    _display->print(_node_name);
-
-    sprintf(tmp, "Build: %s", _build_date);
-    _display->setCursor(0, 32);
-    _display->print(tmp);
-
-    if (_connected) {
-      //_display->printf("freq : %03.2f sf %d\n", _prefs.freq, _prefs.sf);
-      //_display->printf("bw   : %03.2f cr %d\n", _prefs.bw, _prefs.cr);
-    } else if (_pin_code != 0) {
+      _display->setCursor(100, 9);
       _display->setTextSize(2);
-      _display->setCursor(0, 43);
-      sprintf(tmp, "Pin:%d", _pin_code);
+      sprintf(tmp, "%d", _msgcount);
       _display->print(tmp);
+    } else {
+      // render 'home' screen
+      _display->drawXbm(0, 0, meshcore_logo, 128, 13);
+      _display->setCursor(0, 20);
+      _display->setTextSize(1);
+      _display->print(_node_name);
+
+      sprintf(tmp, "Build: %s", _build_date);
+      _display->setCursor(0, 32);
+      _display->print(tmp);
+
+      if (_connected) {
+        //_display->printf("freq : %03.2f sf %d\n", _prefs.freq, _prefs.sf);
+        //_display->printf("bw   : %03.2f cr %d\n", _prefs.bw, _prefs.cr);
+      } else if (_pin_code != 0) {
+        _display->setTextSize(2);
+        _display->setCursor(0, 43);
+        sprintf(tmp, "Pin:%d", _pin_code);
+        _display->print(tmp);
+      }
     }
   }
 }
 
-void UITask::loop() {
-  if (millis() >= _next_read) {
-    int btnState = digitalRead(PIN_USER_BTN);
-    if (btnState != _prevBtnState) {
-      if (btnState == LOW) {  // pressed?
-        if (_display->isOn()) {
-          clearMsgPreview();
-        } else {
-          _display->turnOn();
-        }
-        _auto_off = millis() + AUTO_OFF_MILLIS;   // extend auto-off timer
+void UITask::userLedHandler() {
+#ifdef PIN_STATUS_LED
+  static int state = 0;
+  static int next_change = 0;
+  int cur_time = millis();
+  if (cur_time > next_change) {
+    if (state == 0) {
+      state = 1; // led on, short = unread msg
+      if (_msgcount > 0) {
+        next_change = cur_time + 500;
+      } else {
+        next_change = cur_time + 2000;
       }
-      _prevBtnState = btnState;
+    } else {
+      state = 0;
+      if (_board->getBattMilliVolts() > 3800) {
+        next_change = cur_time + 2000;
+      } else {
+        next_change = cur_time + 4000; // 4s blank if bat level low
+      }
     }
-    _next_read = millis() + 100;  // 10 reads per second
+    digitalWrite(PIN_STATUS_LED, state);
   }
+#endif
+}
 
-  if (_display->isOn()) {
+void UITask::buttonHandler() {
+#ifdef PIN_USER_BTN
+  static int prev_btn_state = HIGH;
+  static unsigned long btn_state_change_time = 0;
+  static unsigned long next_read = 0;
+  int cur_time = millis();
+  if (cur_time >= next_read) {
+    int btn_state = digitalRead(PIN_USER_BTN);
+    if (btn_state != prev_btn_state) {
+      if (btn_state == USER_BTN_PRESSED) {  // pressed?
+        if (_display != NULL) {
+          if (_display->isOn()) {
+            clearMsgPreview();
+          } else {
+            _display->turnOn();
+          }
+          _auto_off = cur_time + AUTO_OFF_MILLIS;   // extend auto-off timer
+        }
+      } else { // unpressed ? check pressed time ...
+        if ((cur_time - btn_state_change_time) > 5000) {
+          Serial.println("power off");
+          #ifdef PIN_STATUS_LED
+          digitalWrite(PIN_STATUS_LED, LOW);
+          delay(10);
+          #endif
+          _board->powerOff();
+        }
+      }
+      btn_state_change_time = millis();
+      prev_btn_state = btn_state;
+    }
+    next_read = millis() + 100;  // 10 reads per second
+  }
+#endif
+}
+
+void UITask::loop() {
+  buttonHandler();
+  userLedHandler();
+
+  if (_display != NULL && _display->isOn()) {
     if (millis() >= _next_refresh) {
       _display->startFrame();
       renderCurrScreen();

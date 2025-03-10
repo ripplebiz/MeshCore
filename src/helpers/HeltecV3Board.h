@@ -24,11 +24,20 @@
 #include <driver/rtc_io.h>
 
 class HeltecV3Board : public ESP32Board {
+private:
+  bool adc_active_state;
+
 public:
   void begin() {
     ESP32Board::begin();
 
+    // Auto-detect correct ADC_CTRL pin polarity (different for boards >3.2)
+    pinMode(PIN_ADC_CTRL, INPUT);
+    adc_active_state = !digitalRead(PIN_ADC_CTRL);
+    
     pinMode(PIN_ADC_CTRL, OUTPUT);
+    digitalWrite(PIN_ADC_CTRL, !adc_active_state); // Initially inactive
+
     pinMode(PIN_VEXT_EN, OUTPUT);
     digitalWrite(PIN_VEXT_EN, LOW);  // for V3.2 boards
 
@@ -69,7 +78,7 @@ public:
 
   uint16_t getBattMilliVolts() override {
     analogReadResolution(10);
-    digitalWrite(PIN_ADC_CTRL, PIN_ADC_CTRL_ACTIVE);
+    digitalWrite(PIN_ADC_CTRL, adc_active_state);
 
     uint32_t raw = 0;
     for (int i = 0; i < 8; i++) {
@@ -77,7 +86,7 @@ public:
     }
     raw = raw / 8;
 
-    digitalWrite(PIN_ADC_CTRL, PIN_ADC_CTRL_INACTIVE);
+    digitalWrite(PIN_ADC_CTRL, !adc_active_state);
 
     return (5.2 * (3.3 / 1024.0) * raw) * 1000;
   }

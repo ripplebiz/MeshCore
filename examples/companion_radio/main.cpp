@@ -15,6 +15,7 @@
 #include <helpers/SimpleMeshTables.h>
 #include <helpers/IdentityStore.h>
 #include <helpers/BaseSerialInterface.h>
+#include <helpers/LocationProvider.h>
 #include <RTClib.h>
 
 /* ---------------------------------- CONFIGURATION ------------------------------------- */
@@ -59,6 +60,11 @@
   #include <helpers/HeltecV3Board.h>
   #include <helpers/CustomSX1262Wrapper.h>
   static HeltecV3Board board;
+  #ifdef HAS_GPS
+  #include <helpers/MicroNMEALocationProvider.h>
+  HardwareSerial gps_serial = HardwareSerial(1);
+  MicroNMEALocationProvider nmea = MicroNMEALocationProvider(gps_serial);
+  #endif
 #elif defined(HELTEC_LORA_V2)
   #include <helpers/HeltecV2Board.h>
   #include <helpers/CustomSX1276Wrapper.h>
@@ -84,6 +90,9 @@
   #include <helpers/nrf52/T1000eBoard.h>
   #include <helpers/CustomLR1110Wrapper.h>
   static T1000eBoard board;
+  #include <helpers/MicroNMEALocationProvider.h>
+  HardwareSerial& gps_serial = Serial1;
+  MicroNMEALocationProvider nmea = MicroNMEALocationProvider(gps_serial);
 #elif defined(HELTEC_T114)
   #include <helpers/nrf52/T114Board.h>
   #include <helpers/CustomSX1262Wrapper.h>
@@ -223,6 +232,10 @@ class MyMesh : public BaseChatMesh {
   uint8_t app_target_ver;
   uint8_t cmd_frame[MAX_FRAME_SIZE+1];
   uint8_t out_frame[MAX_FRAME_SIZE+1];
+#ifdef HAS_GPS  
+  LocationProvider* _gps;
+  bool _time_sync_needed;
+#endif
 
   struct Frame {
     uint8_t len;
@@ -640,6 +653,11 @@ public:
     _prefs.cr = LORA_CR;
     _prefs.tx_power_dbm = LORA_TX_POWER;
     //_prefs.rx_delay_base = 10.0f;  enable once new algo fixed
+
+    #ifdef HAS_GPS
+    _gps = NULL;
+    _time_sync_needed = false;
+    #endif
   }
 
   void begin(FILESYSTEM& fs, mesh::RNG& trng) {
@@ -1163,6 +1181,32 @@ public:
     }
   }
 
+  #ifdef HAS_GPS
+  void setLocationProvider(LocationProvider& lp) {
+    _gps = &lp;
+    _time_sync_needed = true;
+  }
+
+  void handleGps() {
+    static long next_gps_update = 0;
+    if (_gps != NULL) {
+      _gps->loop();
+
+      if (millisHasNowPassed(next_gps_update)) {
+        if (_gps->isValid()) {
+          _prefs.node_lat = ((double)_gps->getLatitude())/1000000.;
+          _prefs.node_lon = ((double)_gps->getLongitude())/1000000.;
+          if (_time_sync_needed) {
+            getRTCClock()->setCurrentTime(_gps->getTimestamp());
+            _time_sync_needed = false;
+          }
+        }
+        next_gps_update = futureMillis(5000);
+      }
+    }
+  }
+  #endif
+
   void loop() {
     BaseChatMesh::loop();
 
@@ -1189,6 +1233,10 @@ public:
     } else if (!_serial->isWriteBusy()) {
       checkConnections();
     }
+
+  #ifdef HAS_GPS
+    handleGps();
+  #endif
 
   #ifdef DISPLAY_CLASS
     ui_task.setHasConnection(_serial->isConnected());
@@ -1328,6 +1376,15 @@ void setup() {
 #ifdef DISPLAY_CLASS
   display.begin();
   ui_task.begin(the_mesh.getNodeName(), FIRMWARE_BUILD_DATE, the_mesh.getBLEPin());
+#endif
+
+#ifdef HAS_GPS
+#ifdef HELTEC_LORA_V3
+  gps_serial.setPins(GPS_RX_PIN, GPS_TX_PIN);
+#endif
+  gps_serial.begin(GPS_BAUDRATE);
+  nmea.begin();
+  the_mesh.setLocationProvider(nmea);
 #endif
 }
 

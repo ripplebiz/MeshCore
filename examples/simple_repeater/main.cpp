@@ -24,11 +24,11 @@
 /* ------------------------------ Config -------------------------------- */
 
 #ifndef FIRMWARE_BUILD_DATE
-  #define FIRMWARE_BUILD_DATE   "7 Mar 2025"
+  #define FIRMWARE_BUILD_DATE   "9 Mar 2025"
 #endif
 
 #ifndef FIRMWARE_VERSION
-  #define FIRMWARE_VERSION   "v1.2.1"
+  #define FIRMWARE_VERSION   "v1.2.2"
 #endif
 
 #ifndef LORA_FREQ
@@ -78,10 +78,14 @@
   #include <helpers/ESP32Board.h>
   #include <helpers/CustomSX1262Wrapper.h>
   static ESP32Board board;
-  #elif defined(LILYGO_TLORA)
+#elif defined(LILYGO_TLORA)
   #include <helpers/LilyGoTLoraBoard.h>
   #include <helpers/CustomSX1276Wrapper.h>
   static LilyGoTLoraBoard board;
+#elif defined(STATION_G2)
+  #include <helpers/StationG2Board.h>
+  #include <helpers/CustomSX1262Wrapper.h>
+  static StationG2Board board;
 #elif defined(RAK_4631)
   #include <helpers/nrf52/RAK4631Board.h>
   #include <helpers/CustomSX1262Wrapper.h>
@@ -248,6 +252,15 @@ protected:
     DateTime dt = DateTime(now);
     sprintf(tmp, "%02d:%02d:%02d - %d/%d/%d U", dt.hour(), dt.minute(), dt.second(), dt.day(), dt.month(), dt.year());
     return tmp;
+  }
+
+  void logRxRaw(float snr, float rssi, const uint8_t raw[], int len) override {
+  #if MESH_PACKET_LOGGING
+    Serial.print(getLogDateTime());
+    Serial.print(" RAW: ");
+    mesh::Utils::printHex(Serial, raw, len);
+    Serial.println();
+  #endif
   }
 
   void logRx(mesh::Packet* pkt, int len, float score) override {
@@ -690,14 +703,16 @@ void setup() {
     halt();
   }
 
-  radio.setCRC(0);
+  radio.setCRC(1);
 
 #ifdef SX126X_CURRENT_LIMIT
   radio.setCurrentLimit(SX126X_CURRENT_LIMIT);
 #endif
-
 #ifdef SX126X_DIO2_AS_RF_SWITCH
   radio.setDio2AsRfSwitch(SX126X_DIO2_AS_RF_SWITCH);
+#endif
+#ifdef SX126X_RX_BOOSTED_GAIN
+  radio.setRxBoostedGainMode(SX126X_RX_BOOSTED_GAIN);
 #endif
 
   fast_rng.begin(radio.random(0x7FFFFFFF));

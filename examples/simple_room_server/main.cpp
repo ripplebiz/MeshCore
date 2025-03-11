@@ -22,11 +22,11 @@
 /* ------------------------------ Config -------------------------------- */
 
 #ifndef FIRMWARE_BUILD_DATE
-  #define FIRMWARE_BUILD_DATE   "7 Mar 2025"
+  #define FIRMWARE_BUILD_DATE   "9 Mar 2025"
 #endif
 
 #ifndef FIRMWARE_VERSION
-  #define FIRMWARE_VERSION   "v1.2.1"
+  #define FIRMWARE_VERSION   "v1.2.2"
 #endif
 
 #ifndef LORA_FREQ
@@ -59,7 +59,7 @@
   #define  ADMIN_PASSWORD  "password"
 #endif
 
-#ifndef MAX_CLIENTS 
+#ifndef MAX_CLIENTS
  #define MAX_CLIENTS           32
 #endif
 
@@ -84,10 +84,22 @@
   #include <helpers/LilyGoTLoraBoard.h>
   #include <helpers/CustomSX1276Wrapper.h>
   static LilyGoTLoraBoard board;
+#elif defined(STATION_G2)
+  #include <helpers/StationG2Board.h>
+  #include <helpers/CustomSX1262Wrapper.h>
+  static StationG2Board board;
 #elif defined(RAK_4631)
   #include <helpers/nrf52/RAK4631Board.h>
   #include <helpers/CustomSX1262Wrapper.h>
   static RAK4631Board board;
+#elif defined(HELTEC_T114)
+  #include <helpers/nrf52/T114Board.h>
+  #include <helpers/CustomSX1262Wrapper.h>
+  static T114Board board;
+#elif defined(LILYGO_TECHO)
+  #include <helpers/nrf52/TechoBoard.h>
+  #include <helpers/CustomSX1262Wrapper.h>
+  static TechoBoard board;
 #else
   #error "need to provide a 'board' object"
 #endif
@@ -260,12 +272,21 @@ protected:
     return _prefs.airtime_factor;
   }
 
+  void logRxRaw(float snr, float rssi, const uint8_t raw[], int len) override {
+    #if MESH_PACKET_LOGGING
+      Serial.print(getLogDateTime());
+      Serial.print(" RAW: ");
+      mesh::Utils::printHex(Serial, raw, len);
+      Serial.println();
+    #endif
+  }
+
   int calcRxDelay(float score, uint32_t air_time) const override {
     if (_prefs.rx_delay_base <= 0.0f) return 0;
     return (int) ((pow(_prefs.rx_delay_base, 0.85f - score) - 1.0) * air_time);
   }
 
-  const char* getLogDateTime() override { 
+  const char* getLogDateTime() override {
     static char tmp[32];
     uint32_t now = getRTCClock()->getCurrentTime();
     DateTime dt = DateTime(now);
@@ -470,7 +491,7 @@ protected:
         } else {
           memcpy(&data[5], &forceSince, 4);  // make sure there are zeroes in payload (for ack_hash calc below)
         }
-        if (forceSince > 0) { 
+        if (forceSince > 0) {
           client->sync_since = forceSince;    // force-update the 'sync since'
         }
 
@@ -525,7 +546,7 @@ protected:
 
 public:
   MyMesh(RADIO_CLASS& phy, mesh::MainBoard& board, RadioLibWrapper& radio, mesh::MillisecondClock& ms, mesh::RNG& rng, mesh::RTCClock& rtc, mesh::MeshTables& tables)
-     : mesh::Mesh(radio, ms, rng, rtc, *new StaticPoolPacketManager(32), tables), 
+     : mesh::Mesh(radio, ms, rng, rtc, *new StaticPoolPacketManager(32), tables),
         _phy(&phy), _board(&board), _cli(board, this, &_prefs, this)
   {
     my_radio = &radio;
@@ -593,7 +614,7 @@ public:
       return false;
     #endif
   }
-    
+
   void sendSelfAdvertisement(int delay_millis) override {
     mesh::Packet* pkt = createSelfAdvert();
     if (pkt) {
@@ -688,7 +709,7 @@ SimpleMeshTables tables;
 #ifdef ESP32
 ESP32RTCClock fallback_clock;
 #else
-VolatileRTCClock fallback_clock; 
+VolatileRTCClock fallback_clock;
 #endif
 AutoDiscoverRTCClock rtc_clock(fallback_clock);
 
@@ -730,14 +751,16 @@ void setup() {
     halt();
   }
 
-  radio.setCRC(0);
+  radio.setCRC(1);
 
 #ifdef SX126X_CURRENT_LIMIT
   radio.setCurrentLimit(SX126X_CURRENT_LIMIT);
 #endif
-
 #ifdef SX126X_DIO2_AS_RF_SWITCH
   radio.setDio2AsRfSwitch(SX126X_DIO2_AS_RF_SWITCH);
+#endif
+#ifdef SX126X_RX_BOOSTED_GAIN
+  radio.setRxBoostedGainMode(SX126X_RX_BOOSTED_GAIN);
 #endif
 
   fast_rng.begin(radio.random(0x7FFFFFFF));
@@ -780,7 +803,7 @@ void loop() {
   int len = strlen(command);
   while (Serial.available() && len < sizeof(command)-1) {
     char c = Serial.read();
-    if (c != '\n') { 
+    if (c != '\n') {
       command[len++] = c;
       command[len] = 0;
     }

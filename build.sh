@@ -57,8 +57,8 @@ build_firmware() {
     pio run -t mergebin -e $1
   fi
 
-  # build .uf2 for RAK_4631 and t1000e
-  if [[ $1 == *"RAK_4631"* || $1 == *"t1000e"* ]]; then
+  # build .uf2 for nrf52 boards
+  if [[ $1 == *"RAK_4631"* || $1 == *"t1000e"* || $1 == *"t114"* || $1 == *"T-Echo"* ]]; then
     python bin/uf2conv/uf2conv.py .pio/build/$1/firmware.hex -c -o .pio/build/$1/firmware.uf2 -f 0xADA52840
   fi
 

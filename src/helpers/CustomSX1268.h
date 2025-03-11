@@ -9,7 +9,7 @@ class CustomSX1268 : public SX1268 {
     CustomSX1268(Module *mod) : SX1268(mod) { }
 
     bool isReceiving() {
-      uint16_t irq = getIrqStatus();
+      uint16_t irq = getIrqFlags();
       bool hasPreamble = (irq & SX126X_IRQ_HEADER_VALID);
       return hasPreamble;
     }

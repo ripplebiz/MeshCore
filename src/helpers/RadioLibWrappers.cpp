@@ -52,10 +52,11 @@ int RadioLibWrapper::recvRaw(uint8_t* bytes, int sz) {
       int err = _radio->readData(bytes, len);
       if (err != RADIOLIB_ERR_NONE) {
         MESH_DEBUG_PRINTLN("RadioLibWrapper: error: readData(%d)", err);
+        len = 0;
       } else {
       //  Serial.print("  readData() -> "); Serial.println(len);
+        n_recv++;
       }
-      n_recv++;
     }
     state = STATE_IDLE;   // need another startReceive()
     return len;

@@ -31,8 +31,13 @@ public:
 
   uint16_t getBattMilliVolts() override {
   #ifdef BATTERY_PIN
+    analogReference(AR_INTERNAL_3_0);
     analogReadResolution(12);
     float volts = (analogRead(BATTERY_PIN) * ADC_MULTIPLIER * AREF_VOLTAGE) / 4096;
+
+    analogReference(AR_DEFAULT);  // put back to default
+    analogReadResolution(10);
+
     return volts * 1000;
   #else
     return 0;

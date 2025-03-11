@@ -126,11 +126,11 @@ static uint32_t _atoi(const char* sp) {
 #define FIRMWARE_VER_CODE    2
 
 #ifndef FIRMWARE_BUILD_DATE
-  #define FIRMWARE_BUILD_DATE   "7 Mar 2025"
+  #define FIRMWARE_BUILD_DATE   "9 Mar 2025"
 #endif
 
 #ifndef FIRMWARE_VERSION
-  #define FIRMWARE_VERSION   "v1.2.1"
+  #define FIRMWARE_VERSION   "v1.2.2"
 #endif
 
 #define CMD_APP_START              1
@@ -190,6 +190,7 @@ static uint32_t _atoi(const char* sp) {
 #define PUSH_CODE_LOGIN_SUCCESS     0x85
 #define PUSH_CODE_LOGIN_FAIL        0x86
 #define PUSH_CODE_STATUS_RESPONSE   0x87
+#define PUSH_CODE_LOG_RX_DATA       0x88
 
 /* -------------------------------------------------------------------------------------- */
 
@@ -456,6 +457,18 @@ protected:
   int calcRxDelay(float score, uint32_t air_time) const override {
     if (_prefs.rx_delay_base <= 0.0f) return 0;
     return (int) ((pow(_prefs.rx_delay_base, 0.85f - score) - 1.0) * air_time);
+  }
+
+  void logRxRaw(float snr, float rssi, const uint8_t raw[], int len) override {
+    if (_serial->isConnected()) {
+      int i = 0;
+      out_frame[i++] = PUSH_CODE_LOG_RX_DATA;
+      out_frame[i++] = (int8_t)(snr * 4);
+      out_frame[i++] = (int8_t)(rssi);
+      memcpy(&out_frame[i], raw, len); i += len;
+
+      _serial->writeFrame(out_frame, i);
+    }
   }
 
   void onDiscoveredContact(ContactInfo& contact, bool is_new) override {
@@ -1297,14 +1310,16 @@ void setup() {
     halt();
   }
 
-  radio.setCRC(0);
+  radio.setCRC(1);
 
 #ifdef SX126X_CURRENT_LIMIT
   radio.setCurrentLimit(SX126X_CURRENT_LIMIT);
 #endif
-
 #ifdef SX126X_DIO2_AS_RF_SWITCH
   radio.setDio2AsRfSwitch(SX126X_DIO2_AS_RF_SWITCH);
+#endif
+#ifdef SX126X_RX_BOOSTED_GAIN
+  radio.setRxBoostedGainMode(SX126X_RX_BOOSTED_GAIN);
 #endif
 
   fast_rng.begin(radio.random(0x7FFFFFFF));
@@ -1315,16 +1330,21 @@ void setup() {
   InternalFS.begin();
   the_mesh.begin(InternalFS, trng);
 
-  #ifdef BLE_PIN_CODE
-    char dev_name[32+10];
-    sprintf(dev_name, "MeshCore-%s", the_mesh.getNodeName());
-    serial_interface.begin(dev_name, the_mesh.getBLEPin());
+#ifdef BLE_PIN_CODE
+  char dev_name[32+10];
+  const char* prefix = 
+  #ifdef BLE_NAME_PREFIX
+      BLE_NAME_PREFIX;
   #else
-    pinMode(WB_IO2, OUTPUT);
-    serial_interface.begin(Serial);
+      "MeshCore-";
   #endif
-    the_mesh.startInterface(serial_interface);
-
+  sprintf(dev_name, "%s%s", prefix, the_mesh.getNodeName());
+  serial_interface.begin(dev_name, the_mesh.getBLEPin());
+#else
+  pinMode(WB_IO2, OUTPUT);
+  serial_interface.begin(Serial);
+#endif
+  the_mesh.startInterface(serial_interface);
 #elif defined(ESP32)
   SPIFFS.begin(true);
   the_mesh.begin(SPIFFS, trng);
@@ -1339,7 +1359,13 @@ void setup() {
   serial_interface.begin(TCP_PORT);
 #elif defined(BLE_PIN_CODE)
   char dev_name[32+10];
-  sprintf(dev_name, "MeshCore-%s", the_mesh.getNodeName());
+  const char* prefix = 
+  #ifdef BLE_NAME_PREFIX
+      BLE_NAME_PREFIX;
+  #else
+      "MeshCore-";
+  #endif
+  sprintf(dev_name, "%s%s", prefix, the_mesh.getNodeName());
   serial_interface.begin(dev_name, the_mesh.getBLEPin());
 #else
   serial_interface.begin(Serial);

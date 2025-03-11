@@ -3,7 +3,7 @@
 
 #if defined(NRF52_PLATFORM)
   #include <InternalFileSystem.h>
-#elif defined(ESP32) 
+#elif defined(ESP32)
   #include <SPIFFS.h>
 #elif defined(ESP8285) || defined(ESP866)
   #include <FS.h>

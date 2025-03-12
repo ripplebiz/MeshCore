@@ -102,7 +102,7 @@ class Dispatcher {
   uint32_t n_recv_flood, n_recv_direct;
   uint32_t n_full_events;
 
-  void processRecvPacket(Packet* pkt);
+  virtual void processRecvPacket(Packet* pkt);
 
 protected:
   PacketManager* _mgr;

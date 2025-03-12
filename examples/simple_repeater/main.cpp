@@ -59,22 +59,63 @@
   #define  ADMIN_PASSWORD  "password"
 #endif
 
+#ifndef WIFI_BRIDGE_HOST
+  #define WIFI_BRIDGE_HOST false
+#endif
+
+#ifndef WIFI_BRIDGE_SSID
+  #define WIFI_BRIDGE_SSID "meshcore-bridge"
+#endif
+
+#ifndef WIFI_BRIDGE_PASSWORD
+  #define WIFI_BRIDGE_PASSWORD "password"
+#endif
+
+#ifndef UDP_SERVER_PORT
+  #define UDP_SERVER_PORT 8000
+#endif
+
+#ifndef UDP_PACKET_BUFFER_SIZE
+  #define UDP_PACKET_BUFFER_SIZE 10
+#endif
+
+
 #if defined(HELTEC_LORA_V3)
   #include <helpers/HeltecV3Board.h>
   #include <helpers/CustomSX1262Wrapper.h>
+  #include <WiFi.h>
+  #include "AsyncUDP.h"
+  #include <Vector.h>
+  #include <Packet.h>
+  #include <Dispatcher.h>
   static HeltecV3Board board;
 #elif defined(HELTEC_LORA_V2)
   #include <helpers/HeltecV2Board.h>
   #include <helpers/CustomSX1276Wrapper.h>
+  #include <WiFi.h>
+  #include "AsyncUDP.h"
+  #include <Vector.h>
+  #include <Packet.h>
+  #include <Dispatcher.h>
   static HeltecV2Board board;
 #elif defined(ARDUINO_XIAO_ESP32C3)
   #include <helpers/XiaoC3Board.h>
   #include <helpers/CustomSX1262Wrapper.h>
   #include <helpers/CustomSX1268Wrapper.h>
+  #include <WiFi.h>
+  #include "AsyncUDP.h"
+  #include <Vector.h>
+  #include <Packet.h>
+  #include <Dispatcher.h>
   static XiaoC3Board board;
 #elif defined(SEEED_XIAO_S3) || defined(LILYGO_T3S3)
   #include <helpers/ESP32Board.h>
   #include <helpers/CustomSX1262Wrapper.h>
+  #include <WiFi.h>
+  #include "AsyncUDP.h"
+  #include <Vector.h>
+  #include <Packet.h>
+  #include <Dispatcher.h>
   static ESP32Board board;
 #elif defined(LILYGO_TLORA)
   #include <helpers/LilyGoTLoraBoard.h>
@@ -83,6 +124,11 @@
 #elif defined(STATION_G2)
   #include <helpers/StationG2Board.h>
   #include <helpers/CustomSX1262Wrapper.h>
+  #include <WiFi.h>
+  #include "AsyncUDP.h"
+  #include <Vector.h>
+  #include <Packet.h>
+  #include <Dispatcher.h>
   static StationG2Board board;
 #elif defined(RAK_4631)
   #include <helpers/nrf52/RAK4631Board.h>
@@ -116,6 +162,10 @@
 #define CMD_GET_STATUS      0x01
 
 #define RESP_SERVER_LOGIN_OK      0   // response to ANON_REQ
+
+#ifdef WiFi_h
+void wifiEventCb(arduino_event_t* event);
+#endif
 
 struct RepeaterStats {
   uint16_t batt_milli_volts;
@@ -158,6 +208,13 @@ class MyMesh : public mesh::Mesh, public CommonCLICallbacks {
   CommonCLI _cli;
   uint8_t reply_data[MAX_PACKET_PAYLOAD];
   ClientInfo known_clients[MAX_CLIENTS];
+
+  #ifdef WiFi_h
+  AsyncUDP udp;
+  mesh::Packet* inboundUdpBuffer[UDP_PACKET_BUFFER_SIZE];
+  Vector<mesh::Packet*> inboundUdpPackets;
+  bool _isServerRunning;
+  #endif
 
   ClientInfo* putClient(const mesh::Identity& id) {
     uint32_t min_time = 0xFFFFFFFF;
@@ -228,6 +285,148 @@ class MyMesh : public mesh::Mesh, public CommonCLICallbacks {
     return _fs->open(fname, "a", true);
   #endif
   }
+
+  #ifdef WiFi_h
+
+  void processRecvPacket(mesh::Packet* pkt) override {
+    mesh::DispatcherAction action = onRecvPacket(pkt);
+    if (action == ACTION_RELEASE) {
+      _mgr->free(pkt);
+    } else if (action == ACTION_MANUAL_HOLD) {
+      // sub-class is wanting to manually hold Packet instance, and call releasePacket() at appropriate time
+    } else {   // ACTION_RETRANSMIT*
+      uint8_t priority = (action >> 24) - 1;
+      uint32_t _delay = action & 0xFFFFFF;
+  
+      
+  
+      if(_isServerRunning){ 
+      
+        Serial.println("Bridging outbound packet to wifi network");
+
+        uint8_t pktBuffer[256];
+        uint8_t pktLen = pkt->writeTo(pktBuffer);
+        
+        udp.broadcastTo( pktBuffer, pktLen, UDP_SERVER_PORT);
+
+      }
+
+      _mgr->queueOutbound(pkt, priority, futureMillis(_delay));
+    }
+  }
+
+  public:
+
+  void handleUdpPackets(){
+
+    if(!_isServerRunning){ return; }
+
+    if(!inboundUdpPackets.empty()){
+      Serial.printf("Processing %d udp packets\n", inboundUdpPackets.size());
+    }
+
+    while(!inboundUdpPackets.empty()){
+      mesh::Packet* pkt = inboundUdpPackets.front();
+      inboundUdpPackets.remove(0);
+
+      mesh::DispatcherAction action = onRecvPacket(pkt);
+      if (action == ACTION_RELEASE) {
+        Serial.println("release udp packet");
+        _mgr->free(pkt);
+      } else if (action == ACTION_MANUAL_HOLD) {
+        Serial.println("hold");
+        // sub-class is wanting to manually hold Packet instance, and call releasePacket() at appropriate time
+      } else {   // ACTION_RETRANSMIT*
+        uint8_t priority = (action >> 24) - 1;
+        uint32_t _delay = action & 0xFFFFFF;
+
+        Serial.println("bridging udp packet to mesh");
+
+        _mgr->queueOutbound(pkt, priority, futureMillis(_delay));
+      }
+    }
+
+  }
+
+  void startServer(){
+
+    if(_isServerRunning){ return; }
+
+    inboundUdpPackets = Vector<mesh::Packet*>(inboundUdpBuffer);
+
+    if (udp.listen(UDP_SERVER_PORT)) {
+
+      _isServerRunning = true;
+      Serial.println("UDP Listening on IP: ");
+      Serial.println(WiFi.localIP());
+      udp.onPacket([this](AsyncUDPPacket packet) {
+        Serial.print("UDP Packet Type: ");
+        Serial.print(packet.isBroadcast() ? "Broadcast" : packet.isMulticast() ? "Multicast" : "Unicast");
+        Serial.print(", From: ");
+        Serial.print(packet.remoteIP());
+        Serial.print(":");
+        Serial.print(packet.remotePort());
+        Serial.print(", To: ");
+        Serial.print(packet.localIP());
+        Serial.print(":");
+        Serial.print(packet.localPort());
+        Serial.print(", Length: ");
+        Serial.print(packet.length());
+        Serial.println();
+
+        mesh::Packet* pkt = this->obtainNewPacket();
+        pkt->readFrom(packet.data(), packet.length());
+
+        Serial.printf("Size: %d max: %d\n", inboundUdpPackets.size(), inboundUdpPackets.max_size());
+
+        if(!inboundUdpPackets.full()){
+
+          inboundUdpPackets.push_back(pkt);
+          Serial.println("queued udp packet");
+
+        } else {
+          this->releasePacket(pkt);
+        }
+      });
+
+
+
+      Serial.print("UDP ready");
+    }
+  }
+
+  void wifiEventHandler(arduino_event_t* event) {
+    switch (event->event_id) {
+      case SYSTEM_EVENT_STA_CONNECTED:
+        Serial.println("ESP32 Connected to WiFi Network");
+        this->startServer();
+        break;
+      case  SYSTEM_EVENT_STA_GOT_IP:
+        Serial.println("ESP32 got IP");
+        this->startServer();
+        break;
+      case SYSTEM_EVENT_AP_START:
+        Serial.println("ESP32 soft AP started");
+        this->startServer();
+        break;
+      case ARDUINO_EVENT_WIFI_AP_STACONNECTED:
+        Serial.println("Station connected to ESP32 soft AP");
+        break;
+      case ARDUINO_EVENT_WIFI_AP_STADISCONNECTED:
+        Serial.println("Station disconnected from ESP32 soft AP");
+        break;
+      case ARDUINO_EVENT_WIFI_AP_STAIPASSIGNED:
+        Serial.println("IP assigned to soft AP client");
+        this->startServer();
+        break;
+      default:
+        Serial.printf("wifi event %d \n", (uint8_t) event->event_id );
+        break;
+    }
+  }
+
+  #endif
+
 
 protected:
   float getAirtimeBudgetFactor() const override {
@@ -520,7 +719,9 @@ public:
     memset(known_clients, 0, sizeof(known_clients));
     next_local_advert = 0;
     _logging = false;
-
+    #ifdef WiFi_h
+    _isServerRunning = false;
+    #endif
     // defaults
     memset(&_prefs, 0, sizeof(_prefs));
     _prefs.airtime_factor = 1.0;    // one half
@@ -535,7 +736,7 @@ public:
     _prefs.bw = LORA_BW;
     _prefs.cr = LORA_CR;
     _prefs.tx_power_dbm = LORA_TX_POWER;
-    _prefs.advert_interval = 1;  // default to 2 minutes for NEW installs
+    _prefs.advert_interval = 10;  // default to 2 minutes for NEW installs
   }
 
   CommonCLI* getCLI() { return &_cli; }
@@ -551,6 +752,27 @@ public:
     _phy->setBandwidth(_prefs.bw);
     _phy->setCodingRate(_prefs.cr);
     _phy->setOutputPower(_prefs.tx_power_dbm);
+
+#ifdef WiFi_h
+    WiFi.disconnect(true);
+
+    if(WIFI_BRIDGE_HOST){
+    
+      Serial.println("wifi ap starting");
+      
+      WiFi.onEvent(wifiEventCb);
+      WiFi.mode(WIFI_MODE_AP);
+      WiFi.softAP(WIFI_BRIDGE_SSID, WIFI_BRIDGE_PASSWORD);
+    
+    } else {
+
+      Serial.println("wifi client starting");
+      WiFi.onEvent(wifiEventCb);
+      WiFi.mode(WIFI_MODE_STA);
+      WiFi.begin(WIFI_BRIDGE_SSID, WIFI_BRIDGE_PASSWORD);
+
+    }
+#endif
 
     updateAdvertTimer();
   }
@@ -614,6 +836,9 @@ public:
   }
 
   void loop() {
+#ifdef WiFi_h
+    handleUdpPackets();
+#endif
     mesh::Mesh::loop();
 
     if (next_local_advert && millisHasNowPassed(next_local_advert)) {
@@ -658,6 +883,12 @@ void halt() {
 }
 
 static char command[80];
+
+#ifdef WiFi_h
+void wifiEventCb(arduino_event_t* event){
+  the_mesh.wifiEventHandler(event);
+}
+#endif
 
 void setup() {
   Serial.begin(115200);

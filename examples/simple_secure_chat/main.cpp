@@ -107,7 +107,7 @@ class MyMesh : public BaseChatMesh, ContactVisitor {
   FILESYSTEM* _fs;
   NodePrefs _prefs;
   uint32_t expected_ack_crc;
-  mesh::GroupChannel* _public;
+  ChannelDetails* _public;
   unsigned long last_msg_sent;
   ContactInfo* curr_recipient;
   char command[512+10];
@@ -337,7 +337,7 @@ public:
     }
 
     loadContacts();
-    _public = addChannel(PUBLIC_GROUP_PSK); // pre-configure Andy's public channel
+    _public = addChannel("Public", PUBLIC_GROUP_PSK); // pre-configure Andy's public channel
   }
 
   void savePrefs() {
@@ -405,7 +405,7 @@ public:
       temp[5 + MAX_TEXT_LEN] = 0;  // truncate if too long
 
       int len = strlen((char *) &temp[5]);
-      auto pkt = createGroupDatagram(PAYLOAD_TYPE_GRP_TXT, *_public, temp, 5 + len);
+      auto pkt = createGroupDatagram(PAYLOAD_TYPE_GRP_TXT, _public->channel, temp, 5 + len);
       if (pkt) {
         sendFlood(pkt);
         Serial.println("   Sent.");

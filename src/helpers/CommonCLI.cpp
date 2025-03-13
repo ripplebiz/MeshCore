@@ -41,6 +41,7 @@ void CommonCLI::loadPrefs(FILESYSTEM* fs) {
       file.read((uint8_t *) &_prefs->reserved2, sizeof(_prefs->reserved2));  // 115
       file.read((uint8_t *) &_prefs->bw, sizeof(_prefs->bw));  // 116
       file.read(pad, 4);   // 120
+      file.read((uint8_t *) &_prefs->flood_max, sizeof(_prefs->flood_max));   // 124
 
       // sanitise bad pref values
       _prefs->rx_delay_base = constrain(_prefs->rx_delay_base, 0, 20.0f);
@@ -91,6 +92,7 @@ void CommonCLI::savePrefs(FILESYSTEM* fs) {
     file.write((uint8_t *) &_prefs->reserved2, sizeof(_prefs->reserved2));  // 115
     file.write((uint8_t *) &_prefs->bw, sizeof(_prefs->bw));  // 116
     file.write(pad, 4);   // 120
+    file.write((uint8_t *) &_prefs->flood_max, sizeof(_prefs->flood_max));   // 124
 
     file.close();
   }
@@ -176,6 +178,8 @@ void CommonCLI::handleCommand(uint32_t sender_timestamp, const char* command, ch
         sprintf(reply, "> %s", StrHelper::ftoa(_prefs->rx_delay_base));
       } else if (memcmp(config, "txdelay", 7) == 0) {
         sprintf(reply, "> %s", StrHelper::ftoa(_prefs->tx_delay_factor));
+      } else if (memcmp(config, "flood.max", 9) == 0) {
+        sprintf(reply, "> %d", (uint32_t)_prefs->flood_max);
       } else if (memcmp(config, "direct.txdelay", 14) == 0) {
         sprintf(reply, "> %s", StrHelper::ftoa(_prefs->direct_tx_delay_factor));
       } else if (memcmp(config, "tx", 2) == 0 && (config[2] == 0 || config[2] == ' ')) {
@@ -261,6 +265,15 @@ void CommonCLI::handleCommand(uint32_t sender_timestamp, const char* command, ch
           strcpy(reply, "OK");
         } else {
           strcpy(reply, "Error, cannot be negative");
+        }
+      } else if (memcmp(config, "flood.max ", 10) == 0) {
+        uint8_t m = atoi(&config[10]);
+        if (m <= 64) {
+          _prefs->flood_max = m;
+          savePrefs();
+          strcpy(reply, "OK");
+        } else {
+          strcpy(reply, "Error, max 64");
         }
       } else if (memcmp(config, "direct.txdelay ", 15) == 0) {
         float f = atof(&config[15]);

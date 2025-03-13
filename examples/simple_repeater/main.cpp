@@ -22,11 +22,11 @@
 /* ------------------------------ Config -------------------------------- */
 
 #ifndef FIRMWARE_BUILD_DATE
-  #define FIRMWARE_BUILD_DATE   "9 Mar 2025"
+  #define FIRMWARE_BUILD_DATE   "13 Mar 2025"
 #endif
 
 #ifndef FIRMWARE_VERSION
-  #define FIRMWARE_VERSION   "v1.2.2"
+  #define FIRMWARE_VERSION   "v1.3.0"
 #endif
 
 #ifndef LORA_FREQ
@@ -235,7 +235,9 @@ protected:
   }
 
   bool allowPacketForward(const mesh::Packet* packet) override {
-    return !_prefs.disable_fwd;
+    if (_prefs.disable_fwd) return false;
+    if (packet->isRouteFlood() && packet->path_len >= _prefs.flood_max) return false;
+    return true;
   }
 
   const char* getLogDateTime() override {
@@ -536,6 +538,7 @@ public:
     _prefs.cr = LORA_CR;
     _prefs.tx_power_dbm = LORA_TX_POWER;
     _prefs.advert_interval = 1;  // default to 2 minutes for NEW installs
+    _prefs.flood_max = 64;
   }
 
   CommonCLI* getCLI() { return &_cli; }

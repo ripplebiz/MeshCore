@@ -23,6 +23,7 @@ struct NodePrefs {  // persisted to file
     uint8_t reserved1;
     uint8_t reserved2;
     float bw;
+    uint8_t flood_max;
 };
 
 class CommonCLICallbacks {

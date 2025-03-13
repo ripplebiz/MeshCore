@@ -17,6 +17,10 @@ public:
     // for future use, sub-classes SHOULD call this from their begin()
     startup_reason = BD_STARTUP_NORMAL;
 
+  #ifdef ESP32_CPU_FREQ
+    setCpuFrequencyMhz(ESP32_CPU_FREQ);
+  #endif
+
   #ifdef PIN_VBAT_READ
     // battery read support
     pinMode(PIN_VBAT_READ, INPUT);

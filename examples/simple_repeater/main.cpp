@@ -59,6 +59,10 @@
   #define  ADMIN_PASSWORD  "password"
 #endif
 
+#ifndef WIFI_ENABLE
+  #define WIFI_ENABLE false
+#endif
+
 #ifndef WIFI_BRIDGE_HOST
   #define WIFI_BRIDGE_HOST false
 #endif
@@ -69,6 +73,10 @@
 
 #ifndef WIFI_BRIDGE_PASSWORD
   #define WIFI_BRIDGE_PASSWORD "password"
+#endif
+
+#ifndef UDP_SERVER_ENABLE
+  #define UDP_SERVER_ENABLE false
 #endif
 
 #ifndef UDP_SERVER_PORT
@@ -354,7 +362,7 @@ class MyMesh : public mesh::Mesh, public CommonCLICallbacks {
 
     inboundUdpPackets = Vector<mesh::Packet*>(inboundUdpBuffer);
 
-    if (udp.listen(UDP_SERVER_PORT)) {
+    if (udp.listen(_prefs.udp_bridge_server_port)) {
 
       _isServerRunning = true;
       Serial.println("UDP Listening on IP: ");
@@ -740,6 +748,13 @@ public:
     _prefs.tx_power_dbm = LORA_TX_POWER;
     _prefs.advert_interval = 1;  // default to 2 minutes for NEW installs
     _prefs.flood_max = 64;
+
+    _prefs.wifi_enable = WIFI_ENABLE;
+    _prefs.wifi_ap_enable = WIFI_BRIDGE_HOST;
+    StrHelper::strncpy(_prefs.wifi_ssid, WIFI_BRIDGE_SSID, sizeof(_prefs.wifi_ssid));
+    StrHelper::strncpy(_prefs.wifi_password, WIFI_BRIDGE_PASSWORD, sizeof(_prefs.wifi_password));
+    _prefs.udp_bridge_enable = UDP_SERVER_ENABLE;
+    _prefs.udp_bridge_server_port = UDP_SERVER_PORT;
   }
 
   CommonCLI* getCLI() { return &_cli; }
@@ -759,20 +774,20 @@ public:
 #ifdef WiFi_h
     WiFi.disconnect(true);
 
-    if(WIFI_BRIDGE_HOST){
+    if(_prefs.wifi_ap_enable){
     
       Serial.println("wifi ap starting");
       
       WiFi.onEvent(wifiEventCb);
       WiFi.mode(WIFI_MODE_AP);
-      WiFi.softAP(WIFI_BRIDGE_SSID, WIFI_BRIDGE_PASSWORD);
+      WiFi.softAP(_prefs.wifi_ssid, _prefs.wifi_password);
     
-    } else {
+    } else if(_prefs.wifi_enable) {
 
       Serial.println("wifi client starting");
       WiFi.onEvent(wifiEventCb);
       WiFi.mode(WIFI_MODE_STA);
-      WiFi.begin(WIFI_BRIDGE_SSID, WIFI_BRIDGE_PASSWORD);
+      WiFi.softAP(_prefs.wifi_ssid, _prefs.wifi_password);
 
     }
 #endif

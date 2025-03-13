@@ -30,7 +30,6 @@ struct NodePrefs {  // persisted to file
     char wifi_password[32];
     bool udp_bridge_enable;
     uint16_t udp_bridge_server_port;
-    uint8_t udp_bridge_packet_buffer;
 };
 
 class CommonCLICallbacks {

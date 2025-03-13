@@ -43,6 +43,13 @@ void CommonCLI::loadPrefs(FILESYSTEM* fs) {
       file.read(pad, 4);   // 120
       file.read((uint8_t *) &_prefs->flood_max, sizeof(_prefs->flood_max));   // 124
 
+      file.read((uint8_t*) &_prefs->wifi_enable, sizeof(_prefs->wifi_enable));         //125
+      file.read((uint8_t*) &_prefs->wifi_ap_enable, sizeof(_prefs->wifi_ap_enable));   //126
+      file.read((uint8_t*) &_prefs->wifi_ssid, sizeof(_prefs->wifi_ssid));             //127
+      file.read((uint8_t*) &_prefs->wifi_password, sizeof(_prefs->wifi_password));     //159
+      file.read((uint8_t*) &_prefs->udp_bridge_enable, sizeof(_prefs->udp_bridge_enable));  //191
+      file.read((uint8_t*) &_prefs->udp_bridge_server_port, sizeof(_prefs->udp_bridge_server_port));  //192
+
       // sanitise bad pref values
       _prefs->rx_delay_base = constrain(_prefs->rx_delay_base, 0, 20.0f);
       _prefs->tx_delay_factor = constrain(_prefs->tx_delay_factor, 0, 2.0f);
@@ -93,6 +100,13 @@ void CommonCLI::savePrefs(FILESYSTEM* fs) {
     file.write((uint8_t *) &_prefs->bw, sizeof(_prefs->bw));  // 116
     file.write(pad, 4);   // 120
     file.write((uint8_t *) &_prefs->flood_max, sizeof(_prefs->flood_max));   // 124
+
+    file.write((uint8_t*) &_prefs->wifi_enable, sizeof(_prefs->wifi_enable));         //125
+    file.write((uint8_t*) &_prefs->wifi_ap_enable, sizeof(_prefs->wifi_ap_enable));   //126
+    file.write((uint8_t*) &_prefs->wifi_ssid, sizeof(_prefs->wifi_ssid));             //127
+    file.write((uint8_t*) &_prefs->wifi_password, sizeof(_prefs->wifi_password));     //159
+    file.write((uint8_t*) &_prefs->udp_bridge_enable, sizeof(_prefs->udp_bridge_enable));  //191
+    file.write((uint8_t*) &_prefs->udp_bridge_server_port, sizeof(_prefs->udp_bridge_server_port));  //192
 
     file.close();
   }
@@ -180,6 +194,18 @@ void CommonCLI::handleCommand(uint32_t sender_timestamp, const char* command, ch
         sprintf(reply, "> %s", StrHelper::ftoa(_prefs->tx_delay_factor));
       } else if (memcmp(config, "flood.max", 9) == 0) {
         sprintf(reply, "> %d", (uint32_t)_prefs->flood_max);
+      } else if (memcmp(config, "wifi.enable", 11) == 0) {
+        sprintf(reply, "> %s", _prefs->wifi_enable ? "off" : "on");
+      } else if (memcmp(config, "wifi.ap_enable", 14) == 0) {
+        sprintf(reply, "> %s", _prefs->wifi_ap_enable ? "off" : "on");
+      } else if (memcmp(config, "wifi.ssid", 9) == 0) {
+        sprintf(reply, "> %s", _prefs->wifi_ssid);
+      } else if (memcmp(config, "wifi.password", 13) == 0) {
+        sprintf(reply, "> %s", _prefs->wifi_password);
+      } else if (memcmp(config, "udp.enable", 10) == 0) {
+        sprintf(reply, "> %s", _prefs->udp_bridge_enable ? "off" : "on");
+      } else if (memcmp(config, "udp.port", 8) == 0) {
+        sprintf(reply, "> %d", (uint32_t) _prefs->udp_bridge_server_port);
       } else if (memcmp(config, "direct.txdelay", 14) == 0) {
         sprintf(reply, "> %s", StrHelper::ftoa(_prefs->direct_tx_delay_factor));
       } else if (memcmp(config, "tx", 2) == 0 && (config[2] == 0 || config[2] == ' ')) {
@@ -275,6 +301,31 @@ void CommonCLI::handleCommand(uint32_t sender_timestamp, const char* command, ch
         } else {
           strcpy(reply, "Error, max 64");
         }
+      } else if (memcmp(config, "wifi.enable ", 12) == 0) {
+        _prefs->wifi_enable = memcmp(&config[12], "off", 3) == 0;
+        savePrefs();
+        strcpy(reply, _prefs->wifi_enable ? "OK - Reboot to apply wifi OFF" : "OK - Reboot to apply wifi ON");
+      } else if (memcmp(config, "wifi.ap_enable ", 15) == 0) {
+        _prefs->wifi_enable = memcmp(&config[15], "off", 3) == 0;
+        savePrefs();
+        strcpy(reply, _prefs->wifi_enable ? "OK - Reboot to apply wifi AP OFF" : "OK - Reboot to apply wifi AP ON");
+      } else if (memcmp(config, "wifi.ssid ", 10) == 0) {
+        StrHelper::strncpy(_prefs->wifi_ssid, &config[10], sizeof(_prefs->wifi_ssid));
+        savePrefs();
+        strcpy(reply, "OK - Reboot to apply");
+      } else if (memcmp(config, "wifi.password ", 14) == 0) {
+        StrHelper::strncpy(_prefs->wifi_password, &config[14], sizeof(_prefs->wifi_password));
+        savePrefs();
+        strcpy(reply, "OK - Reboot to apply");
+      } else if (memcmp(config, "udp.enable ", 11) == 0) {
+        _prefs->udp_bridge_enable = memcmp(&config[11], "off", 3) == 0;
+        savePrefs();
+        strcpy(reply, _prefs->udp_bridge_enable ? "OK - Reboot to apply UDP server OFF" : "OK - Reboot to apply UDP server ON");
+      } else if (memcmp(config, "udp.port ", 9) == 0) {
+        uint16_t p = atoi(&config[9]);
+        _prefs->udp_bridge_server_port = p;
+        savePrefs();
+        strcpy(reply, "OK - Reboot to apply");
       } else if (memcmp(config, "direct.txdelay ", 15) == 0) {
         float f = atof(&config[15]);
         if (f >= 0) {

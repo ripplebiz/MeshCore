@@ -294,30 +294,18 @@ class MyMesh : public mesh::Mesh, public CommonCLICallbacks {
   #endif
   }
 
-  #ifdef WiFi_h
+#ifdef WiFi_h
 
-  void processRecvPacket(mesh::Packet* pkt) override {
-    mesh::DispatcherAction action = onRecvPacket(pkt);
-    if (action == ACTION_RELEASE) {
-      _mgr->free(pkt);
-    } else if (action == ACTION_MANUAL_HOLD) {
-      // sub-class is wanting to manually hold Packet instance, and call releasePacket() at appropriate time
-    } else {   // ACTION_RETRANSMIT*
-      uint8_t priority = (action >> 24) - 1;
-      uint32_t _delay = action & 0xFFFFFF;
-  
-      if(_prefs.udp_bridge_enable){ 
+  void onSendPacket(mesh::Packet* pkt) override {
+    if(_prefs.udp_bridge_enable && _isServerRunning){ 
+    
+      Serial.println("Bridging outbound packet to network");
+
+      uint8_t pktBuffer[256];
+      uint8_t pktLen = pkt->writeTo(pktBuffer);
       
-        Serial.println("Bridging outbound packet to network");
+      udp.broadcastTo( pktBuffer, pktLen, _prefs.udp_bridge_server_port);
 
-        uint8_t pktBuffer[256];
-        uint8_t pktLen = pkt->writeTo(pktBuffer);
-        
-        udp.broadcastTo( pktBuffer, pktLen, UDP_SERVER_PORT);
-
-      }
-
-      _mgr->queueOutbound(pkt, priority, futureMillis(_delay));
     }
   }
 
@@ -429,7 +417,7 @@ public:
     }
   }
 
-  #endif
+#endif
 
 
 protected:
@@ -768,10 +756,10 @@ public:
     _phy->setOutputPower(_prefs.tx_power_dbm);
 
 #ifdef WiFi_h
-    WiFi.disconnect(true);
 
     if(_prefs.wifi_ap_enable){
     
+      WiFi.disconnect(true);
       Serial.println("wifi ap starting");
       
       WiFi.onEvent(wifiEventCb);
@@ -780,10 +768,11 @@ public:
     
     } else if(_prefs.wifi_enable) {
 
+      WiFi.disconnect(true);
       Serial.println("wifi client starting");
       WiFi.onEvent(wifiEventCb);
       WiFi.mode(WIFI_MODE_STA);
-      WiFi.softAP(_prefs.wifi_ssid, _prefs.wifi_password);
+      WiFi.begin(_prefs.wifi_ssid, _prefs.wifi_password);
 
     }
 #endif

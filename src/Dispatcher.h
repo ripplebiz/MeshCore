@@ -102,7 +102,7 @@ class Dispatcher {
   uint32_t n_recv_flood, n_recv_direct;
   uint32_t n_full_events;
 
-  virtual void processRecvPacket(Packet* pkt);
+  void processRecvPacket(Packet* pkt);
 
 protected:
   PacketManager* _mgr;
@@ -116,6 +116,7 @@ protected:
   }
 
   virtual DispatcherAction onRecvPacket(Packet* pkt) = 0;
+  virtual void onSendPacket(Packet* pkt);
 
   virtual void logRxRaw(float snr, float rssi, const uint8_t raw[], int len) { }   // custom hook
 

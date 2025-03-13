@@ -166,6 +166,10 @@ void Dispatcher::checkRecv() {
   }
 }
 
+void Dispatcher::onSendPacket(Packet* pkt) {
+  //
+}
+
 void Dispatcher::processRecvPacket(Packet* pkt) {
   DispatcherAction action = onRecvPacket(pkt);
   if (action == ACTION_RELEASE) {
@@ -190,6 +194,7 @@ void Dispatcher::checkSend() {
 
   outbound = _mgr->getNextOutbound(_ms->getMillis());
   if (outbound) {
+    onSendPacket(outbound);
     int len = 0;
     uint8_t raw[MAX_TRANS_UNIT];
 

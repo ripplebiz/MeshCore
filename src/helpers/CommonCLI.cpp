@@ -195,15 +195,15 @@ void CommonCLI::handleCommand(uint32_t sender_timestamp, const char* command, ch
       } else if (memcmp(config, "flood.max", 9) == 0) {
         sprintf(reply, "> %d", (uint32_t)_prefs->flood_max);
       } else if (memcmp(config, "wifi.enable", 11) == 0) {
-        sprintf(reply, "> %s", _prefs->wifi_enable ? "off" : "on");
+        sprintf(reply, "> %s", _prefs->wifi_enable ? "on" : "off");
       } else if (memcmp(config, "wifi.ap_enable", 14) == 0) {
-        sprintf(reply, "> %s", _prefs->wifi_ap_enable ? "off" : "on");
+        sprintf(reply, "> %s", _prefs->wifi_ap_enable ? "on" : "off");
       } else if (memcmp(config, "wifi.ssid", 9) == 0) {
         sprintf(reply, "> %s", _prefs->wifi_ssid);
       } else if (memcmp(config, "wifi.password", 13) == 0) {
         sprintf(reply, "> %s", _prefs->wifi_password);
       } else if (memcmp(config, "udp.enable", 10) == 0) {
-        sprintf(reply, "> %s", _prefs->udp_bridge_enable ? "off" : "on");
+        sprintf(reply, "> %s", _prefs->udp_bridge_enable ? "on" : "off");
       } else if (memcmp(config, "udp.port", 8) == 0) {
         sprintf(reply, "> %d", (uint32_t) _prefs->udp_bridge_server_port);
       } else if (memcmp(config, "direct.txdelay", 14) == 0) {
@@ -302,13 +302,13 @@ void CommonCLI::handleCommand(uint32_t sender_timestamp, const char* command, ch
           strcpy(reply, "Error, max 64");
         }
       } else if (memcmp(config, "wifi.enable ", 12) == 0) {
-        _prefs->wifi_enable = memcmp(&config[12], "off", 3) == 0;
+        _prefs->wifi_enable = memcmp(&config[12], "on", 2) == 0;
         savePrefs();
-        strcpy(reply, _prefs->wifi_enable ? "OK - Reboot to apply wifi OFF" : "OK - Reboot to apply wifi ON");
+        strcpy(reply, _prefs->wifi_enable ? "OK - Reboot to apply wifi ON" : "OK - Reboot to apply wifi OFF");
       } else if (memcmp(config, "wifi.ap_enable ", 15) == 0) {
-        _prefs->wifi_enable = memcmp(&config[15], "off", 3) == 0;
+        _prefs->wifi_ap_enable = memcmp(&config[15], "on", 2) == 0;
         savePrefs();
-        strcpy(reply, _prefs->wifi_enable ? "OK - Reboot to apply wifi AP OFF" : "OK - Reboot to apply wifi AP ON");
+        strcpy(reply, _prefs->wifi_enable ? "OK - Reboot to apply wifi AP ON" : "OK - Reboot to apply wifi AP OFF");
       } else if (memcmp(config, "wifi.ssid ", 10) == 0) {
         StrHelper::strncpy(_prefs->wifi_ssid, &config[10], sizeof(_prefs->wifi_ssid));
         savePrefs();
@@ -318,9 +318,9 @@ void CommonCLI::handleCommand(uint32_t sender_timestamp, const char* command, ch
         savePrefs();
         strcpy(reply, "OK - Reboot to apply");
       } else if (memcmp(config, "udp.enable ", 11) == 0) {
-        _prefs->udp_bridge_enable = memcmp(&config[11], "off", 3) == 0;
+        _prefs->udp_bridge_enable = memcmp(&config[11], "on", 2) == 0;
         savePrefs();
-        strcpy(reply, _prefs->udp_bridge_enable ? "OK - Reboot to apply UDP server OFF" : "OK - Reboot to apply UDP server ON");
+        strcpy(reply, _prefs->udp_bridge_enable ? "OK - Reboot to apply UDP server ON" : "OK - Reboot to apply UDP server OFF");
       } else if (memcmp(config, "udp.port ", 9) == 0) {
         uint16_t p = atoi(&config[9]);
         _prefs->udp_bridge_server_port = p;

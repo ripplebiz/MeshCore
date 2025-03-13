@@ -306,11 +306,9 @@ class MyMesh : public mesh::Mesh, public CommonCLICallbacks {
       uint8_t priority = (action >> 24) - 1;
       uint32_t _delay = action & 0xFFFFFF;
   
+      if(_prefs.udp_bridge_enable){ 
       
-  
-      if(_isServerRunning){ 
-      
-        Serial.println("Bridging outbound packet to wifi network");
+        Serial.println("Bridging outbound packet to network");
 
         uint8_t pktBuffer[256];
         uint8_t pktLen = pkt->writeTo(pktBuffer);

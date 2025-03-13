@@ -323,7 +323,7 @@ class MyMesh : public mesh::Mesh, public CommonCLICallbacks {
     }
   }
 
-  public:
+public:
 
   void handleUdpPackets(){
 

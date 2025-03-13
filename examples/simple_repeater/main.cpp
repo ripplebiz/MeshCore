@@ -358,7 +358,7 @@ class MyMesh : public mesh::Mesh, public CommonCLICallbacks {
 
   void startServer(){
 
-    if(_isServerRunning){ return; }
+    if(_isServerRunning || !_prefs.udp_bridge_enable){ return; }
 
     inboundUdpPackets = Vector<mesh::Packet*>(inboundUdpBuffer);
 
@@ -396,8 +396,6 @@ class MyMesh : public mesh::Mesh, public CommonCLICallbacks {
           this->releasePacket(pkt);
         }
       });
-
-
 
       Serial.print("UDP ready");
     }

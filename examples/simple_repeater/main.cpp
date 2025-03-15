@@ -5,6 +5,8 @@
   #include <InternalFileSystem.h>
 #elif defined(ESP32)
   #include <SPIFFS.h>
+#elif defined(ESP8285) || defined(ESP866)
+  #include <FS.h>
 #endif
 
 #define RADIOLIB_STATIC_ONLY 1
@@ -96,6 +98,10 @@
   #include <helpers/nrf52/TechoBoard.h>
   #include <helpers/CustomSX1262Wrapper.h>
   static TechoBoard board;
+#elif defined(ESP8285)
+  #include <helpers/ESP8285Board.h>
+  #include <helpers/CustomSX1276Wrapper.h>
+  static ESP8285Board board;
 #else
   #error "need to provide a 'board' object"
 #endif
@@ -224,6 +230,8 @@ class MyMesh : public mesh::Mesh, public CommonCLICallbacks {
   File openAppend(const char* fname) {
   #if defined(NRF52_PLATFORM)
     return _fs->open(fname, FILE_O_WRITE);
+  #elif defined(ESP8285)
+    return _fs->open(fname, "a");
   #else
     return _fs->open(fname, "a", true);
   #endif
@@ -569,7 +577,7 @@ public:
   bool formatFileSystem() override {
 #if defined(NRF52_PLATFORM)
     return InternalFS.format();
-#elif defined(ESP32)
+#elif defined(ESP32) || defined(ESP8285)
     return SPIFFS.format();
 #else
   #error "need to implement file system erase"
@@ -601,7 +609,11 @@ public:
   }
 
   void dumpLogFile() override {
-    File f = _fs->open(PACKET_LOG_FILE);
+    #if defined(ESP8285)
+      File f = _fs->open(PACKET_LOG_FILE, "r");
+    #else
+      File f = _fs->open(PACKET_LOG_FILE);
+    #endif
     if (f) {
       while (f.available()) {
         int c = f.read();
@@ -635,7 +647,7 @@ public:
 
 #if defined(NRF52_PLATFORM)
 RADIO_CLASS radio = new Module(P_LORA_NSS, P_LORA_DIO_1, P_LORA_RESET, P_LORA_BUSY, SPI);
-#elif defined(LILYGO_TLORA)
+#elif defined(LILYGO_TLORA) || defined(ESP8285)
 SPIClass spi;
 RADIO_CLASS radio = new Module(P_LORA_NSS, P_LORA_DIO_0, P_LORA_RESET, P_LORA_DIO_1, spi);
 #elif defined(P_LORA_SCLK)
@@ -681,6 +693,8 @@ void setup() {
 #if defined(NRF52_PLATFORM)
   SPI.setPins(P_LORA_MISO, P_LORA_SCLK, P_LORA_MOSI);
   SPI.begin();
+#elif defined(ESP8285)
+  spi.begin();
 #elif defined(P_LORA_SCLK)
   spi.begin(P_LORA_SCLK, P_LORA_MISO, P_LORA_MOSI);
 #endif
@@ -713,6 +727,10 @@ void setup() {
   IdentityStore store(InternalFS, "");
 #elif defined(ESP32)
   SPIFFS.begin(true);
+  fs = &SPIFFS;
+  IdentityStore store(SPIFFS, "/identity");
+#elif defined(ESP8285)
+  SPIFFS.begin();
   fs = &SPIFFS;
   IdentityStore store(SPIFFS, "/identity");
 #else

@@ -15,7 +15,11 @@ static uint32_t _atoi(const char* sp) {
 
 void CommonCLI::loadPrefs(FILESYSTEM* fs) {
   if (fs->exists("/node_prefs")) {
-    File file = fs->open("/node_prefs");
+    #if defined(ESP8285)
+      File file = fs->open("/node_prefs", "r");
+    #else
+      File file = fs->open("/node_prefs");
+    #endif
     if (file) {
       uint8_t pad[8];
 
@@ -64,7 +68,11 @@ void CommonCLI::savePrefs(FILESYSTEM* fs) {
   File file = fs->open("/node_prefs", FILE_O_WRITE);
   if (file) { file.seek(0); file.truncate(); }
 #else
-  File file = fs->open("/node_prefs", "w", true);
+  #if defined(ESP8285)
+    File file = fs->open("/node_prefs", "w");
+  #else
+    File file = fs->open("/node_prefs", "w", true);
+  #endif
 #endif
   if (file) {
     uint8_t pad[8];

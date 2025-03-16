@@ -99,6 +99,7 @@
 #elif defined(FAKETEC)
   #include <helpers/nrf52/faketecBoard.h>
   #include <helpers/CustomSX1262Wrapper.h>
+  #include <helpers/CustomLLCC68Wrapper.h>
   static faketecBoard board;
 #else
   #error "need to provide a 'board' object"

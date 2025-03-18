@@ -2,6 +2,7 @@
 #include "CommonCLI.h"
 #include "TxtDataHelpers.h"
 #include <RTClib.h>
+#include "../Validate.h"
 
 // Believe it or not, this std C function is busted on some platforms!
 static uint32_t _atoi(const char* sp) {
@@ -121,12 +122,11 @@ void CommonCLI::handleCommand(uint32_t sender_timestamp, const char* command, ch
       _callbacks->sendSelfAdvertisement(400);
       strcpy(reply, "OK - Advert sent");
     } else if (memcmp(command, "clock sync", 10) == 0) {
-      uint32_t curr = getRTCClock()->getCurrentTime();
-      if (sender_timestamp > curr) {
+      if (Validate::validEpochTime(sender_timestamp)) {
         getRTCClock()->setCurrentTime(sender_timestamp + 1);
         strcpy(reply, "OK - clock set");
       } else {
-        strcpy(reply, "ERR: clock cannot go backwards");
+        strcpy(reply, "ERR: invalid timestamp");
       }
     } else if (memcmp(command, "start ota", 9) == 0) {
       if (_board->startOTAUpdate()) {
@@ -140,12 +140,11 @@ void CommonCLI::handleCommand(uint32_t sender_timestamp, const char* command, ch
       sprintf(reply, "%02d:%02d - %d/%d/%d UTC", dt.hour(), dt.minute(), dt.day(), dt.month(), dt.year());
     } else if (memcmp(command, "time ", 5) == 0) {  // set time (to epoch seconds)
       uint32_t secs = _atoi(&command[5]);
-      uint32_t curr = getRTCClock()->getCurrentTime();
-      if (secs > curr) {
+      if (Validate::validEpochTime(secs)) {
         getRTCClock()->setCurrentTime(secs);
         strcpy(reply, "(OK - clock set!)");
       } else {
-        strcpy(reply, "(ERR: clock cannot go backwards)");
+        strcpy(reply, "(ERR: invalid timestamp)");
       }
     } else if (memcmp(command, "password ", 9) == 0) {
       // change admin password

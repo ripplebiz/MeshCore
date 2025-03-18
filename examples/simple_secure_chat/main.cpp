@@ -15,6 +15,7 @@
 #include <helpers/SimpleMeshTables.h>
 #include <helpers/IdentityStore.h>
 #include <RTClib.h>
+#include <Validate.h>
 
 /* ---------------------------------- CONFIGURATION ------------------------------------- */
 
@@ -190,12 +191,11 @@ class MyMesh : public BaseChatMesh, ContactVisitor {
   }
 
   void setClock(uint32_t timestamp) {
-    uint32_t curr = getRTCClock()->getCurrentTime();
-    if (timestamp > curr) {
+    if (Validate::validEpochTime(timestamp)) {
       getRTCClock()->setCurrentTime(timestamp);
       Serial.println("   (OK - clock set!)");
     } else {
-      Serial.println("   (ERR: clock cannot go backwards)");
+      Serial.println("   (ERR: invalid timestamp)");
     }
   }
 

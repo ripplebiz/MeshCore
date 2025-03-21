@@ -2,7 +2,6 @@
 
 #include <MeshCore.h>
 #include <Arduino.h>
-#include <Wire.h>
 
 #define P_LORA_NSS 13 //P1.13 45
 #define P_LORA_DIO_1 11 //P0.10 10
@@ -20,27 +19,13 @@
 #define  PIN_VBAT_READ 17
 #define  ADC_MULTIPLIER   (1.815f) // dependent on voltage divider resistors. TODO: more accurate battery tracking
 
-class faketecBoard : public mesh::MainBoard {
+class FaketecBoard : public mesh::MainBoard {
 protected:
   uint8_t startup_reason;
+  uint8_t btn_prev_state;
 
 public:
-  void begin() {
-    // for future use, sub-classes SHOULD call this from their begin()
-    startup_reason = BD_STARTUP_NORMAL;
-
-    pinMode(PIN_VBAT_READ, INPUT);
-
-#if defined(PIN_BOARD_SDA) && defined(PIN_BOARD_SCL)
-    Wire.setPins(PIN_BOARD_SDA, PIN_BOARD_SCL)
-#endif
-
-    Wire.begin();
-
-    pinMode(SX126X_POWER_EN, OUTPUT);
-    digitalWrite(SX126X_POWER_EN, HIGH);
-    delay(10);   // give sx1262 some time to power up
-  }
+  void begin();
 
   uint8_t getStartupReason() const override { return startup_reason; }
 
@@ -59,6 +44,17 @@ public:
 
   const char* getManufacturerName() const override {
     return "Faketec DIY";
+  }
+
+  int buttonStateChanged() {
+    #ifdef BUTTON_PIN
+      uint8_t v = digitalRead(BUTTON_PIN);
+      if (v != btn_prev_state) {
+        btn_prev_state = v;
+        return (v == LOW) ? 1 : -1;
+      }
+    #endif
+      return 0;
   }
 
   void reboot() override {

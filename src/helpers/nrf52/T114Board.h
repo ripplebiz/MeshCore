@@ -18,7 +18,8 @@
 
 // built-ins
 #define  PIN_VBAT_READ    4
-#define  ADC_MULTIPLIER   (3 * 1.73 * 1.187 * 1000)
+#define  PIN_BAT_CTL      6
+#define  MV_LSB   (3000.0F / 4096.0F) // 12-bit ADC with 3.0V input range
 
 class T114Board : public mesh::MainBoard {
 protected:
@@ -37,17 +38,18 @@ public:
   }
 #endif
 
-  #define BATTERY_SAMPLES 8
-
   uint16_t getBattMilliVolts() override {
+    int adcvalue = 0;
     analogReadResolution(12);
-    uint32_t raw = 0;
-    for (int i = 0; i < BATTERY_SAMPLES; i++) {
-      raw += analogRead(PIN_VBAT_READ);
-    }
-    raw = raw / BATTERY_SAMPLES;
+    analogReference(AR_INTERNAL_3_0);
+    pinMode(PIN_BAT_CTL, OUTPUT);          // battery adc can be read only ctrl pin 6 set to high
+    digitalWrite(PIN_BAT_CTL, 1);
 
-    return (ADC_MULTIPLIER * raw) / 4096;
+    delay(10);
+    adcvalue = analogRead(PIN_VBAT_READ);
+    digitalWrite(6, 0);
+
+    return (uint16_t)((float)adcvalue * MV_LSB * 4.9);
   }
 
   const char* getManufacturerName() const override {

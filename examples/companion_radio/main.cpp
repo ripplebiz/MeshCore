@@ -17,6 +17,7 @@
 #include <helpers/BaseSerialInterface.h>
 #include <RTClib.h>
 #include <Validate.h>
+#include <target.h>
 
 /* ---------------------------------- CONFIGURATION ------------------------------------- */
 
@@ -60,59 +61,6 @@
 
 #define  PUBLIC_GROUP_PSK  "izOH6cXN6mrJ5e26oRXNcg=="
 
-#if defined(HELTEC_LORA_V3)
-  #include <helpers/HeltecV3Board.h>
-  #include <helpers/CustomSX1262Wrapper.h>
-  static HeltecV3Board board;
-#elif defined(HELTEC_LORA_V2)
-  #include <helpers/HeltecV2Board.h>
-  #include <helpers/CustomSX1276Wrapper.h>
-  static HeltecV2Board board;
-#elif defined(ARDUINO_XIAO_ESP32C3)
-  #include <helpers/XiaoC3Board.h>
-  #include <helpers/CustomSX1262Wrapper.h>
-  #include <helpers/CustomSX1268Wrapper.h>
-  static XiaoC3Board board;
-#elif defined(SEEED_XIAO_S3) || defined(LILYGO_T3S3)
-  #include <helpers/ESP32Board.h>
-  #include <helpers/CustomSX1262Wrapper.h>
-  static ESP32Board board;
-#elif defined(LILYGO_TLORA)
-  #include <helpers/LilyGoTLoraBoard.h>
-  #include <helpers/CustomSX1276Wrapper.h>
-  static LilyGoTLoraBoard board;
-#elif defined(RAK_4631)
-  #include <helpers/nrf52/RAK4631Board.h>
-  #include <helpers/CustomSX1262Wrapper.h>
-  static RAK4631Board board;
-#elif defined(T1000_E)
-  #include <helpers/nrf52/T1000eBoard.h>
-  #include <helpers/CustomLR1110Wrapper.h>
-  static T1000eBoard board;
-#elif defined(HELTEC_T114)
-  #include <helpers/nrf52/T114Board.h>
-  #include <helpers/CustomSX1262Wrapper.h>
-  static T114Board board;
-#elif defined(LILYGO_TECHO)
-  #include <helpers/nrf52/TechoBoard.h>
-  #include <helpers/CustomSX1262Wrapper.h>
-  static TechoBoard board;
-
-#elif defined(LILYGO_TBEAM)
-  #include <helpers/TBeamBoard.h>
-  #include <helpers/CustomSX1276Wrapper.h>
-  static TBeamBoard board;
-
-#elif defined(FAKETEC)
-  #include <helpers/nrf52/faketecBoard.h>
-  #include <helpers/CustomSX1262Wrapper.h>
-  #include <helpers/CustomLLCC68Wrapper.h>
-  static faketecBoard board;
-
-#else
-  #error "need to provide a 'board' object"
-#endif
-
 #ifdef DISPLAY_CLASS
   #include "UITask.h"
   #include <helpers/ui/SSD1306Display.h>
@@ -142,11 +90,11 @@ static uint32_t _atoi(const char* sp) {
 #define FIRMWARE_VER_CODE    3
 
 #ifndef FIRMWARE_BUILD_DATE
-  #define FIRMWARE_BUILD_DATE   "13 Mar 2025"
+  #define FIRMWARE_BUILD_DATE   "19 Mar 2025"
 #endif
 
 #ifndef FIRMWARE_VERSION
-  #define FIRMWARE_VERSION   "v1.3.0"
+  #define FIRMWARE_VERSION   "v1.4.0"
 #endif
 
 #define CMD_APP_START              1
@@ -185,6 +133,7 @@ static uint32_t _atoi(const char* sp) {
 #define CMD_SIGN_DATA             34
 #define CMD_SIGN_FINISH           35
 #define CMD_SEND_TRACE_PATH       36
+#define CMD_SET_DEVICE_PIN        37
 
 #define RESP_CODE_OK                0
 #define RESP_CODE_ERR               1
@@ -739,7 +688,7 @@ protected:
     memcpy(&out_frame[i], &auth_code, 4); i += 4;
     memcpy(&out_frame[i], path_hashes, path_len); i += path_len;
     memcpy(&out_frame[i], path_snrs, path_len); i += path_len;
-    out_frame[i++] = (int8_t)(_radio->getLastSNR() * 4);   // extra/final SNR (to this node)
+    out_frame[i++] = (int8_t)(packet->getSNR() * 4);   // extra/final SNR (to this node)
 
     if (_serial->isConnected()) {
       _serial->writeFrame(out_frame, i);
@@ -914,7 +863,7 @@ public:
       out_frame[i++] = FIRMWARE_VER_CODE;
       out_frame[i++] = MAX_CONTACTS / 2;        // v3+
       out_frame[i++] = MAX_GROUP_CHANNELS;      // v3+
-      memset(&out_frame[i], 0, 4); i += 4;  // reserved
+      memcpy(&out_frame[i], &_prefs.ble_pin, 4); i += 4;
       memset(&out_frame[i], 0, 12);
       strcpy((char *) &out_frame[i], FIRMWARE_BUILD_DATE); i += 12;
       StrHelper::strzcpy((char *) &out_frame[i], board.getManufacturerName(), 40); i += 40;
@@ -1403,6 +1352,10 @@ public:
       } else {
         writeErrFrame(ERR_CODE_TABLE_FULL);
       }
+    } else if (cmd_frame[0] == CMD_SET_DEVICE_PIN && len >= 5) {
+      memcpy(&_prefs.ble_pin, &cmd_frame[1], 4);
+      savePrefs();
+      writeOKFrame();
     } else {
       writeErrFrame(ERR_CODE_UNSUPPORTED_CMD);
       MESH_DEBUG_PRINTLN("ERROR: unknown command: %02X", cmd_frame[0]);
@@ -1469,20 +1422,6 @@ public:
   #error "need to define a serial interface"
 #endif
 
-#if defined(NRF52_PLATFORM)
-RADIO_CLASS radio = new Module(P_LORA_NSS, P_LORA_DIO_1, P_LORA_RESET, P_LORA_BUSY, SPI);
-#elif defined(LILYGO_TLORA)
-SPIClass spi;
-RADIO_CLASS radio = new Module(P_LORA_NSS, P_LORA_DIO_0, P_LORA_RESET, P_LORA_DIO_1, spi);
-#elif defined(LILYGO_TBEAM)
-SPIClass spi;
-RADIO_CLASS radio = new Module(P_LORA_NSS, P_LORA_DIO_0, P_LORA_RESET, P_LORA_DIO_1, spi);
-#elif defined(P_LORA_SCLK)
-SPIClass spi;
-RADIO_CLASS radio = new Module(P_LORA_NSS, P_LORA_DIO_1, P_LORA_RESET, P_LORA_BUSY, spi);
-#else
-RADIO_CLASS radio = new Module(P_LORA_NSS, P_LORA_DIO_1, P_LORA_RESET, P_LORA_BUSY);
-#endif
 StdRNG fast_rng;
 SimpleMeshTables tables;
 MyMesh the_mesh(radio, *new WRAPPER_CLASS(radio, board), fast_rng, *new VolatileRTCClock(), tables);
@@ -1495,43 +1434,8 @@ void setup() {
   Serial.begin(115200);
 
   board.begin();
-#ifdef SX126X_DIO3_TCXO_VOLTAGE
-  float tcxo = SX126X_DIO3_TCXO_VOLTAGE;
-#else
-  float tcxo = 1.6f;
-#endif
 
-#if defined(NRF52_PLATFORM)
-  SPI.setPins(P_LORA_MISO, P_LORA_SCLK, P_LORA_MOSI);
-  SPI.begin();
-#elif defined(P_LORA_SCLK)
-  spi.begin(P_LORA_SCLK, P_LORA_MISO, P_LORA_MOSI);
-#endif
-  int status = radio.begin(LORA_FREQ, LORA_BW, LORA_SF, LORA_CR, RADIOLIB_SX126X_SYNC_WORD_PRIVATE, LORA_TX_POWER, 8, tcxo);
-#if defined(FAKETEC)
-  if (status == RADIOLIB_ERR_SPI_CMD_FAILED || status == RADIOLIB_ERR_SPI_CMD_INVALID) {
-    #define SX126X_DIO3_TCXO_VOLTAGE (0.0f);
-    tcxo = SX126X_DIO3_TCXO_VOLTAGE;
-    status = radio.begin(LORA_FREQ, LORA_BW, LORA_SF, LORA_CR, RADIOLIB_SX126X_SYNC_WORD_PRIVATE, LORA_TX_POWER, 8, tcxo);
-  }
-#endif
-  if (status != RADIOLIB_ERR_NONE) {
-    Serial.print("ERROR: radio init failed: ");
-    Serial.println(status);
-    halt();
-  }
-
-  radio.setCRC(1);
-
-#ifdef SX126X_CURRENT_LIMIT
-  radio.setCurrentLimit(SX126X_CURRENT_LIMIT);
-#endif
-#ifdef SX126X_DIO2_AS_RF_SWITCH
-  radio.setDio2AsRfSwitch(SX126X_DIO2_AS_RF_SWITCH);
-#endif
-#ifdef SX126X_RX_BOOSTED_GAIN
-  radio.setRxBoostedGainMode(SX126X_RX_BOOSTED_GAIN);
-#endif
+  if (!radio_init()) { halt(); }
 
   fast_rng.begin(radio.random(0x7FFFFFFF));
 

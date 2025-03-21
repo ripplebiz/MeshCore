@@ -7,6 +7,7 @@
 
 #include <rom/rtc.h>
 #include <sys/time.h>
+#include <Wire.h>
 
 class ESP32Board : public mesh::MainBoard {
 protected:

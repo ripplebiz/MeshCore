@@ -37,6 +37,8 @@ public:
     power.setALDO2Voltage(3300);
     power.enableALDO2();
 
+    pinMode(38,INPUT_PULLUP);
+
     esp_reset_reason_t reason = esp_reset_reason();
     if (reason == ESP_RST_DEEPSLEEP) {
       long wakeup_source = esp_sleep_get_ext1_wakeup_status();

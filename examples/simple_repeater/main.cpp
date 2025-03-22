@@ -5,6 +5,11 @@
   #include <InternalFileSystem.h>
 #elif defined(ESP32)
   #include <SPIFFS.h>
+  #include <WiFi.h>
+  #include <AsyncUDP.h>
+  #include <Vector.h>
+  #include <Packet.h>
+  #include <Dispatcher.h>
 #endif
 
 #define RADIOLIB_STATIC_ONLY 1
@@ -18,6 +23,7 @@
 #include <helpers/TxtDataHelpers.h>
 #include <helpers/CommonCLI.h>
 #include <RTClib.h>
+#include <target.h>
 
 /* ------------------------------ Config -------------------------------- */
 
@@ -87,78 +93,6 @@
   #define UDP_PACKET_BUFFER_SIZE 10
 #endif
 
-
-#if defined(HELTEC_LORA_V3)
-  #include <helpers/HeltecV3Board.h>
-  #include <helpers/CustomSX1262Wrapper.h>
-  #include <WiFi.h>
-  #include "AsyncUDP.h"
-  #include <Vector.h>
-  #include <Packet.h>
-  #include <Dispatcher.h>
-  static HeltecV3Board board;
-#elif defined(HELTEC_LORA_V2)
-  #include <helpers/HeltecV2Board.h>
-  #include <helpers/CustomSX1276Wrapper.h>
-  #include <WiFi.h>
-  #include "AsyncUDP.h"
-  #include <Vector.h>
-  #include <Packet.h>
-  #include <Dispatcher.h>
-  static HeltecV2Board board;
-#elif defined(ARDUINO_XIAO_ESP32C3)
-  #include <helpers/XiaoC3Board.h>
-  #include <helpers/CustomSX1262Wrapper.h>
-  #include <helpers/CustomSX1268Wrapper.h>
-  #include <WiFi.h>
-  #include "AsyncUDP.h"
-  #include <Vector.h>
-  #include <Packet.h>
-  #include <Dispatcher.h>
-  static XiaoC3Board board;
-#elif defined(SEEED_XIAO_S3) || defined(LILYGO_T3S3)
-  #include <helpers/ESP32Board.h>
-  #include <helpers/CustomSX1262Wrapper.h>
-  #include <WiFi.h>
-  #include "AsyncUDP.h"
-  #include <Vector.h>
-  #include <Packet.h>
-  #include <Dispatcher.h>
-  static ESP32Board board;
-#elif defined(LILYGO_TLORA)
-  #include <helpers/LilyGoTLoraBoard.h>
-  #include <helpers/CustomSX1276Wrapper.h>
-  static LilyGoTLoraBoard board;
-#elif defined(STATION_G2)
-  #include <helpers/StationG2Board.h>
-  #include <helpers/CustomSX1262Wrapper.h>
-  #include <WiFi.h>
-  #include "AsyncUDP.h"
-  #include <Vector.h>
-  #include <Packet.h>
-  #include <Dispatcher.h>
-  static StationG2Board board;
-#elif defined(RAK_4631)
-  #include <helpers/nrf52/RAK4631Board.h>
-  #include <helpers/CustomSX1262Wrapper.h>
-  static RAK4631Board board;
-#elif defined(HELTEC_T114)
-  #include <helpers/nrf52/T114Board.h>
-  #include <helpers/CustomSX1262Wrapper.h>
-  static T114Board board;
-#elif defined(LILYGO_TECHO)
-  #include <helpers/nrf52/TechoBoard.h>
-  #include <helpers/CustomSX1262Wrapper.h>
-  static TechoBoard board;
-#elif defined(FAKETEC)
-  #include <helpers/nrf52/faketecBoard.h>
-  #include <helpers/CustomSX1262Wrapper.h>
-  #include <helpers/CustomLLCC68Wrapper.h>
-  static faketecBoard board;
-#else
-  #error "need to provide a 'board' object"
-#endif
-
 #ifdef DISPLAY_CLASS
   #include <helpers/ui/SSD1306Display.h>
 
@@ -166,6 +100,12 @@
 
   #include "UITask.h"
   static UITask ui_task(display);
+#endif
+
+#ifdef WiFi_h
+
+
+
 #endif
 
 #define PACKET_LOG_FILE  "/packet_log"
@@ -863,17 +803,6 @@ public:
   }
 };
 
-#if defined(NRF52_PLATFORM)
-RADIO_CLASS radio = new Module(P_LORA_NSS, P_LORA_DIO_1, P_LORA_RESET, P_LORA_BUSY, SPI);
-#elif defined(LILYGO_TLORA)
-SPIClass spi;
-RADIO_CLASS radio = new Module(P_LORA_NSS, P_LORA_DIO_0, P_LORA_RESET, P_LORA_DIO_1, spi);
-#elif defined(P_LORA_SCLK)
-SPIClass spi;
-RADIO_CLASS radio = new Module(P_LORA_NSS, P_LORA_DIO_1, P_LORA_RESET, P_LORA_BUSY, spi);
-#else
-RADIO_CLASS radio = new Module(P_LORA_NSS, P_LORA_DIO_1, P_LORA_RESET, P_LORA_BUSY);
-#endif
 StdRNG fast_rng;
 SimpleMeshTables tables;
 
@@ -908,44 +837,7 @@ void setup() {
 #endif
   rtc_clock.begin(Wire);
 
-#ifdef SX126X_DIO3_TCXO_VOLTAGE
-  float tcxo = SX126X_DIO3_TCXO_VOLTAGE;
-#else
-  float tcxo = 1.6f;
-#endif
-
-#if defined(NRF52_PLATFORM)
-  SPI.setPins(P_LORA_MISO, P_LORA_SCLK, P_LORA_MOSI);
-  SPI.begin();
-#elif defined(P_LORA_SCLK)
-  spi.begin(P_LORA_SCLK, P_LORA_MISO, P_LORA_MOSI);
-#endif
-  int status = radio.begin(LORA_FREQ, LORA_BW, LORA_SF, LORA_CR, RADIOLIB_SX126X_SYNC_WORD_PRIVATE, LORA_TX_POWER, 8, tcxo);
-#if defined(FAKETEC)
-  if (status == RADIOLIB_ERR_SPI_CMD_FAILED || status == RADIOLIB_ERR_SPI_CMD_INVALID) {
-    #define SX126X_DIO3_TCXO_VOLTAGE (0.0f);
-    tcxo = SX126X_DIO3_TCXO_VOLTAGE;
-    status = radio.begin(LORA_FREQ, LORA_BW, LORA_SF, LORA_CR, RADIOLIB_SX126X_SYNC_WORD_PRIVATE, LORA_TX_POWER, 8, tcxo);
-  }
-#endif
-  if (status != RADIOLIB_ERR_NONE) {
-    delay(5000);
-    Serial.print("ERROR: radio init failed: ");
-    Serial.println(status);
-    halt();
-  }
-
-  radio.setCRC(1);
-
-#ifdef SX126X_CURRENT_LIMIT
-  radio.setCurrentLimit(SX126X_CURRENT_LIMIT);
-#endif
-#ifdef SX126X_DIO2_AS_RF_SWITCH
-  radio.setDio2AsRfSwitch(SX126X_DIO2_AS_RF_SWITCH);
-#endif
-#ifdef SX126X_RX_BOOSTED_GAIN
-  radio.setRxBoostedGainMode(SX126X_RX_BOOSTED_GAIN);
-#endif
+  if (!radio_init()) { halt(); }
 
   fast_rng.begin(radio.random(0x7FFFFFFF));
 

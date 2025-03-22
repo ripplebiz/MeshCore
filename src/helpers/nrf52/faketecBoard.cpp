@@ -6,19 +6,40 @@
 
 static BLEDfu bledfu;
 
+void FaketecBoard::begin() {    
+    // for future use, sub-classes SHOULD call this from their begin()
+    startup_reason = BD_STARTUP_NORMAL;
+    btn_prev_state = HIGH;
+  
+    pinMode(PIN_VBAT_READ, INPUT);
+
+    #ifdef BUTTON_PIN
+      pinMode(BUTTON_PIN, INPUT);
+    #endif
+
+    #if defined(PIN_BOARD_SDA) && defined(PIN_BOARD_SCL)
+      Wire.setPins(PIN_BOARD_SDA, PIN_BOARD_SCL);
+    #endif
+    
+    Wire.begin();
+
+    pinMode(SX126X_POWER_EN, OUTPUT);
+    digitalWrite(SX126X_POWER_EN, HIGH);
+    delay(10);   // give sx1262 some time to power up
+}
+
 static void connect_callback(uint16_t conn_handle) {
-  (void)conn_handle;
-  MESH_DEBUG_PRINTLN("BLE client connected");
+    (void)conn_handle;
+    MESH_DEBUG_PRINTLN("BLE client connected");
 }
 
 static void disconnect_callback(uint16_t conn_handle, uint8_t reason) {
-  (void)conn_handle;
-  (void)reason;
-
-  MESH_DEBUG_PRINTLN("BLE client disconnected");
+    (void)conn_handle;
+    (void)reason;
+    MESH_DEBUG_PRINTLN("BLE client disconnected");
 }
 
-bool faketecBoard::startOTAUpdate() {
+bool FaketecBoard::startOTAUpdate(const char* id, char reply[]) {
   // Config the peripheral connection with maximum bandwidth
   // more SRAM required by SoftDevice
   // Note: All config***() function must be called before begin()
@@ -57,5 +78,6 @@ bool faketecBoard::startOTAUpdate() {
   Bluefruit.Advertising.setFastTimeout(30);   // number of seconds in fast mode
   Bluefruit.Advertising.start(0);             // 0 = Don't stop advertising after n seconds
 
+  strcpy(reply, "OK - started");
   return true;
 }

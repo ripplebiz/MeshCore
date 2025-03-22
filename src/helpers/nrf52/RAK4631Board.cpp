@@ -37,7 +37,7 @@ void RAK4631Board::begin() {
   delay(10);   // give sx1262 some time to power up
 }
 
-bool RAK4631Board::startOTAUpdate() {
+bool RAK4631Board::startOTAUpdate(const char* id, char reply[]) {
   // Config the peripheral connection with maximum bandwidth
   // more SRAM required by SoftDevice
   // Note: All config***() function must be called before begin()
@@ -76,5 +76,6 @@ bool RAK4631Board::startOTAUpdate() {
   Bluefruit.Advertising.setFastTimeout(30);   // number of seconds in fast mode
   Bluefruit.Advertising.start(0);             // 0 = Don't stop advertising after n seconds
 
+  strcpy(reply, "OK - started");
   return true;
 }

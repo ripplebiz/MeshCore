@@ -42,7 +42,7 @@ void T114Board::begin() {
   delay(10);   // give sx1262 some time to power up
 }
 
-bool T114Board::startOTAUpdate() {
+bool T114Board::startOTAUpdate(const char* id, char reply[]) {
   // Config the peripheral connection with maximum bandwidth
   // more SRAM required by SoftDevice
   // Note: All config***() function must be called before begin()
@@ -81,5 +81,6 @@ bool T114Board::startOTAUpdate() {
   Bluefruit.Advertising.setFastTimeout(30);   // number of seconds in fast mode
   Bluefruit.Advertising.start(0);             // 0 = Don't stop advertising after n seconds
 
+  strcpy(reply, "OK - started");
   return true;
 }

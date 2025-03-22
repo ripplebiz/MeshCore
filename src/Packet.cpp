@@ -10,11 +10,13 @@ Packet::Packet() {
   payload_len = 0;
 }
 
-
 void Packet::calculatePacketHash(uint8_t* hash) const {
   SHA256 sha;
   uint8_t t = getPayloadType();
   sha.update(&t, 1);
+  if (t == PAYLOAD_TYPE_TRACE) {
+    sha.update(&path_len, sizeof(path_len));   // CAVEAT: TRACE packets can revisit same node on return path
+  }
   sha.update(payload, payload_len);
   sha.finalize(hash, MAX_HASH_SIZE);
 }

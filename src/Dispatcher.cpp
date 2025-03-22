@@ -115,6 +115,7 @@ void Dispatcher::checkRecv() {
           } else {
             memcpy(pkt->payload, &raw[i], pkt->payload_len);
 
+            pkt->_snr = _radio->getLastSNR() * 4.0f;
             score = _radio->packetScore(_radio->getLastSNR(), len);
             air_time = _radio->getEstAirtimeFor(len);
           }
@@ -129,7 +130,7 @@ void Dispatcher::checkRecv() {
     Serial.print(getLogDateTime());
     Serial.printf(": RX, len=%d (type=%d, route=%s, payload_len=%d) SNR=%d RSSI=%d score=%d", 
             2 + pkt->path_len + pkt->payload_len, pkt->getPayloadType(), pkt->isRouteDirect() ? "D" : "F", pkt->payload_len,
-            (int)_radio->getLastSNR(), (int)_radio->getLastRSSI(), (int)(score*1000));
+            (int)pkt->getSNR(), (int)_radio->getLastRSSI(), (int)(score*1000));
 
     static uint8_t packet_hash[MAX_HASH_SIZE];
     pkt->calculatePacketHash(packet_hash);
@@ -238,6 +239,7 @@ Packet* Dispatcher::obtainNewPacket() {
     n_full_events++;
   } else {
     pkt->payload_len = pkt->path_len = 0;
+    pkt->_snr = 0;
   }
   return pkt;
 }

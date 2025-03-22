@@ -55,6 +55,11 @@ MeshCore is designed for use with:
 ## 📜 License
 MeshCore is open-source software released under the MIT License. You are free to use, modify, and distribute it for personal and commercial projects.
 
+## Contributing
+
+Please submit PR's using 'dev' as the base branch!
+For minor changes just submit your PR and I'll try to review it, but for anything more 'impactful' please open an Issue first and start a discussion. Is better to sound out what it is you want to achieve first, and try to come to a consensus on what the best approach is, especially when it impacts the structure or architecture of this codebase.
+
 ## 📞 Get Support
 
 Check out the GitHub Issues page to report bugs or request features.

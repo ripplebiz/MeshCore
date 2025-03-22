@@ -106,13 +106,13 @@ protected:
   virtual void onDiscoveredContact(ContactInfo& contact, bool is_new) = 0;
   virtual bool processAck(const uint8_t *data) = 0;
   virtual void onContactPathUpdated(const ContactInfo& contact) = 0;
-  virtual void onMessageRecv(const ContactInfo& contact, uint8_t path_len, uint32_t sender_timestamp, const char *text) = 0;
-  virtual void onCommandDataRecv(const ContactInfo& contact, uint8_t path_len, uint32_t sender_timestamp, const char *text) = 0;
-  virtual void onSignedMessageRecv(const ContactInfo& contact, uint8_t path_len, uint32_t sender_timestamp, const uint8_t *sender_prefix, const char *text) = 0;
+  virtual void onMessageRecv(const ContactInfo& contact, mesh::Packet* pkt, uint32_t sender_timestamp, const char *text) = 0;
+  virtual void onCommandDataRecv(const ContactInfo& contact, mesh::Packet* pkt, uint32_t sender_timestamp, const char *text) = 0;
+  virtual void onSignedMessageRecv(const ContactInfo& contact, mesh::Packet* pkt, uint32_t sender_timestamp, const uint8_t *sender_prefix, const char *text) = 0;
   virtual uint32_t calcFloodTimeoutMillisFor(uint32_t pkt_airtime_millis) const = 0;
   virtual uint32_t calcDirectTimeoutMillisFor(uint32_t pkt_airtime_millis, uint8_t path_len) const = 0;
   virtual void onSendTimeout() = 0;
-  virtual void onChannelMessageRecv(const mesh::GroupChannel& channel, int in_path_len, uint32_t timestamp, const char *text) = 0;
+  virtual void onChannelMessageRecv(const mesh::GroupChannel& channel, mesh::Packet* pkt, uint32_t timestamp, const char *text) = 0;
   virtual void onContactResponse(const ContactInfo& contact, const uint8_t* data, uint8_t len) = 0;
 
   // storage concepts, for sub-classes to override/implement

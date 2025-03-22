@@ -83,6 +83,12 @@ If you have two supported devices, and there are not many MeshCore users near yo
 
 If you have two supported devices, and there are other MeshcCore users near by, you can flash one of your devices with BLE Companion firmware, and flash another supported device to repeater firmware.  Place the repeater high above ground o extend your MeshCore network's reach.
 
+After you flashed the latest firmware onto your repeater device, keep the device connected to your computer via USB serial, use the console feature on the web flasher and set the frequency for your region or country, so your client can remote administer the rpeater or room server over RF:
+
+`set freq {frequency}`
+
+The repeater and room server CLI reference is here: https://github.com/ripplebiz/MeshCore/wiki/Repeater-&-Room-Server-CLI-Reference
+
 If you have more supported devices, you can use your additional deivces with the room server firmware.  
 
 ### Q: Does MeshCore cost any money?
@@ -96,10 +102,10 @@ The T-Deck firmware is free to download and most features are available without 
 
 ### Q: What frequencies are supported by MeshCore?
 **A:** It supports the 868MHz range in the UK/EU and the 915MHz range in New Zealand, Australia, and the USA. Countries and regions in these two frequency ranges are also supported. The firmware and client allow users to set their preferred frequency.  
-- Australia and New Zealand are using **915.8MHz**
-- UK and EU are gravitating toward **867.5MHz**
-- There are discussions on discord for UK to move to 869.525MHz (https://discord.com/channels/826570251612323860/1330643963501351004/1342554454498742374)
-- Canada and USA is on **910.525MHz**
+- Australia and New Zealand are on **915.8MHz**
+- UK and EU are on **869.525MHz**
+- Canada and USA are on **910.525MHz**
+- For other regions and countries, please check your local LoRa frequency
 
 the rest of the radio settings are the same for all frequencies:  
 - Spread Factor (SF): 10  
@@ -231,6 +237,13 @@ Lowering the spreading factor makes it more difficult for the gateway to receive
 So it's balancing act between speed of the transmission and resistance to noise.
 things network is mainly focused on LoRaWAN, but the LoRa low-level stuff still checks out for any LoRa project
 
+### Q: What happens when a node learns a route via a mobile repeater, and that repeater is gone?
+
+**A:** If you used to reach a node through a repeater and the repeater is no longer reachable, the client will send the message using the existing (but now broken) known path, the message will fail after 3 retries, and the app will reset the path and send the message as flood on the last retry by default.  This can be turned off in settings.  If the destination is reachable directly or through another repeater, the new path will be used going forward.  Or you can set the path manually if you know a specific repeater to use to reach that destination.
+
+In the case if users are moving around frequently, and the paths are breaking, they just see the phone client retries and revert to flood to attempt to reestablish a path. 
+
+
 ### Q: Is MeshCore open source?
 **A:** Most of the firmware is freely available. Everything is open source except the T-Deck firmware and Liam's native mobile apps.  
 - Firmware repo: <https://github.com/ripplebiz/MeshCore>  
@@ -359,5 +372,4 @@ You can update repeater and room server firmware with a bluetooth connection bet
 
 
 ---
-    
     

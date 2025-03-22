@@ -105,7 +105,7 @@ void BaseChatMesh::onPeerDataRecv(mesh::Packet* packet, uint8_t type, int sender
     data[len] = 0; // need to make a C string again, with null terminator
 
     if (flags == TXT_TYPE_PLAIN) {
-      onMessageRecv(from, packet->isRouteFlood() ? packet->path_len : 0xFF, timestamp, (const char *) &data[5]);  // let UI know
+      onMessageRecv(from, packet, timestamp, (const char *) &data[5]);  // let UI know
 
       uint32_t ack_hash;    // calc truncated hash of the message timestamp + text + sender pub_key, to prove to sender that we got it
       mesh::Utils::sha256((uint8_t *) &ack_hash, 4, data, 5 + strlen((char *)&data[5]), from.id.pub_key, PUB_KEY_SIZE);
@@ -126,7 +126,7 @@ void BaseChatMesh::onPeerDataRecv(mesh::Packet* packet, uint8_t type, int sender
         }
       }
     } else if (flags == TXT_TYPE_CLI_DATA) {
-      onCommandDataRecv(from, packet->isRouteFlood() ? packet->path_len : 0xFF, timestamp, (const char *) &data[5]);  // let UI know
+      onCommandDataRecv(from, packet, timestamp, (const char *) &data[5]);  // let UI know
       // NOTE: no ack expected for CLI_DATA replies
 
       if (packet->isRouteFlood()) {
@@ -138,7 +138,7 @@ void BaseChatMesh::onPeerDataRecv(mesh::Packet* packet, uint8_t type, int sender
       if (timestamp > from.sync_since) {  // make sure 'sync_since' is up-to-date
         from.sync_since = timestamp;
       }
-      onSignedMessageRecv(from, packet->isRouteFlood() ? packet->path_len : 0xFF, timestamp, &data[5], (const char *) &data[9]);  // let UI know
+      onSignedMessageRecv(from, packet, timestamp, &data[5], (const char *) &data[9]);  // let UI know
 
       uint32_t ack_hash;    // calc truncated hash of the message timestamp + text + OUR pub_key, to prove to sender that we got it
       mesh::Utils::sha256((uint8_t *) &ack_hash, 4, data, 9 + strlen((char *)&data[9]), self_id.pub_key, PUB_KEY_SIZE);
@@ -222,7 +222,7 @@ void BaseChatMesh::onGroupDataRecv(mesh::Packet* packet, uint8_t type, const mes
     data[len] = 0; // need to make a C string again, with null terminator
 
     // notify UI  of this new message
-    onChannelMessageRecv(channel, packet->isRouteFlood() ? packet->path_len : -1, timestamp, (const char *) &data[5]);  // let UI know
+    onChannelMessageRecv(channel, packet, timestamp, (const char *) &data[5]);  // let UI know
   }
 }
 

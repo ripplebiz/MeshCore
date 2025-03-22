@@ -1,7 +1,13 @@
 #include "SSD1306Display.h"
 
+bool SSD1306Display::i2c_probe(TwoWire& wire, uint8_t addr) {
+  wire.beginTransmission(addr);
+  uint8_t error = wire.endTransmission();
+  return (error == 0);
+}
+
 bool SSD1306Display::begin() {
-  return display.begin(SSD1306_SWITCHCAPVCC, DISPLAY_ADDRESS, true, false);
+  return display.begin(SSD1306_SWITCHCAPVCC, DISPLAY_ADDRESS, true, false) && i2c_probe(Wire, DISPLAY_ADDRESS);
 }
 
 void SSD1306Display::turnOn() {

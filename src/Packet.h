@@ -25,6 +25,7 @@ namespace mesh {
 #define PAYLOAD_TYPE_GRP_DATA    0x06    // an (unverified) group datagram (prefixed with channel hash, MAC) (enc data: timestamp, blob)
 #define PAYLOAD_TYPE_ANON_REQ    0x07    // generic request (prefixed with dest_hash, ephemeral pub_key, MAC) (enc data: ...)
 #define PAYLOAD_TYPE_PATH        0x08    // returned path (prefixed with dest/src hashes, MAC) (enc data: path, extra)
+#define PAYLOAD_TYPE_TRACE       0x09    // trace a path, collecting SNI for each hop
 //...
 #define PAYLOAD_TYPE_RAW_CUSTOM   0x0F    // custom packet as raw bytes, for applications with custom encryption, payloads, etc
 
@@ -44,6 +45,7 @@ public:
   uint16_t payload_len, path_len;
   uint8_t path[MAX_PATH_SIZE];
   uint8_t payload[MAX_PACKET_PAYLOAD];
+  int8_t _snr;
 
   /**
    * \brief calculate the hash of payload + type
@@ -71,6 +73,8 @@ public:
 
   void markDoNotRetransmit() { header = 0xFF; }
   bool isMarkedDoNotRetransmit() const { return header == 0xFF; }
+
+  float getSNR() const { return ((float)_snr) / 4.0f; }
 
   /**
    * \brief  save entire packet as a blob

@@ -41,6 +41,30 @@ DispatcherAction Mesh::onRecvPacket(Packet* pkt) {
     return ACTION_RELEASE;
   }
 
+  if (pkt->isRouteDirect() && pkt->getPayloadType() == PAYLOAD_TYPE_TRACE) {
+    if (pkt->path_len < MAX_PATH_SIZE) {
+      uint8_t i = 0;
+      uint32_t trace_tag;
+      memcpy(&trace_tag, &pkt->payload[i], 4); i += 4;
+      uint32_t auth_code;
+      memcpy(&auth_code, &pkt->payload[i], 4); i += 4;
+      uint8_t flags = pkt->payload[i++];
+
+      uint8_t len = pkt->payload_len - i;
+      if (pkt->path_len >= len) {   // TRACE has reached end of given path
+        onTraceRecv(pkt, trace_tag, auth_code, flags, pkt->path, &pkt->payload[i], len);
+      } else if (self_id.isHashMatch(&pkt->payload[i + pkt->path_len]) && allowPacketForward(pkt) && !_tables->hasSeen(pkt)) {
+        // append SNR (Not hash!)
+        pkt->path[pkt->path_len] = (int8_t) (pkt->getSNR()*4);
+        pkt->path_len += PATH_HASH_SIZE;
+
+        uint32_t d = getDirectRetransmitDelay(pkt);
+        return ACTION_RETRANSMIT_DELAYED(5, d);  // schedule with priority 5 (for now), maybe make configurable?
+      }
+    }
+    return ACTION_RELEASE;
+  }
+
   if (pkt->isRouteDirect() && pkt->path_len >= PATH_HASH_SIZE) {
     if (self_id.isHashMatch(pkt->path) && allowPacketForward(pkt)) {
       if (_tables->hasSeen(pkt)) return ACTION_RELEASE;  // don't retransmit!
@@ -79,7 +103,7 @@ DispatcherAction Mesh::onRecvPacket(Packet* pkt) {
       uint8_t src_hash = pkt->payload[i++];
 
       uint8_t* macAndData = &pkt->payload[i];   // MAC + encrypted data 
-      if (i + 2 >= pkt->payload_len) {
+      if (i + CIPHER_MAC_SIZE >= pkt->payload_len) {
         MESH_DEBUG_PRINTLN("%s Mesh::onRecvPacket(): incomplete data packet", getLogDateTime());
       } else if (!_tables->hasSeen(pkt)) {
         // NOTE: this is a 'first packet wins' impl. When receiving from multiple paths, the first to arrive wins.
@@ -333,7 +357,7 @@ Packet* Mesh::createPathReturn(const uint8_t* dest_hash, const uint8_t* secret, 
 
 Packet* Mesh::createDatagram(uint8_t type, const Identity& dest, const uint8_t* secret, const uint8_t* data, size_t data_len) {
   if (type == PAYLOAD_TYPE_TXT_MSG || type == PAYLOAD_TYPE_REQ || type == PAYLOAD_TYPE_RESPONSE) {
-    if (data_len + 2 + CIPHER_BLOCK_SIZE-1 > MAX_PACKET_PAYLOAD) return NULL;
+    if (data_len + CIPHER_MAC_SIZE + CIPHER_BLOCK_SIZE-1 > MAX_PACKET_PAYLOAD) return NULL;
   } else {
     return NULL;  // invalid type
   }
@@ -433,7 +457,28 @@ Packet* Mesh::createRawData(const uint8_t* data, size_t len) {
   return packet;
 }
 
+Packet* Mesh::createTrace(uint32_t tag, uint32_t auth_code, uint8_t flags) {
+  Packet* packet = obtainNewPacket();
+  if (packet == NULL) {
+    MESH_DEBUG_PRINTLN("%s Mesh::createTrace(): error, packet pool empty", getLogDateTime());
+    return NULL;
+  }
+  packet->header = (PAYLOAD_TYPE_TRACE << PH_TYPE_SHIFT);  // ROUTE_TYPE_* set later
+
+  memcpy(packet->payload, &tag, 4);
+  memcpy(&packet->payload[4], &auth_code, 4);
+  packet->payload[8] = flags;
+  packet->payload_len = 9;  // NOTE: path will be appended to payload[] later
+
+  return packet;
+}
+
 void Mesh::sendFlood(Packet* packet, uint32_t delay_millis) {
+  if (packet->getPayloadType() == PAYLOAD_TYPE_TRACE) {
+    MESH_DEBUG_PRINTLN("%s Mesh::sendFlood(): TRACE type not suspported", getLogDateTime());
+    return;
+  }
+
   packet->header &= ~PH_ROUTE_MASK;
   packet->header |= ROUTE_TYPE_FLOOD;
   packet->path_len = 0;
@@ -455,11 +500,20 @@ void Mesh::sendDirect(Packet* packet, const uint8_t* path, uint8_t path_len, uin
   packet->header &= ~PH_ROUTE_MASK;
   packet->header |= ROUTE_TYPE_DIRECT;
 
-  memcpy(packet->path, path, packet->path_len = path_len);
+  uint8_t pri;
+  if (packet->getPayloadType() == PAYLOAD_TYPE_TRACE) {   // TRACE packets are different
+    // for TRACE packets, path is appended to end of PAYLOAD. (path is used for SNR's)
+    memcpy(&packet->payload[packet->payload_len], path, path_len);
+    packet->payload_len += path_len;
 
+    packet->path_len = 0;
+    pri = 5;   // maybe make this configurable
+  } else {
+    memcpy(packet->path, path, packet->path_len = path_len);
+    pri = 0;
+  }
   _tables->hasSeen(packet); // mark this packet as already sent in case it is rebroadcast back to us
-
-  sendPacket(packet, 0, delay_millis);
+  sendPacket(packet, pri, delay_millis);
 }
 
 void Mesh::sendZeroHop(Packet* packet, uint32_t delay_millis) {

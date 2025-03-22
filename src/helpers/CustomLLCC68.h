@@ -9,7 +9,7 @@ class CustomLLCC68 : public LLCC68 {
     CustomLLCC68(Module *mod) : LLCC68(mod) { }
 
     bool isReceiving() {
-      uint16_t irq = getIrqStatus();
+      uint16_t irq = getIrqFlags();
       bool hasPreamble = (irq & SX126X_IRQ_HEADER_VALID);
       return hasPreamble;
     }

@@ -23,7 +23,12 @@ public:
 #ifdef LILYGO_T3S3
   void begin(HWCDC& serial) { _serial = &serial; }
 #elif defined(NRF52_PLATFORM)
-  void begin(Adafruit_USBD_CDC& serial) { _serial = &serial; }
+  void begin(Adafruit_USBD_CDC& serial) {
+    _serial = &serial;
+  #ifdef RAK_4631
+    pinMode(WB_IO2, OUTPUT);
+  #endif
+  }
 #else
   void begin(HardwareSerial& serial) { _serial = &serial; }
 #endif

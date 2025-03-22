@@ -24,6 +24,12 @@ struct NodePrefs {  // persisted to file
     uint8_t reserved2;
     float bw;
     uint8_t flood_max;
+    bool wifi_enable;
+    bool wifi_ap_enable;
+    char wifi_ssid[32];
+    char wifi_password[32];
+    bool udp_bridge_enable;
+    uint16_t udp_bridge_server_port;
 };
 
 class CommonCLICallbacks {

@@ -308,7 +308,7 @@ void CommonCLI::handleCommand(uint32_t sender_timestamp, const char* command, ch
       } else if (memcmp(config, "wifi.ap_enable ", 15) == 0) {
         _prefs->wifi_ap_enable = memcmp(&config[15], "on", 2) == 0;
         savePrefs();
-        strcpy(reply, _prefs->wifi_enable ? "OK - Reboot to apply wifi AP ON" : "OK - Reboot to apply wifi AP OFF");
+        strcpy(reply, _prefs->wifi_ap_enable ? "OK - Reboot to apply wifi AP ON" : "OK - Reboot to apply wifi AP OFF");
       } else if (memcmp(config, "wifi.ssid ", 10) == 0) {
         StrHelper::strncpy(_prefs->wifi_ssid, &config[10], sizeof(_prefs->wifi_ssid));
         savePrefs();

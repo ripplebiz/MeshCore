@@ -13,6 +13,7 @@
 #include <helpers/IdentityStore.h>
 #include <helpers/BaseSerialInterface.h>
 #include <RTClib.h>
+#include <Validate.h>
 #include <target.h>
 
 /* ---------------------------------- CONFIGURATION ------------------------------------- */
@@ -1013,7 +1014,7 @@ public:
       uint32_t secs;
       memcpy(&secs, &cmd_frame[1], 4);
       uint32_t curr = getRTCClock()->getCurrentTime();
-      if (secs >= curr) {
+      if (Validate::validEpochTime(secs)) {
         getRTCClock()->setCurrentTime(secs);
         writeOKFrame();
       } else {

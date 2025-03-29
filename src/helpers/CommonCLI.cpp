@@ -198,6 +198,12 @@ void CommonCLI::handleCommand(uint32_t sender_timestamp, const char* command, ch
         sprintf(reply, "> %d", (uint32_t) _prefs->tx_power_dbm);
       } else if (memcmp(config, "freq", 4) == 0) {
         sprintf(reply, "> %s", StrHelper::ftoa(_prefs->freq));
+      } else if (memcmp(config, "public.key", 10) == 0) {
+        char pub_key_hex[PUB_KEY_SIZE * 2 + 1];
+        mesh::Utils::toHex(pub_key_hex, _mesh->self_id.pub_key, PUB_KEY_SIZE);
+        sprintf(reply, "> %s", pub_key_hex);
+      } else if (memcmp(config, "role", 4) == 0) {
+        sprintf(reply, "> %s", _callbacks->getRole());
       } else {
         sprintf(reply, "??: %s", config);
       }

@@ -66,6 +66,8 @@
   static UITask ui_task(display);
 #endif
 
+#define FIRMWARE_ROLE "repeater"
+
 #define PACKET_LOG_FILE  "/packet_log"
 
 /* ------------------------------ Code -------------------------------- */
@@ -512,6 +514,7 @@ public:
 
   const char* getFirmwareVer() override { return FIRMWARE_VERSION; }
   const char* getBuildDate() override { return FIRMWARE_BUILD_DATE; }
+  const char* getRole() override { return FIRMWARE_ROLE; }
   const char* getNodeName() { return _prefs.node_name; }
 
   void savePrefs() override {

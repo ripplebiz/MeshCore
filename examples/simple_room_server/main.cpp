@@ -74,6 +74,8 @@
   static UITask ui_task(display);
 #endif
 
+#define FIRMWARE_ROLE "room_server"
+
 #define PACKET_LOG_FILE  "/packet_log"
 
 /* ------------------------------ Code -------------------------------- */
@@ -261,7 +263,7 @@ class MyMesh : public mesh::Mesh, public CommonCLICallbacks {
       return _fs->open(fname, "a", true);
     #endif
     }
-  
+
 protected:
   float getAirtimeBudgetFactor() const override {
     return _prefs.airtime_factor;
@@ -598,7 +600,7 @@ protected:
           memcpy(reply_data, &now, 4);   // response packets always prefixed with timestamp
           memcpy(&reply_data[4], &stats, sizeof(stats));
           uint8_t reply_len = 4 + sizeof(stats);
-  
+
           if (packet->isRouteFlood()) {
             // let this sender know path TO here, so they can use sendDirect(), and ALSO encode the response
             mesh::Packet* path = createPathReturn(client->id, secret, packet->path, packet->path_len,
@@ -701,6 +703,7 @@ public:
 
   const char* getFirmwareVer() override { return FIRMWARE_VERSION; }
   const char* getBuildDate() override { return FIRMWARE_BUILD_DATE; }
+  const char* getRole() override { return FIRMWARE_ROLE; }
   const char* getNodeName() { return _prefs.node_name; }
 
   void savePrefs() override {

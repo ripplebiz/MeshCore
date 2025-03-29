@@ -31,6 +31,7 @@ public:
   virtual void savePrefs() = 0;
   virtual const char* getFirmwareVer() = 0;
   virtual const char* getBuildDate() = 0;
+  virtual const char* getRole() = 0;
   virtual bool formatFileSystem() = 0;
   virtual void sendSelfAdvertisement(int delay_millis) = 0;
   virtual void updateAdvertTimer() = 0;
@@ -56,7 +57,7 @@ class CommonCLI {
   void loadPrefsInt(FILESYSTEM* _fs, const char* filename);
 
 public:
-  CommonCLI(mesh::MainBoard& board, mesh::Mesh* mesh, NodePrefs* prefs, CommonCLICallbacks* callbacks) 
+  CommonCLI(mesh::MainBoard& board, mesh::Mesh* mesh, NodePrefs* prefs, CommonCLICallbacks* callbacks)
       : _board(&board), _mesh(mesh), _prefs(prefs), _callbacks(callbacks) { }
 
   void loadPrefs(FILESYSTEM* _fs);

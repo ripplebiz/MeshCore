@@ -207,6 +207,24 @@ Once you have the tiles downloaded, copy the `\tiles` folder to the root of your
 **A:** You can download, install, and use the T-Deck firmware for free, but it has some features (map zoom, server administration) that are enabled if you purchase an unlock code for \$10 per T-Deck device.  
 Unlock page: <https://buymeacoffee.com/ripplebiz/e/249834>
 
+### Q: How to decipher the diagnostics screen on T-Deck?
+
+**A: ** Space is tight on T-Deck's screen so the information is a bit cryptic.  Format is :
+`{hops} l:{packet-length}({payload-len}) t:{packet-type} snr:{n} rssi:{n}`
+
+See here for packet-type: [https://github.com/ripplebiz/MeshCore/blob/main/src/Packet.h#L19](https://github.com/ripplebiz/MeshCore/blob/main/src/Packet.h#L19 "https://github.com/ripplebiz/MeshCore/blob/main/src/Packet.h#L19")
+ 
+
+    #define PAYLOAD_TYPE_REQ 0x00 // request (prefixed with dest/src hashes, MAC) (enc data: timestamp, blob) 
+    #define PAYLOAD_TYPE_RESPONSE 0x01 // response to REQ or ANON_REQ (prefixed with dest/src hashes, MAC) (enc data: timestamp, blob) 
+    #define PAYLOAD_TYPE_TXT_MSG 0x02 // a plain text message (prefixed with dest/src hashes, MAC) (enc data: timestamp, text) 
+    #define PAYLOAD_TYPE_ACK 0x03 // a simple ack #define PAYLOAD_TYPE_ADVERT 0x04 // a node advertising its Identity 
+    #define PAYLOAD_TYPE_GRP_TXT 0x05 // an (unverified) group text message (prefixed with channel hash, MAC) (enc data: timestamp, "name: msg") 
+    #define PAYLOAD_TYPE_GRP_DATA 0x06 // an (unverified) group datagram (prefixed with channel hash, MAC) (enc data: timestamp, blob) 
+    #define PAYLOAD_TYPE_ANON_REQ 0x07 // generic request (prefixed with dest_hash, ephemeral pub_key, MAC) (enc data: ...) 
+    #define PAYLOAD_TYPE_PATH 0x08 // returned path (prefixed with dest/src hashes, MAC) (enc data: path, extra)
+
+[Source](https://discord.com/channels/1343693475589263471/1343693475589263474/1350611321040932966)
 
 ### Q: The T-Deck sound is too loud?
 ### Q: Can you customize the sound?
@@ -237,12 +255,37 @@ Lowering the spreading factor makes it more difficult for the gateway to receive
 So it's balancing act between speed of the transmission and resistance to noise.
 things network is mainly focused on LoRaWAN, but the LoRa low-level stuff still checks out for any LoRa project
 
+### Q: Do MeshCore clients repeat?
+**A:** No, MeshCore clients do not repeat.  This is the core of MeshCore's messaging-first design.  This is to avoid devices flooding the air ware and create endless collisions so messages sent aren't received.  
+In MeshCore, only repeaters and room server with '`set repeat on` repeat.  
+
 ### Q: What happens when a node learns a route via a mobile repeater, and that repeater is gone?
 
 **A:** If you used to reach a node through a repeater and the repeater is no longer reachable, the client will send the message using the existing (but now broken) known path, the message will fail after 3 retries, and the app will reset the path and send the message as flood on the last retry by default.  This can be turned off in settings.  If the destination is reachable directly or through another repeater, the new path will be used going forward.  Or you can set the path manually if you know a specific repeater to use to reach that destination.
 
 In the case if users are moving around frequently, and the paths are breaking, they just see the phone client retries and revert to flood to attempt to reestablish a path. 
 
+### Q: How does a node discovery a path to its destination and then use it to send messages in the future, instead of flooding every message it sends like Meshtastic?
+
+Routes are stored in sender's contact list.  When you send a message the first time, the message  first gets to your destination by flood routing,  When your destination node gets the message, it  sends back to the sender a delivery report with all repeaters that the original message went through. This delivery report is flood-routed back to you the sender and is a basis for future direct path. when you send the next message, the path will get embedded into the packet and be evaluated by repeaters. if the hop and address of the repeater matches, it will retransmit the message, otherwise it will not retransmit, hence minimizing utilization.
+
+[Source](https://discord.com/channels/826570251612323860/1330643963501351004/1351279141630119996)
+
+### Q: Do public channels always flood? Do private channels always flood?
+
+**A:** Yes, group channels are A to B, so there is no defined path.  They have to flood.  Repeaters can however deny flood traffic up to some hop limit, with the `set flood.max` CLI command.  Admistrators of repeaters get to set the rules of their repeaters.
+
+[Source](https://discord.com/channels/1343693475589263471/1343693475589263474/1350023009527664672)
+
+
+### Q: what is the public key for the default public channel?
+**A:** The smartphone app key is in hex:
+` 8b3387e9c5cdea6ac9e5edbaa115cd72`
+
+T-Deck uses the same key but in base64 
+`izOH6cXN6mrJ5e26oRXNcg==`
+The third character is the capital letter 'O', not zero `0`
+[Source](https://discord.com/channels/826570251612323860/1330643963501351004/1354194409213792388)
 
 ### Q: Is MeshCore open source?
 **A:** Most of the firmware is freely available. Everything is open source except the T-Deck firmware and Liam's native mobile apps.  
@@ -273,12 +316,87 @@ Javascript: https://github.com/liamcottle/meshcore.js
 ### Q: Does MeshCore support ATAK
 **A:** ATAK is not currently on MeshCore's roadmap.
 
+Meshcore would not be best suited to ATAK  because MeshCore:
+clients do not repeat and therefore you would need a network of repeaters in place
+will not have a stable path where all clients are constantly moving between repeaters
+
+MeshCore clients would need to reset path constantly and flood traffic across the network which could lead to lots of collisions with something as chatty as ATAK. 
+
+This could change in the future if MeshCore develops a client firmware that repeats.
+[Source](https://discord.com/channels/826570251612323860/1330643963501351004/1354780032140054659)
+
 ### Q: How do I add a node to the [MeshCore Map]([url](https://meshcore.co.uk/map.html))
 **A:** From the smartphone app, connect to a BLE Companion radio
 - To add the BLE Companion radio your smartphone is connected to to the map, tap the `advert` icon, then tap `Advert (To Clipboard)`.  
 - To add a Repeater or Room Server to the map, tap the 3 dots next to the Repeater or Room Server you want to add to the map, then tap `Share (To Clipboard)`.  
 - Go to the [MeshCore Map web site]([url](https://meshcore.co.uk/map.html)), tap the plus sign on the lower right corner and paste in the meshcore://... blob, then tap `Add Node`
-    
+
+### Q: Can I use a Raspberry Pi to update a MeshCore radio?
+** A:** Yes.
+You will need to install picocom on the pi.
+`sudo apt install picocom`
+
+Then run the following commands to setup the repeater.
+```
+picocom -b 115200 /dev/ttyUSB0 --imap lfcrlf
+set name your_repeater_name
+time epoch_time
+password your_unique_password
+set advert.interval 240
+advert
+```
+Note: If using a RAK the path will most likely be /dev/ttyACM0
+
+Epoch time comes from https://www.epochconverter.com/
+
+You can also flash the repeater using esptool.  You will need to install esptool with the following command...
+
+`pip install esptool --break-system-packages`
+
+Then to flash the firmware to Heltec, obtain the .bin file from https://flasher.meshcore.co.uk/ (download all firmware link)
+
+For Heltec:
+`esptool.py -p /dev/ttyUSB0 --chip esp32-s3 write_flash 0x00000 firmware.bin`
+
+If flashing a visual studio code build bin file, flash with the following offset:
+`esptool.py -p /dev/ttyUSB0 --chip esp32-s3 write_flash 0x10000 firmware.bin`
+
+For Pi
+Download the zip from the online flasher website and use the following command:
+
+Note: Requires adafruit-nrfutil command which can be installed as follows.
+`pip install adafruit-nrfutil --break-system-packages`
+
+```
+adafruit-nrfutil --verbose dfu serial --package t1000_e_bootloader-0.9.1-5-g488711a_s140_7.3.0.zip -p /dev/ttyACM0 -b 115200 --singlebank --touch 1200
+```
+
+[Source](https://discord.com/channels/826570251612323860/1330643963501351004/1342120825251299388)
+  
+### Q: Are there are projects built around MeshCore?
+
+**A:** Yes.  See the following:
+
+#### meshcoremqtt
+A python based script to send meshore debug and packet capture data to MQTT for analysis
+https://github.com/Andrew-a-g/meshcoretomqtt
+
+#### MeshCore for Home Assistant
+A custom Home Assistant integration for MeshCore mesh radio nodes. It allows you to monitor and control MeshCore nodes via USB, BLE, or TCP connections.
+https://github.com/awolden/meshcore-ha
+
+#### Python MeshCore
+Bindings to access your MeshCore companion radio nodes in python.
+https://github.com/fdlamotte/meshcore_py
+
+#### meshcore-cli  
+CLI interface to MeshCore companion radio over BLE, TCP, or serial.  Uses Pyton MeshCore above.
+ https://github.com/fdlamotte/meshcore-cli
+
+#### meshcore.js
+A Javascript library for interacting with a MeshCore device running the companion radio firmware
+https://github.com/liamcottle/meshcore.js
+
 ---
 
 ## Troubleshooting
@@ -313,7 +431,8 @@ You can update repeater and room server firmware with a bluetooth connection bet
 2. On the phone client, log on to the repeater as administrator (default password is `password`) to issue the `start ota`command to the repeater or room server to get the device into OTA DFU mode
    
 ![image](https://github.com/user-attachments/assets/889bb81b-7214-4a1c-955a-396b5a05d8ad)
-	1. `start ota` can be initiated from USB serial console on the web flasher page or a T-Deck
+
+1. `start ota` can be initiated from USB serial console on the web flasher page or a T-Deck
 4. On the smartphone, download and run the nRF app and scan for Bluetooth devices
 5. Connect to the repeater/room server node you want to update
 	1. nRF app is available on both Android and iOS
@@ -322,7 +441,8 @@ You can update repeater and room server firmware with a bluetooth connection bet
 
 **iOS continues here:**
 5. Once connected successfully, a `DFU` icon ![Pasted image 20250309173039](https://github.com/user-attachments/assets/af7a9f78-8739-4946-b734-02bade9c8e71)
- appears in the top right corner of the app![Pasted image 20250309171919](https://github.com/user-attachments/assets/08007ec8-4924-49c1-989f-ca2611e78793)
+ appears in the top right corner of the app
+ ![Pasted image 20250309171919](https://github.com/user-attachments/assets/08007ec8-4924-49c1-989f-ca2611e78793)
 
 6. Scroll down to change the `PRN(s)` number:
 

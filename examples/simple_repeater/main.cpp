@@ -102,12 +102,6 @@
   static UITask ui_task(display);
 #endif
 
-#ifdef WiFi_h
-
-
-
-#endif
-
 #define PACKET_LOG_FILE  "/packet_log"
 
 /* ------------------------------ Code -------------------------------- */

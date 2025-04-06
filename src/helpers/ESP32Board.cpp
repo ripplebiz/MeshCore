@@ -1,6 +1,8 @@
 #ifdef ESP_PLATFORM
 
 #include "ESP32Board.h"
+
+#if defined(ADMIN_PASSWORD)   // Repeater or Room Server only
 #include <WiFi.h>
 #include <AsyncTCP.h>
 #include <ESPAsyncWebServer.h>
@@ -29,4 +31,11 @@ bool ESP32Board::startOTAUpdate(const char* id, char reply[]) {
 
   return true;
 }
+
+#else
+bool ESP32Board::startOTAUpdate(const char* id, char reply[]) {
+  return false; // not supported
+}
+#endif
+
 #endif

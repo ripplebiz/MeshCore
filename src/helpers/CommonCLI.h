@@ -11,8 +11,8 @@ struct NodePrefs {  // persisted to file
     float freq;
     uint8_t tx_power_dbm;
     uint8_t disable_fwd;
-    uint8_t advert_interval;   // minutes
-    uint8_t unused;
+    uint8_t advert_interval;   // minutes / 2
+    uint8_t flood_advert_interval;   // hours
     float rx_delay_base;
     float tx_delay_factor;
     char guest_password[16];
@@ -20,7 +20,7 @@ struct NodePrefs {  // persisted to file
     uint32_t guard;
     uint8_t sf;
     uint8_t cr;
-    uint8_t reserved1;
+    uint8_t allow_read_only;
     uint8_t reserved2;
     float bw;
     uint8_t flood_max;
@@ -40,6 +40,7 @@ public:
   virtual bool formatFileSystem() = 0;
   virtual void sendSelfAdvertisement(int delay_millis) = 0;
   virtual void updateAdvertTimer() = 0;
+  virtual void updateFloodAdvertTimer() = 0;
   virtual void setLoggingOn(bool enable) = 0;
   virtual void eraseLogFile() = 0;
   virtual void dumpLogFile() = 0;
@@ -57,6 +58,8 @@ class CommonCLI {
   void savePrefs() { _callbacks->savePrefs(); }
 
   void checkAdvertInterval();
+
+  void loadPrefsInt(FILESYSTEM* _fs, const char* filename);
 
 public:
   CommonCLI(mesh::MainBoard& board, mesh::Mesh* mesh, NodePrefs* prefs, CommonCLICallbacks* callbacks) 

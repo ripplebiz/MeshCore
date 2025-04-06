@@ -907,7 +907,7 @@ public:
       memcpy(&msg_timestamp, &cmd_frame[i], 4); i += 4;
       uint8_t* pub_key_prefix = &cmd_frame[i]; i += 6;
       ContactInfo* recipient = lookupContactByPubKey(pub_key_prefix, 6);
-      if (recipient && attempt < 4 && (txt_type == TXT_TYPE_PLAIN || txt_type == TXT_TYPE_CLI_DATA)) {
+      if (recipient && (txt_type == TXT_TYPE_PLAIN || txt_type == TXT_TYPE_CLI_DATA)) {
         char *text = (char *) &cmd_frame[i];
         int tlen = len - i;
         uint32_t est_timeout;

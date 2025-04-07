@@ -14,12 +14,12 @@
 #define USE_LFXO    // 32.768 kHz crystal oscillator
 #define VARIANT_MCK (64000000ul)
 
-#define WIRE_INTERFACES_COUNT 	(1)
-
+#define WIRE_INTERFACES_COUNT   (1)
+#define PIN_TXCO                (21)
 ////////////////////////////////////////////////////////////////////////////////
 // Power
 
-#define PIN_PWR_EN              (6)
+#define PIN_PWR_EN              (12)
 
 #define BATTERY_PIN             (4)
 #define ADC_MULTIPLIER          (4.90F)
@@ -62,11 +62,11 @@
 ////////////////////////////////////////////////////////////////////////////////
 // Builtin LEDs
 
-#define LED_RED                 (13)
+#define LED_RED                 (34)
+#define LED_GREEN               (33)
 #define LED_BLUE                (14)
-#define LED_GREEN               (15)
 
-#define LED_BUILTIN             (15)
+#define LED_BUILTIN             LED_GREEN
 #define PIN_LED                 LED_BUILTIN
 #define LED_PIN                 LED_BUILTIN
 #define LED_STATE_ON            LOW
@@ -80,7 +80,7 @@
 #define PIN_BUTTON1             (42)
 #define BUTTON_PIN              PIN_BUTTON1
 
-#define PIN_BUTTON2             (18)
+#define PIN_BUTTON2             (11)
 #define BUTTON_PIN2             PIN_BUTTON2
 
 #define EXTERNAL_FLASH_DEVICES MX25R1635F

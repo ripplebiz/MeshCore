@@ -1,12 +1,12 @@
 #include <Arduino.h>
-#include "faketecBoard.h"
+#include "PromicroBoard.h"
 
 #include <bluefruit.h>
 #include <Wire.h>
 
 static BLEDfu bledfu;
 
-void FaketecBoard::begin() {    
+void PromicroBoard::begin() {    
     // for future use, sub-classes SHOULD call this from their begin()
     startup_reason = BD_STARTUP_NORMAL;
     btn_prev_state = HIGH;
@@ -39,7 +39,7 @@ static void disconnect_callback(uint16_t conn_handle, uint8_t reason) {
     MESH_DEBUG_PRINTLN("BLE client disconnected");
 }
 
-bool FaketecBoard::startOTAUpdate(const char* id, char reply[]) {
+bool PromicroBoard::startOTAUpdate(const char* id, char reply[]) {
   // Config the peripheral connection with maximum bandwidth
   // more SRAM required by SoftDevice
   // Note: All config***() function must be called before begin()
@@ -50,7 +50,7 @@ bool FaketecBoard::startOTAUpdate(const char* id, char reply[]) {
   // Set max power. Accepted values are: -40, -30, -20, -16, -12, -8, -4, 0, 4
   Bluefruit.setTxPower(4);
   // Set the BLE device name
-  Bluefruit.setName("Faketec_OTA");
+  Bluefruit.setName("ProMicro_OTA");
 
   Bluefruit.Periph.setConnectCallback(connect_callback);
   Bluefruit.Periph.setDisconnectCallback(disconnect_callback);

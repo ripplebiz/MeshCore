@@ -7,9 +7,6 @@
   #include <SPIFFS.h>
 #endif
 
-#define RADIOLIB_STATIC_ONLY 1
-#include <RadioLib.h>
-#include <helpers/RadioLibWrappers.h>
 #include <helpers/ArduinoHelpers.h>
 #include <helpers/StaticPoolPacketManager.h>
 #include <helpers/SimpleMeshTables.h>
@@ -193,6 +190,10 @@ protected:
     return 0;  // disable rxdelay
   }
 
+  bool allowPacketForward(const mesh::Packet* packet) override {
+    return true;
+  }
+
   void onDiscoveredContact(ContactInfo& contact, bool is_new) override {
     // TODO: if not in favs,  prompt to add as fav(?)
 
@@ -262,8 +263,7 @@ protected:
   }
 
 public:
-
-  MyMesh(RadioLibWrapper& radio, mesh::RNG& rng, mesh::RTCClock& rtc, SimpleMeshTables& tables)
+  MyMesh(mesh::Radio& radio, StdRNG& rng, mesh::RTCClock& rtc, SimpleMeshTables& tables)
      : BaseChatMesh(radio, *new ArduinoMillis(), rng, rtc, *new StaticPoolPacketManager(16), tables)
   {
     // defaults
@@ -291,7 +291,19 @@ public:
     IdentityStore store(fs, "/identity");
   #endif
     if (!store.load("_main", self_id, _prefs.node_name, sizeof(_prefs.node_name))) {  // legacy: node_name was from identity file
+      // Need way to get some entropy to seed RNG
+      Serial.println("Press ENTER to generate key:");
+      char c = 0;
+      while (c != '\n') {   // wait for ENTER to be pressed
+        if (Serial.available()) c = Serial.read();
+      }
+      ((StdRNG *)getRNG())->begin(millis());
+
       self_id = mesh::LocalIdentity(getRNG());  // create new random identity
+      int count = 0;
+      while (count < 10 && (self_id.pub_key[0] == 0x00 || self_id.pub_key[0] == 0xFF)) {  // reserved id hashes
+        self_id = mesh::LocalIdentity(getRNG()); count++;
+      }
       store.save("_main", self_id);
     }
 
@@ -325,6 +337,8 @@ public:
     Serial.println("===== MeshCore Chat Terminal =====");
     Serial.println();
     Serial.printf("WELCOME  %s\n", _prefs.node_name);
+    mesh::Utils::printHex(Serial, self_id.pub_key, PUB_KEY_SIZE);
+    Serial.println();
     Serial.println("   (enter 'help' for basic commands)");
     Serial.println();
   }
@@ -513,7 +527,7 @@ public:
 
 StdRNG fast_rng;
 SimpleMeshTables tables;
-MyMesh the_mesh(*new WRAPPER_CLASS(radio, board), fast_rng, *new VolatileRTCClock(), tables);
+MyMesh the_mesh(radio_driver, fast_rng, *new VolatileRTCClock(), tables); // TODO: test with 'rtc_clock' in target.cpp
 
 void halt() {
   while (1) ;
@@ -526,7 +540,7 @@ void setup() {
 
   if (!radio_init()) { halt(); }
 
-  fast_rng.begin(radio.random(0x7FFFFFFF));
+  fast_rng.begin(radio_get_rng_seed());
 
 #if defined(NRF52_PLATFORM)
   InternalFS.begin();
@@ -538,12 +552,8 @@ void setup() {
   #error "need to define filesystem"
 #endif
 
-  if (LORA_FREQ != the_mesh.getFreqPref()) {
-    radio.setFrequency(the_mesh.getFreqPref());
-  }
-  if (LORA_TX_POWER != the_mesh.getTxPowerPref()) {
-    radio.setOutputPower(the_mesh.getTxPowerPref());
-  }
+  radio_set_params(the_mesh.getFreqPref(), LORA_BW, LORA_SF, LORA_CR);
+  radio_set_tx_power(the_mesh.getTxPowerPref());
 
   the_mesh.showWelcome();
 

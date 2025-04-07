@@ -38,7 +38,7 @@ void CommonCLI::loadPrefsInt(FILESYSTEM* fs, const char* filename) {
     file.read((uint8_t *) &_prefs->tx_power_dbm, sizeof(_prefs->tx_power_dbm));  // 76
     file.read((uint8_t *) &_prefs->disable_fwd, sizeof(_prefs->disable_fwd));  // 77
     file.read((uint8_t *) &_prefs->advert_interval, sizeof(_prefs->advert_interval));  // 78
-    file.read((uint8_t *) &_prefs->flood_advert_interval, sizeof(_prefs->flood_advert_interval));  // 79
+    file.read((uint8_t *) pad, 1);  // 79  was 'unused'
     file.read((uint8_t *) &_prefs->rx_delay_base, sizeof(_prefs->rx_delay_base));  // 80
     file.read((uint8_t *) &_prefs->tx_delay_factor, sizeof(_prefs->tx_delay_factor));  // 84
     file.read((uint8_t *) &_prefs->guest_password[0], sizeof(_prefs->guest_password));  // 88
@@ -51,12 +51,14 @@ void CommonCLI::loadPrefsInt(FILESYSTEM* fs, const char* filename) {
     file.read((uint8_t *) &_prefs->bw, sizeof(_prefs->bw));  // 116
     file.read(pad, 4);   // 120
     file.read((uint8_t *) &_prefs->flood_max, sizeof(_prefs->flood_max));   // 124
-    file.read((uint8_t*) &_prefs->wifi_enable, sizeof(_prefs->wifi_enable));         //125
-    file.read((uint8_t*) &_prefs->wifi_ap_enable, sizeof(_prefs->wifi_ap_enable));   //126
-    file.read((uint8_t*) &_prefs->wifi_ssid, sizeof(_prefs->wifi_ssid));             //127
-    file.read((uint8_t*) &_prefs->wifi_password, sizeof(_prefs->wifi_password));     //159
-    file.read((uint8_t*) &_prefs->udp_bridge_enable, sizeof(_prefs->udp_bridge_enable));  //191
-    file.read((uint8_t*) &_prefs->udp_bridge_server_port, sizeof(_prefs->udp_bridge_server_port));  //192
+    file.read((uint8_t *) &_prefs->flood_advert_interval, sizeof(_prefs->flood_advert_interval));  // 125
+    file.read((uint8_t*) &_prefs->wifi_enable, sizeof(_prefs->wifi_enable));         //126
+    file.read((uint8_t*) &_prefs->wifi_ap_enable, sizeof(_prefs->wifi_ap_enable));   //127
+    file.read((uint8_t*) &_prefs->wifi_ssid, sizeof(_prefs->wifi_ssid));             //128
+    file.read((uint8_t*) &_prefs->wifi_password, sizeof(_prefs->wifi_password));     //160
+    file.read((uint8_t*) &_prefs->udp_bridge_enable, sizeof(_prefs->udp_bridge_enable));  //192
+    file.read((uint8_t*) &_prefs->udp_bridge_server_port, sizeof(_prefs->udp_bridge_server_port));  //193
+
 
     // sanitise bad pref values
     _prefs->rx_delay_base = constrain(_prefs->rx_delay_base, 0, 20.0f);
@@ -94,7 +96,7 @@ void CommonCLI::savePrefs(FILESYSTEM* fs) {
     file.write((uint8_t *) &_prefs->tx_power_dbm, sizeof(_prefs->tx_power_dbm));  // 76
     file.write((uint8_t *) &_prefs->disable_fwd, sizeof(_prefs->disable_fwd));  // 77
     file.write((uint8_t *) &_prefs->advert_interval, sizeof(_prefs->advert_interval));  // 78
-    file.write((uint8_t *) &_prefs->flood_advert_interval, sizeof(_prefs->flood_advert_interval));  // 79
+    file.write((uint8_t *) pad, 1);  // 79  was 'unused'
     file.write((uint8_t *) &_prefs->rx_delay_base, sizeof(_prefs->rx_delay_base));  // 80
     file.write((uint8_t *) &_prefs->tx_delay_factor, sizeof(_prefs->tx_delay_factor));  // 84
     file.write((uint8_t *) &_prefs->guest_password[0], sizeof(_prefs->guest_password));  // 88
@@ -107,14 +109,14 @@ void CommonCLI::savePrefs(FILESYSTEM* fs) {
     file.write((uint8_t *) &_prefs->bw, sizeof(_prefs->bw));  // 116
     file.write(pad, 4);   // 120
     file.write((uint8_t *) &_prefs->flood_max, sizeof(_prefs->flood_max));   // 124
-
-    file.write((uint8_t*) &_prefs->wifi_enable, sizeof(_prefs->wifi_enable));         //125
-    file.write((uint8_t*) &_prefs->wifi_ap_enable, sizeof(_prefs->wifi_ap_enable));   //126
-    file.write((uint8_t*) &_prefs->wifi_ssid, sizeof(_prefs->wifi_ssid));             //127
-    file.write((uint8_t*) &_prefs->wifi_password, sizeof(_prefs->wifi_password));     //159
-    file.write((uint8_t*) &_prefs->udp_bridge_enable, sizeof(_prefs->udp_bridge_enable));  //191
-    file.write((uint8_t*) &_prefs->udp_bridge_server_port, sizeof(_prefs->udp_bridge_server_port));  //192
-
+    file.write((uint8_t *) &_prefs->flood_advert_interval, sizeof(_prefs->flood_advert_interval));  // 125
+    file.write((uint8_t*) &_prefs->wifi_enable, sizeof(_prefs->wifi_enable));         //126
+    file.write((uint8_t*) &_prefs->wifi_ap_enable, sizeof(_prefs->wifi_ap_enable));   //127
+    file.write((uint8_t*) &_prefs->wifi_ssid, sizeof(_prefs->wifi_ssid));             //128
+    file.write((uint8_t*) &_prefs->wifi_password, sizeof(_prefs->wifi_password));     //160
+    file.write((uint8_t*) &_prefs->udp_bridge_enable, sizeof(_prefs->udp_bridge_enable));  //192
+    file.write((uint8_t*) &_prefs->udp_bridge_server_port, sizeof(_prefs->udp_bridge_server_port));  //193
+    
     file.close();
   }
 }
@@ -221,6 +223,11 @@ void CommonCLI::handleCommand(uint32_t sender_timestamp, const char* command, ch
         sprintf(reply, "> %d", (uint32_t) _prefs->tx_power_dbm);
       } else if (memcmp(config, "freq", 4) == 0) {
         sprintf(reply, "> %s", StrHelper::ftoa(_prefs->freq));
+      } else if (memcmp(config, "public.key", 10) == 0) {
+        strcpy(reply, "> ");
+        mesh::Utils::toHex(&reply[2], _mesh->self_id.pub_key, PUB_KEY_SIZE);
+      } else if (memcmp(config, "role", 4) == 0) {
+        sprintf(reply, "> %s", _callbacks->getRole());
       } else {
         sprintf(reply, "??: %s", config);
       }

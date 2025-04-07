@@ -98,6 +98,7 @@ class Dispatcher {
   Packet* outbound;  // current outbound packet
   unsigned long outbound_expiry, outbound_start, total_air_time;
   unsigned long next_tx_time;
+  unsigned long cad_busy_start;
   uint32_t n_sent_flood, n_sent_direct;
   uint32_t n_recv_flood, n_recv_direct;
   uint32_t n_full_events;
@@ -113,6 +114,7 @@ protected:
     : _radio(&radio), _ms(&ms), _mgr(&mgr)
   {
     outbound = NULL; total_air_time = 0; next_tx_time = 0;
+    cad_busy_start = 0;
   }
 
   virtual DispatcherAction onRecvPacket(Packet* pkt) = 0;
@@ -128,6 +130,7 @@ protected:
   virtual float getAirtimeBudgetFactor() const;
   virtual int calcRxDelay(float score, uint32_t air_time) const;
   virtual uint32_t getCADFailRetryDelay() const;
+  virtual uint32_t getCADFailMaxDuration() const;
 
 public:
   void begin();

@@ -11,7 +11,7 @@ class CustomLR1110 : public LR1110 {
 
     bool isReceiving() {
       uint16_t irq = getIrqStatus();
-      bool hasPreamble = ((irq & LR1110_IRQ_HEADER_VALID) && (irq & LR1110_IRQ_HAS_PREAMBLE));
-      return hasPreamble;
+      bool detected = ((irq & LR1110_IRQ_HEADER_VALID) || (irq & LR1110_IRQ_HAS_PREAMBLE));
+      return detected;
     }
 };

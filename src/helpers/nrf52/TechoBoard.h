@@ -17,28 +17,26 @@
 #define SX126X_DIO3_TCXO_VOLTAGE   1.8
 
 // built-ins
-#define  PIN_VBAT_READ    4
-#define  ADC_MULTIPLIER   (2.0)
+#define VBAT_MV_PER_LSB   (0.73242188F)   // 3.0V ADC range and 12-bit ADC resolution = 3000mV/4096
+
+#define VBAT_DIVIDER      (0.5F)          // 150K + 150K voltage divider on VBAT
+#define VBAT_DIVIDER_COMP (2.0F)          // Compensation factor for the VBAT divider
+
+#define PIN_VBAT_READ     (4)
+#define REAL_VBAT_MV_PER_LSB (VBAT_DIVIDER_COMP * VBAT_MV_PER_LSB)
 
 class TechoBoard : public mesh::MainBoard {
 protected:
   uint8_t startup_reason;
 
 public:
+
   void begin();
-  uint8_t getStartupReason() const override { return startup_reason; }
+  uint16_t getBattMilliVolts() override;
+  bool startOTAUpdate(const char* id, char reply[]) override;
 
-  #define BATTERY_SAMPLES 8
-
-  uint16_t getBattMilliVolts() override {
-    analogReadResolution(12);
-    uint32_t raw = 0;
-    for (int i = 0; i < BATTERY_SAMPLES; i++) {
-      raw += analogRead(PIN_VBAT_READ);
-    }
-    raw = raw / BATTERY_SAMPLES;
-
-    return (ADC_MULTIPLIER * raw) / 4096;
+  uint8_t getStartupReason() const override {
+    return startup_reason;
   }
 
   const char* getManufacturerName() const override {
@@ -48,6 +46,4 @@ public:
   void reboot() override {
     NVIC_SystemReset();
   }
-
-  bool startOTAUpdate(const char* id, char reply[]) override;
 };

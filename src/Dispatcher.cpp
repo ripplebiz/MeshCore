@@ -29,6 +29,9 @@ int Dispatcher::calcRxDelay(float score, uint32_t air_time) const {
 uint32_t Dispatcher::getCADFailRetryDelay() const {
   return 200;
 }
+uint32_t Dispatcher::getCADFailMaxDuration() const {
+  return 4000;   // 4 seconds
+}
 
 void Dispatcher::loop() {
   if (outbound) {  // waiting for outbound send to be completed
@@ -189,9 +192,20 @@ void Dispatcher::checkSend() {
   if (_mgr->getOutboundCount() == 0) return;  // nothing waiting to send
   if (!millisHasNowPassed(next_tx_time)) return;   // still in 'radio silence' phase (from airtime budget setting)
   if (_radio->isReceiving()) {   // LBT - check if radio is currently mid-receive, or if channel activity
-    next_tx_time = futureMillis(getCADFailRetryDelay());
-    return; 
+    if (cad_busy_start == 0) {
+      cad_busy_start = _ms->getMillis();   // record when CAD busy state started
+    }
+
+    if (_ms->getMillis() - cad_busy_start > getCADFailMaxDuration()) {
+      MESH_DEBUG_PRINTLN("%s Dispatcher::checkSend(): CAD busy max duration reached!", getLogDateTime());
+      // channel activity has gone on too long... (Radio might be in a bad state)
+      // force the pending transmit below...
+    } else {
+      next_tx_time = futureMillis(getCADFailRetryDelay());
+      return;
+    }
   }
+  cad_busy_start = 0;  // reset busy state
 
   outbound = _mgr->getNextOutbound(_ms->getMillis());
   if (outbound) {

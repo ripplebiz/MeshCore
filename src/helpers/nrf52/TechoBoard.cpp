@@ -1,6 +1,8 @@
 #include <Arduino.h>
 #include "TechoBoard.h"
 
+#ifdef LILYGO_TECHO
+
 #include <bluefruit.h>
 #include <Wire.h>
 
@@ -22,17 +24,38 @@ void TechoBoard::begin() {
   // for future use, sub-classes SHOULD call this from their begin()
   startup_reason = BD_STARTUP_NORMAL;
 
-  pinMode(PIN_VBAT_READ, INPUT);
+  delay(200);
+  pinMode(PIN_PWR_EN, OUTPUT);
+  digitalWrite(PIN_PWR_EN, HIGH);
+  pinMode(PIN_BUTTON1, INPUT_PULLUP);
+  pinMode(PIN_BUTTON2, INPUT_PULLUP);
+  pinMode(LED_RED, OUTPUT);
+  pinMode(LED_GREEN, OUTPUT);
+  pinMode(LED_BLUE, OUTPUT);
+  delay(200);
 
-#if defined(PIN_BOARD_SDA) && defined(PIN_BOARD_SCL)
-  Wire.setPins(PIN_BOARD_SDA, PIN_BOARD_SCL)
-#endif
+  pinMode(PIN_TXCO, OUTPUT);
+  digitalWrite(PIN_TXCO, HIGH);
 
   Wire.begin();
 
   pinMode(SX126X_POWER_EN, OUTPUT);
   digitalWrite(SX126X_POWER_EN, HIGH);
   delay(10);   // give sx1262 some time to power up
+}
+
+uint16_t TechoBoard::getBattMilliVolts() {
+  int adcvalue = 0;
+
+  analogReference(AR_INTERNAL_3_0);
+  analogReadResolution(12);
+  delay(10);
+
+  // ADC range is 0..3000mV and resolution is 12-bit (0..4095)
+  adcvalue = analogRead(PIN_VBAT_READ);
+  // Convert the raw value to compensated mv, taking the resistor-
+  // divider into account (providing the actual LIPO voltage)
+  return (uint16_t)((float)adcvalue * REAL_VBAT_MV_PER_LSB);
 }
 
 bool TechoBoard::startOTAUpdate(const char* id, char reply[]) {
@@ -77,3 +100,4 @@ bool TechoBoard::startOTAUpdate(const char* id, char reply[]) {
   strcpy(reply, "OK - started");
   return true;
 }
+#endif

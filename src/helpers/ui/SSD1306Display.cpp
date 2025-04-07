@@ -20,6 +20,11 @@ void SSD1306Display::turnOff() {
   _isOn = false;
 }
 
+void SSD1306Display::clear() {
+  display.clearDisplay();
+  display.display();
+}
+
 void SSD1306Display::startFrame(Color bkg) {
   display.clearDisplay();  // TODO: apply 'bkg'
   _color = SSD1306_WHITE;

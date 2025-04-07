@@ -19,7 +19,7 @@
 #define  PIN_VBAT_READ 17
 #define  ADC_MULTIPLIER   (1.815f) // dependent on voltage divider resistors. TODO: more accurate battery tracking
 
-class FaketecBoard : public mesh::MainBoard {
+class PromicroBoard : public mesh::MainBoard {
 protected:
   uint8_t startup_reason;
   uint8_t btn_prev_state;
@@ -43,7 +43,7 @@ public:
   }
 
   const char* getManufacturerName() const override {
-    return "Faketec DIY";
+    return "ProMicro DIY";
   }
 
   int buttonStateChanged() {

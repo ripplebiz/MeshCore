@@ -12,13 +12,10 @@
   #include <Dispatcher.h>
 #endif
 
-#define RADIOLIB_STATIC_ONLY 1
-#include <RadioLib.h>
 #include <helpers/ArduinoHelpers.h>
 #include <helpers/StaticPoolPacketManager.h>
 #include <helpers/SimpleMeshTables.h>
 #include <helpers/IdentityStore.h>
-#include <helpers/AutoDiscoverRTCClock.h>
 #include <helpers/AdvertDataHelpers.h>
 #include <helpers/TxtDataHelpers.h>
 #include <helpers/CommonCLI.h>
@@ -28,11 +25,11 @@
 /* ------------------------------ Config -------------------------------- */
 
 #ifndef FIRMWARE_BUILD_DATE
-  #define FIRMWARE_BUILD_DATE   "19 Mar 2025"
+  #define FIRMWARE_BUILD_DATE   "30 Mar 2025"
 #endif
 
 #ifndef FIRMWARE_VERSION
-  #define FIRMWARE_VERSION   "v1.4.0"
+  #define FIRMWARE_VERSION   "v1.4.2"
 #endif
 
 #ifndef LORA_FREQ
@@ -102,6 +99,8 @@
   static UITask ui_task(display);
 #endif
 
+#define FIRMWARE_ROLE "repeater"
+
 #define PACKET_LOG_FILE  "/packet_log"
 
 /* ------------------------------ Code -------------------------------- */
@@ -145,10 +144,7 @@ struct ClientInfo {
 #define CLI_REPLY_DELAY_MILLIS  1500
 
 class MyMesh : public mesh::Mesh, public CommonCLICallbacks {
-  RadioLibWrapper* my_radio;
   FILESYSTEM* _fs;
-  RADIO_CLASS* _phy;
-  mesh::MainBoard* _board;
   unsigned long next_local_advert, next_flood_advert;
   bool _logging;
   NodePrefs _prefs;
@@ -191,9 +187,9 @@ class MyMesh : public mesh::Mesh, public CommonCLICallbacks {
         stats.batt_milli_volts = board.getBattMilliVolts();
         stats.curr_tx_queue_len = _mgr->getOutboundCount();
         stats.curr_free_queue_len = _mgr->getFreeCount();
-        stats.last_rssi = (int16_t) my_radio->getLastRSSI();
-        stats.n_packets_recv = my_radio->getPacketsRecv();
-        stats.n_packets_sent = my_radio->getPacketsSent();
+        stats.last_rssi = (int16_t) radio_driver.getLastRSSI();
+        stats.n_packets_recv = radio_driver.getPacketsRecv();
+        stats.n_packets_sent = radio_driver.getPacketsSent();
         stats.total_air_time_secs = getTotalAirTime() / 1000;
         stats.total_up_time_secs = _ms->getMillis() / 1000;
         stats.n_sent_flood = getNumSentFlood();
@@ -201,7 +197,7 @@ class MyMesh : public mesh::Mesh, public CommonCLICallbacks {
         stats.n_recv_flood = getNumRecvFlood();
         stats.n_recv_direct = getNumRecvDirect();
         stats.n_full_events = getNumFullEvents();
-        stats.last_snr = (int16_t)(my_radio->getLastSNR() * 4);
+        stats.last_snr = (int16_t)(radio_driver.getLastSNR() * 4);
         stats.n_direct_dups = ((SimpleMeshTables *)getTables())->getNumDirectDups();
         stats.n_flood_dups = ((SimpleMeshTables *)getTables())->getNumFloodDups();
 
@@ -644,11 +640,10 @@ protected:
   }
 
 public:
-  MyMesh(RADIO_CLASS& phy, mesh::MainBoard& board, RadioLibWrapper& radio, mesh::MillisecondClock& ms, mesh::RNG& rng, mesh::RTCClock& rtc, SimpleMeshTables& tables)
+  MyMesh(mesh::MainBoard& board, mesh::Radio& radio, mesh::MillisecondClock& ms, mesh::RNG& rng, mesh::RTCClock& rtc, mesh::MeshTables& tables)
      : mesh::Mesh(radio, ms, rng, rtc, *new StaticPoolPacketManager(32), tables),
-        _phy(&phy), _board(&board), _cli(board, this, &_prefs, this)
+      _cli(board, this, &_prefs, this)
   {
-    my_radio = &radio;
     memset(known_clients, 0, sizeof(known_clients));
     next_local_advert = next_flood_advert = 0;
     _logging = false;
@@ -689,11 +684,8 @@ public:
     // load persisted prefs
     _cli.loadPrefs(_fs);
 
-    _phy->setFrequency(_prefs.freq);
-    _phy->setSpreadingFactor(_prefs.sf);
-    _phy->setBandwidth(_prefs.bw);
-    _phy->setCodingRate(_prefs.cr);
-    _phy->setOutputPower(_prefs.tx_power_dbm);
+    radio_set_params(_prefs.freq, _prefs.bw, _prefs.sf, _prefs.cr);
+    radio_set_tx_power(_prefs.tx_power_dbm);
 
 #ifdef WiFi_h
 
@@ -723,6 +715,7 @@ public:
 
   const char* getFirmwareVer() override { return FIRMWARE_VERSION; }
   const char* getBuildDate() override { return FIRMWARE_BUILD_DATE; }
+  const char* getRole() override { return FIRMWARE_ROLE; }
   const char* getNodeName() { return _prefs.node_name; }
 
   void savePrefs() override {
@@ -783,7 +776,7 @@ public:
   }
 
   void setTxPower(uint8_t power_dbm) override {
-    _phy->setOutputPower(power_dbm);
+    radio_set_tx_power(power_dbm);
   }
 
   void loop() {
@@ -813,14 +806,7 @@ public:
 StdRNG fast_rng;
 SimpleMeshTables tables;
 
-#ifdef ESP32
-ESP32RTCClock fallback_clock;
-#else
-VolatileRTCClock fallback_clock;
-#endif
-AutoDiscoverRTCClock rtc_clock(fallback_clock);
-
-MyMesh the_mesh(radio, board, *new WRAPPER_CLASS(radio, board), *new ArduinoMillis(), fast_rng, rtc_clock, tables);
+MyMesh the_mesh(board, radio_driver, *new ArduinoMillis(), fast_rng, rtc_clock, tables);
 
 void halt() {
   while (1) ;
@@ -839,14 +825,18 @@ void setup() {
   delay(1000);
 
   board.begin();
-#ifdef ESP32
-  fallback_clock.begin();
+
+#ifdef DISPLAY_CLASS
+  if(display.begin()){
+    display.startFrame();
+    display.print("Please wait...");
+    display.endFrame();
+  }
 #endif
-  rtc_clock.begin(Wire);
 
   if (!radio_init()) { halt(); }
 
-  fast_rng.begin(radio.random(0x7FFFFFFF));
+  fast_rng.begin(radio_get_rng_seed());
 
   FILESYSTEM* fs;
 #if defined(NRF52_PLATFORM)
@@ -862,8 +852,11 @@ void setup() {
 #endif
   if (!store.load("_main", the_mesh.self_id)) {
     MESH_DEBUG_PRINTLN("Generating new keypair");
-    RadioNoiseListener rng(radio);
-    the_mesh.self_id = mesh::LocalIdentity(&rng);  // create new random identity
+    the_mesh.self_id = radio_new_identity();   // create new random identity
+    int count = 0;
+    while (count < 10 && (the_mesh.self_id.pub_key[0] == 0x00 || the_mesh.self_id.pub_key[0] == 0xFF)) {  // reserved id hashes
+      the_mesh.self_id = radio_new_identity(); count++;
+    }
     store.save("_main", the_mesh.self_id);
   }
 
@@ -875,7 +868,6 @@ void setup() {
   the_mesh.begin(fs);
 
 #ifdef DISPLAY_CLASS
-  display.begin();
   ui_task.begin(the_mesh.getNodeName(), FIRMWARE_BUILD_DATE);
 #endif
 

@@ -15,6 +15,7 @@ public:
   virtual bool isOn() = 0;
   virtual void turnOn() = 0;
   virtual void turnOff() = 0;
+  virtual void clear() = 0;
   virtual void startFrame(Color bkg = DARK) = 0;
   virtual void setTextSize(int sz) = 0;
   virtual void setColor(Color c) = 0;

@@ -34,7 +34,9 @@ public:
   #endif
 
   #if defined(PIN_BOARD_SDA) && defined(PIN_BOARD_SCL)
+   #if PIN_BOARD_SDA >= 0 && PIN_BOARD_SCL >= 0
     Wire.begin(PIN_BOARD_SDA, PIN_BOARD_SCL);
+   #endif
   #else
     Wire.begin();
   #endif

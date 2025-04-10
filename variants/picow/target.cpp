@@ -4,7 +4,7 @@
 
 PicoWBoard board;
 
-RADIO_CLASS radio = new Module(P_LORA_NSS, P_LORA_DIO_1, P_LORA_RESET, P_LORA_BUSY, SPI);
+RADIO_CLASS radio = new Module(P_LORA_NSS, P_LORA_DIO_1, P_LORA_RESET, P_LORA_BUSY, SPI1);
 
 WRAPPER_CLASS radio_driver(radio, board);
 
@@ -24,13 +24,12 @@ bool radio_init() {
   float tcxo = 1.6f;
 #endif
 
-  SPI.setRX(P_LORA_MISO);
-  SPI.setCS(P_LORA_NSS);
-  SPI.setSCK(P_LORA_SCLK);
-  SPI.setTX(P_LORA_MOSI);
+  SPI1.setMISO(P_LORA_MISO);
+  //SPI1.setCS(P_LORA_NSS); // Setting CS results in freeze
+  SPI1.setSCK(P_LORA_SCLK);
+  SPI1.setMOSI(P_LORA_MOSI);
 
-  //SPI.setPins(P_LORA_MISO, P_LORA_SCLK, P_LORA_MOSI);
-  SPI.begin();
+  SPI1.begin();
   int status = radio.begin(LORA_FREQ, LORA_BW, LORA_SF, LORA_CR, RADIOLIB_SX126X_SYNC_WORD_PRIVATE, LORA_TX_POWER, 8, tcxo);
   if (status != RADIOLIB_ERR_NONE) {
     Serial.print("ERROR: radio init failed: ");

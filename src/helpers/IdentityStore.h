@@ -1,6 +1,6 @@
 #pragma once
 
-#if defined(ESP32)
+#if defined(ESP32) || defined(RP2040_PLATFORM)
   #include <FS.h>
   #define FILESYSTEM  fs::FS
 #elif defined(NRF52_PLATFORM)

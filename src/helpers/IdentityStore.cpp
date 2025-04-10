@@ -5,7 +5,11 @@ bool IdentityStore::load(const char *name, mesh::LocalIdentity& id) {
   char filename[40];
   sprintf(filename, "%s/%s.id", _dir, name);
   if (_fs->exists(filename)) {
+#if defined(RP2040_PLATFORM)
+    File file = _fs->open(filename, "r");
+#else
     File file = _fs->open(filename);
+#endif
     if (file) {
       loaded = id.readFrom(file);
       file.close();
@@ -19,7 +23,11 @@ bool IdentityStore::load(const char *name, mesh::LocalIdentity& id, char display
   char filename[40];
   sprintf(filename, "%s/%s.id", _dir, name);
   if (_fs->exists(filename)) {
+#if defined(RP2040_PLATFORM)
+    File file = _fs->open(filename, "r");
+#else
     File file = _fs->open(filename);
+#endif
     if (file) {
       loaded = id.readFrom(file);
 
@@ -41,6 +49,8 @@ bool IdentityStore::save(const char *name, const mesh::LocalIdentity& id) {
 #if defined(NRF52_PLATFORM)
   File file = _fs->open(filename, FILE_O_WRITE);
   if (file) { file.seek(0); file.truncate(); }
+#elif defined(RP2040_PLATFORM)
+  File file = _fs->open(filename, "w");
 #else
   File file = _fs->open(filename, "w", true);
 #endif
@@ -61,6 +71,8 @@ bool IdentityStore::save(const char *name, const mesh::LocalIdentity& id, const 
 #if defined(NRF52_PLATFORM)
   File file = _fs->open(filename, FILE_O_WRITE);
   if (file) { file.seek(0); file.truncate(); }
+#elif defined(RP2040_PLATFORM)
+  File file = _fs->open(filename, "w");
 #else
   File file = _fs->open(filename, "w", true);
 #endif

@@ -80,11 +80,13 @@
 ////////////////////////////////////////////////////////////////////////////////
 // Builtin buttons
 
-#define PIN_BUTTON1             (5)
+#define PIN_BUTTON1             (42)
 #define BUTTON_PIN              PIN_BUTTON1
 
-#define PIN_BUTTON2             (11)
-#define BUTTON_PIN2             PIN_BUTTON2
+// #define PIN_BUTTON2             (11)
+// #define BUTTON_PIN2             PIN_BUTTON2
+
+#define PIN_USER_BTN            BUTTON_PIN
 
 #define EXTERNAL_FLASH_DEVICES MX25R1635F
 #define EXTERNAL_FLASH_USE_QSPI
@@ -108,3 +110,14 @@
 // Buzzer
 
 #define PIN_BUZZER              (46)
+
+
+////////////////////////////////////////////////////////////////////////////////
+// TFT
+#define PIN_TFT_SCL             (40)
+#define PIN_TFT_SDA             (41)
+#define PIN_TFT_RST             (2)
+#define PIN_TFT_VDD_CTL         (3)
+#define PIN_TFT_LEDA_CTL        (15)
+#define PIN_TFT_CS              (11)
+#define PIN_TFT_DC              (12)

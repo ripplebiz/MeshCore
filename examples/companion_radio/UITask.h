@@ -15,6 +15,7 @@ class UITask {
   char _origin[62];
   char _msg[80];
   int _msgcount;
+  bool _need_refresh = true;
 
   void renderCurrScreen();
   void buttonHandler();

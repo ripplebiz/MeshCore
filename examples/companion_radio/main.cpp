@@ -59,9 +59,12 @@
 
 #ifdef DISPLAY_CLASS
   #include "UITask.h"
-  #include <helpers/ui/SSD1306Display.h>
-
-  static DISPLAY_CLASS  display;
+  #ifdef ST7789
+    #include <helpers/ui/ST7789Display.h>
+  #else
+    #include <helpers/ui/SSD1306Display.h>
+  #endif
+  static DISPLAY_CLASS display;
   #define HAS_UI
 #endif
 

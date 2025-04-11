@@ -7,7 +7,7 @@ class DisplayDriver {
 protected:
   DisplayDriver(int w, int h) { _w = w; _h = h; }
 public:
-  enum Color { DARK, LIGHT };
+  enum Color { DARK=0, LIGHT, RED, GREEN, BLUE, YELLOW, ORANGE }; // on b/w screen, colors will be !=0 synonym of light
 
   int width() const { return _w; }
   int height() const { return _h; }

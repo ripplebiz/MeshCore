@@ -3,6 +3,8 @@
 #include <MeshCore.h>
 #include <Arduino.h>
 
+#ifdef XIAO_NRF52
+
 // LoRa radio module pins for Seeed Xiao-nrf52
 #ifdef SX1262_XIAO_S3_VARIANT
   #define  P_LORA_DIO_1       D0
@@ -73,3 +75,5 @@ public:
 
   bool startOTAUpdate(const char* id, char reply[]) override;
 };
+
+#endif

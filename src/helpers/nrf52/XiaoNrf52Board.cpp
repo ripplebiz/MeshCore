@@ -1,3 +1,5 @@
+#ifdef XIAO_NRF52
+
 #include <Arduino.h>
 #include "XiaoNrf52Board.h"
 
@@ -89,3 +91,5 @@ bool XiaoNrf52Board::startOTAUpdate(const char* id, char reply[]) {
 
   return false;
 }
+
+#endif

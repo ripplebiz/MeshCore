@@ -174,7 +174,7 @@ In UK and EU, 867.5MHz is not allowed to use 250kHz bandwidth and it only allows
 [Source]([https://](https://discord.com/channels/826570251612323860/1330643963501351004/1356540643853209641))
 
 the rest of the radio settings are the same for all frequencies:  
-- Spread Factor (SF): 10  
+- Spread Factor (SF): 11  
 - Coding Rate (CR): 5  
 - Bandwidth (BW): 250.00  
 

@@ -87,13 +87,13 @@ public:
 
     uint32_t raw = 0;
     for (int i = 0; i < 8; i++) {
-      raw += analogRead(PIN_VBAT_READ);
+      raw += analogReadMilliVolts(PIN_VBAT_READ);
     }
     raw = raw / 8;
 
     digitalWrite(PIN_ADC_CTRL, !adc_active_state);
 
-    return (5.2 * (3.3 / 1024.0) * raw) * 1000;
+    return 4.9*1.045*raw;
   }
 
   const char* getManufacturerName() const override {

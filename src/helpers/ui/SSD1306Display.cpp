@@ -38,7 +38,7 @@ void SSD1306Display::setTextSize(int sz) {
 }
 
 void SSD1306Display::setColor(Color c) {
-  _color = (c == LIGHT) ? SSD1306_WHITE : SSD1306_BLACK;
+  _color = (c != 0) ? SSD1306_WHITE : SSD1306_BLACK;
   display.setTextColor(_color);
 }
 

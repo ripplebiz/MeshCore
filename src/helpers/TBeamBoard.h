@@ -33,11 +33,11 @@ class TBeamBoard : public ESP32Board {
 public:
   void begin() {
     ESP32Board::begin();
-    
+
     power.setALDO2Voltage(3300);
     power.enableALDO2();
 
-    pinMode(38,INPUT_PULLUP);
+    pinMode(38, INPUT_PULLUP);
 
     esp_reset_reason_t reason = esp_reset_reason();
     if (reason == ESP_RST_DEEPSLEEP) {
@@ -75,7 +75,7 @@ public:
   }
 
   uint16_t getBattMilliVolts() override {
-    return 0;
+    return power.getBattVoltage();
   }
 
   const char* getManufacturerName() const override {

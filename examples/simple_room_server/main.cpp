@@ -20,11 +20,11 @@
 /* ------------------------------ Config -------------------------------- */
 
 #ifndef FIRMWARE_BUILD_DATE
-  #define FIRMWARE_BUILD_DATE   "7 Apr 2025"
+  #define FIRMWARE_BUILD_DATE   "21 Apr 2025"
 #endif
 
 #ifndef FIRMWARE_VERSION
-  #define FIRMWARE_VERSION   "v1.4.3"
+  #define FIRMWARE_VERSION   "v1.5.1"
 #endif
 
 #ifndef LORA_FREQ
@@ -232,6 +232,17 @@ class MyMesh : public mesh::Mesh, public CommonCLICallbacks {
     }
   }
 
+  uint8_t getUnsyncedCount(ClientInfo* client) {
+    uint8_t count = 0;
+    for (int k = 0; k < MAX_UNSYNCED_POSTS; k++) {
+      if (posts[k].post_timestamp > client->sync_since   // is new post for this Client?
+        && !posts[k].author.matches(client->id)) {    // don't push posts to the author
+        count++;
+      }
+    }
+    return count;
+  }
+
   bool processAck(const uint8_t *data) {
     for (int i = 0; i < num_clients; i++) {
       auto client = &known_clients[i];
@@ -398,7 +409,7 @@ protected:
       reply_data[4] = RESP_SERVER_LOGIN_OK;
       reply_data[5] = (CLIENT_KEEP_ALIVE_SECS >> 4);  // NEW: recommended keep-alive interval (secs / 16)
       reply_data[6] = (perm == RoomPermission::ADMIN ? 1 : (perm == RoomPermission::GUEST ? 0 : 2));
-      reply_data[7] = 0;  // FUTURE: reserved
+      reply_data[7] = getUnsyncedCount(client);  // NEW
       memcpy(&reply_data[8], "OK", 2);  // REVISIT: not really needed
 
       next_push = futureMillis(PUSH_NOTIFY_DELAY_MILLIS);  // delay next push, give RESPONSE packet time to arrive first
@@ -572,6 +583,7 @@ protected:
 
             auto reply = createAck(ack_hash);
             if (reply) {
+              reply->payload[reply->payload_len++] = getUnsyncedCount(client);  // NEW: add unsynced counter to end of ACK packet
               sendDirect(reply, client->out_path, client->out_path_len);
             }
           }
@@ -887,7 +899,7 @@ void setup() {
   the_mesh.begin(fs);
 
 #ifdef DISPLAY_CLASS
-  ui_task.begin(the_mesh.getNodeName(), FIRMWARE_BUILD_DATE);
+  ui_task.begin(the_mesh.getNodeName(), FIRMWARE_BUILD_DATE, FIRMWARE_VERSION);
 #endif
 
   // send out initial Advertisement to the mesh

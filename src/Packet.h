@@ -11,10 +11,10 @@ namespace mesh {
 #define PH_VER_SHIFT         6
 #define PH_VER_MASK       0x03   // 2-bits
 
-#define ROUTE_TYPE_RESERVED1     0x00    // FUTURE
-#define ROUTE_TYPE_FLOOD         0x01    // flood mode, needs 'path' to be built up (max 64 bytes)
-#define ROUTE_TYPE_DIRECT        0x02    // direct route, 'path' is supplied
-#define ROUTE_TYPE_RESERVED2     0x03    // FUTURE
+#define ROUTE_TYPE_TRANSPORT_FLOOD   0x00    // flood mode + transport codes
+#define ROUTE_TYPE_FLOOD             0x01    // flood mode, needs 'path' to be built up (max 64 bytes)
+#define ROUTE_TYPE_DIRECT            0x02    // direct route, 'path' is supplied
+#define ROUTE_TYPE_TRANSPORT_DIRECT  0x03    // direct route + transport codes
 
 #define PAYLOAD_TYPE_REQ         0x00    // request (prefixed with dest/src hashes, MAC) (enc data: timestamp, blob)
 #define PAYLOAD_TYPE_RESPONSE    0x01    // response to REQ or ANON_REQ (prefixed with dest/src hashes, MAC) (enc data: timestamp, blob)
@@ -43,6 +43,7 @@ public:
 
   uint8_t header;
   uint16_t payload_len, path_len;
+  uint16_t transport_codes[2];
   uint8_t path[MAX_PATH_SIZE];
   uint8_t payload[MAX_PACKET_PAYLOAD];
   int8_t _snr;
@@ -58,8 +59,10 @@ public:
    */
   uint8_t getRouteType() const { return header & PH_ROUTE_MASK; }
 
-  bool isRouteFlood() const { return getRouteType() == ROUTE_TYPE_FLOOD; }
-  bool isRouteDirect() const { return getRouteType() == ROUTE_TYPE_DIRECT; }
+  bool isRouteFlood() const { return getRouteType() == ROUTE_TYPE_FLOOD || getRouteType() == ROUTE_TYPE_TRANSPORT_FLOOD; }
+  bool isRouteDirect() const { return getRouteType() == ROUTE_TYPE_DIRECT || getRouteType() == ROUTE_TYPE_TRANSPORT_DIRECT; }
+
+  bool hasTransportCodes() const { return getRouteType() == ROUTE_TYPE_TRANSPORT_FLOOD || getRouteType() == ROUTE_TYPE_TRANSPORT_DIRECT; }
 
   /**
    * \returns  one of PAYLOAD_TYPE_ values
@@ -75,6 +78,11 @@ public:
   bool isMarkedDoNotRetransmit() const { return header == 0xFF; }
 
   float getSNR() const { return ((float)_snr) / 4.0f; }
+
+  /**
+   * \returns  the encoded/wire format length of this packet
+   */
+  int getRawLength() const;
 
   /**
    * \brief  save entire packet as a blob

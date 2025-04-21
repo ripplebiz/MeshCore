@@ -20,25 +20,33 @@ static const uint8_t meshcore_logo [] PROGMEM = {
     0xe3, 0xe3, 0x8f, 0xff, 0x1f, 0xfc, 0x3c, 0x0e, 0x1f, 0xf8, 0xff, 0xf8, 0x70, 0x3c, 0x7f, 0xf8, 
 };
 
-void UITask::begin(const char* node_name, const char* build_date) {
+void UITask::begin(const char* node_name, const char* build_date, const char* firmware_version) {
   _prevBtnState = HIGH;
   _auto_off = millis() + AUTO_OFF_MILLIS;
   _node_name = node_name;
-  _build_date = build_date;
   _display->turnOn();
+
+  // strip off dash and commit hash by changing dash to null terminator
+  // e.g: v1.2.3-abcdef -> v1.2.3
+  char *version = strdup(firmware_version);
+  char *dash = strchr(version, '-');
+  if(dash){
+    *dash = 0;
+  }
+
+  // v1.2.3 (1 Jan 2025)
+  sprintf(_version_info, "%s (%s)", version, build_date);
 }
 
 void UITask::renderCurrScreen() {
-  char tmp[80];
   // render 'home' screen
   _display->drawXbm(0, 0, meshcore_logo, 128, 13);
   _display->setCursor(0, 20);
   _display->setTextSize(1);
   _display->print(_node_name);
 
-  sprintf(tmp, "Build: %s", _build_date);
   _display->setCursor(0, 32);
-  _display->print(tmp);
+  _display->print(_version_info);
   _display->setCursor(0, 43);
   _display->print("< Room Server >");
   //_display->printf("freq : %03.2f sf %d\n", _prefs.freq, _prefs.sf);

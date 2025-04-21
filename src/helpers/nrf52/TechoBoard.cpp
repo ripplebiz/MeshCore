@@ -24,19 +24,6 @@ void TechoBoard::begin() {
   // for future use, sub-classes SHOULD call this from their begin()
   startup_reason = BD_STARTUP_NORMAL;
 
-  delay(200);
-  pinMode(PIN_PWR_EN, OUTPUT);
-  digitalWrite(PIN_PWR_EN, HIGH);
-  pinMode(PIN_BUTTON1, INPUT_PULLUP);
-  pinMode(PIN_BUTTON2, INPUT_PULLUP);
-  pinMode(LED_RED, OUTPUT);
-  pinMode(LED_GREEN, OUTPUT);
-  pinMode(LED_BLUE, OUTPUT);
-  delay(200);
-
-  pinMode(PIN_TXCO, OUTPUT);
-  digitalWrite(PIN_TXCO, HIGH);
-
   Wire.begin();
 
   pinMode(SX126X_POWER_EN, OUTPUT);

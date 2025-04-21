@@ -31,8 +31,29 @@ void BaseChatMesh::onAdvertRecv(mesh::Packet* packet, const mesh::Identity& id, 
     }
   }
 
+  // save a copy of raw advert packet (to support "Share..." function)
+  int plen = packet->writeTo(temp_buf);
+  putBlobByKey(id.pub_key, PUB_KEY_SIZE, temp_buf, plen);
+  
   bool is_new = false;
   if (from == NULL) {
+    if (!isAutoAddEnabled()) {
+      ContactInfo ci;
+      memset(&ci, 0, sizeof(ci));
+      ci.id = id;
+      ci.out_path_len = -1;  // initially out_path is unknown
+      StrHelper::strncpy(ci.name, parser.getName(), sizeof(ci.name));
+      ci.type = parser.getType();
+      if (parser.hasLatLon()) {
+        ci.gps_lat = parser.getIntLat();
+        ci.gps_lon = parser.getIntLon();
+      }
+      ci.last_advert_timestamp = timestamp;
+      ci.lastmod = getRTCClock()->getCurrentTime();
+      onDiscoveredContact(ci, true);       // let UI know
+      return;
+    }
+
     is_new = true;
     if (num_contacts < MAX_CONTACTS) {
       from = &contacts[num_contacts++];
@@ -50,10 +71,6 @@ void BaseChatMesh::onAdvertRecv(mesh::Packet* packet, const mesh::Identity& id, 
     }
   }
 
-  // save a copy of raw advert packet (to support "Share..." function)
-  int plen = packet->writeTo(temp_buf);
-  putBlobByKey(id.pub_key, PUB_KEY_SIZE, temp_buf, plen);
-  
   // update
   StrHelper::strncpy(from->name, parser.getName(), sizeof(from->name));
   from->type = parser.getType();
@@ -252,7 +269,7 @@ int  BaseChatMesh::sendMessage(const ContactInfo& recipient, uint32_t timestamp,
   mesh::Packet* pkt = composeMsgPacket(recipient, timestamp, attempt, text, expected_ack);
   if (pkt == NULL) return MSG_SEND_FAILED;
 
-  uint32_t t = _radio->getEstAirtimeFor(pkt->payload_len + pkt->path_len + 2);
+  uint32_t t = _radio->getEstAirtimeFor(pkt->getRawLength());
 
   int rc;
   if (recipient.out_path_len < 0) {
@@ -279,7 +296,7 @@ int  BaseChatMesh::sendCommandData(const ContactInfo& recipient, uint32_t timest
   auto pkt = createDatagram(PAYLOAD_TYPE_TXT_MSG, recipient.id, recipient.shared_secret, temp, 5 + text_len);
   if (pkt == NULL) return MSG_SEND_FAILED;
 
-  uint32_t t = _radio->getEstAirtimeFor(pkt->payload_len + pkt->path_len + 2);
+  uint32_t t = _radio->getEstAirtimeFor(pkt->getRawLength());
   int rc;
   if (recipient.out_path_len < 0) {
     sendFlood(pkt);
@@ -362,7 +379,7 @@ int BaseChatMesh::sendLogin(const ContactInfo& recipient, const char* password, 
 
   auto pkt = createAnonDatagram(PAYLOAD_TYPE_ANON_REQ, self_id, recipient.id, recipient.shared_secret, temp, tlen);
   if (pkt) {
-    uint32_t t = _radio->getEstAirtimeFor(pkt->payload_len + pkt->path_len + 2);
+    uint32_t t = _radio->getEstAirtimeFor(pkt->getRawLength());
     if (recipient.out_path_len < 0) {
       sendFlood(pkt);
       est_timeout = calcFloodTimeoutMillisFor(t);
@@ -386,7 +403,7 @@ int  BaseChatMesh::sendStatusRequest(const ContactInfo& recipient, uint32_t& est
 
   auto pkt = createDatagram(PAYLOAD_TYPE_REQ, recipient.id, recipient.shared_secret, temp, sizeof(temp));
   if (pkt) {
-    uint32_t t = _radio->getEstAirtimeFor(pkt->payload_len + pkt->path_len + 2);
+    uint32_t t = _radio->getEstAirtimeFor(pkt->getRawLength());
     if (recipient.out_path_len < 0) {
       sendFlood(pkt);
       est_timeout = calcFloodTimeoutMillisFor(t);

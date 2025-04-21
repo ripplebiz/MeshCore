@@ -103,6 +103,7 @@ protected:
   }
 
   // 'UI' concepts, for sub-classes to implement
+  virtual bool isAutoAddEnabled() const { return true; }
   virtual void onDiscoveredContact(ContactInfo& contact, bool is_new) = 0;
   virtual bool processAck(const uint8_t *data) = 0;
   virtual void onContactPathUpdated(const ContactInfo& contact) = 0;

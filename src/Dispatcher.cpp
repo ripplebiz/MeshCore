@@ -101,6 +101,12 @@ void Dispatcher::checkRecv() {
 #endif
 
         pkt->header = raw[i++];
+        if (pkt->hasTransportCodes()) {
+          memcpy(&pkt->transport_codes[0], &raw[i], 2); i += 2;
+          memcpy(&pkt->transport_codes[1], &raw[i], 2); i += 2;
+        } else {
+          pkt->transport_codes[0] = pkt->transport_codes[1] = 0;
+        }
         pkt->path_len = raw[i++];
 
         if (pkt->path_len > MAX_PATH_SIZE || i + pkt->path_len > len) {
@@ -132,7 +138,7 @@ void Dispatcher::checkRecv() {
     #if MESH_PACKET_LOGGING
     Serial.print(getLogDateTime());
     Serial.printf(": RX, len=%d (type=%d, route=%s, payload_len=%d) SNR=%d RSSI=%d score=%d", 
-            2 + pkt->path_len + pkt->payload_len, pkt->getPayloadType(), pkt->isRouteDirect() ? "D" : "F", pkt->payload_len,
+            pkt->getRawLength(), pkt->getPayloadType(), pkt->isRouteDirect() ? "D" : "F", pkt->payload_len,
             (int)pkt->getSNR(), (int)_radio->getLastRSSI(), (int)(score*1000));
 
     static uint8_t packet_hash[MAX_HASH_SIZE];
@@ -147,7 +153,7 @@ void Dispatcher::checkRecv() {
       Serial.printf("\n");
     }
     #endif
-    logRx(pkt, 2 + pkt->path_len + pkt->payload_len, score);   // hook for custom logging
+    logRx(pkt, pkt->getRawLength(), score);   // hook for custom logging
 
     if (pkt->isRouteFlood()) {
       n_recv_flood++;
@@ -212,6 +218,10 @@ void Dispatcher::checkSend() {
     raw[len++] = NODE_ID;
 #endif
     raw[len++] = outbound->header;
+    if (outbound->hasTransportCodes()) {
+      memcpy(&raw[len], &outbound->transport_codes[0], 2); len += 2;
+      memcpy(&raw[len], &outbound->transport_codes[1], 2); len += 2;
+    }
     raw[len++] = outbound->path_len;
     memcpy(&raw[len], outbound->path, outbound->path_len); len += outbound->path_len;
 

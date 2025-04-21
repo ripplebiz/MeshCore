@@ -25,16 +25,30 @@ static const uint8_t meshcore_logo [] PROGMEM = {
     0xe3, 0xe3, 0x8f, 0xff, 0x1f, 0xfc, 0x3c, 0x0e, 0x1f, 0xf8, 0xff, 0xf8, 0x70, 0x3c, 0x7f, 0xf8, 
 };
 
-void UITask::begin(DisplayDriver* display, const char* node_name, const char* build_date, uint32_t pin_code) {
+void UITask::begin(DisplayDriver* display, const char* node_name, const char* build_date, const char* firmware_version, uint32_t pin_code) {
   _display = display;
   _auto_off = millis() + AUTO_OFF_MILLIS;
   clearMsgPreview();
   _node_name = node_name;
-  _build_date = build_date;
   _pin_code = pin_code;
   if (_display != NULL) {
     _display->turnOn();
   }
+
+  // strip off dash and commit hash by changing dash to null terminator
+  // e.g: v1.2.3-abcdef -> v1.2.3
+  char *version = strdup(firmware_version);
+  char *dash = strchr(version, '-');
+  if(dash){
+    *dash = 0;
+  }
+
+  #ifdef PIN_USER_BTN
+    pinMode(PIN_USER_BTN, INPUT);
+  #endif
+
+  // v1.2.3 (1 Jan 2025)
+  sprintf(_version_info, "%s (%s)", version, build_date);
 }
 
 void UITask::msgRead(int msgcount) {
@@ -47,6 +61,7 @@ void UITask::msgRead(int msgcount) {
 void UITask::clearMsgPreview() {
   _origin[0] = 0;
   _msg[0] = 0;
+  _need_refresh = true;
 }
 
 void UITask::newMsg(uint8_t path_len, const char* from_name, const char* text, int msgcount) {
@@ -62,6 +77,7 @@ void UITask::newMsg(uint8_t path_len, const char* from_name, const char* text, i
   if (_display != NULL) {
     if (!_display->isOn()) _display->turnOn();
     _auto_off = millis() + AUTO_OFF_MILLIS;  // extend the auto-off timer
+    _need_refresh = true;
   }
 }
 
@@ -73,38 +89,46 @@ void UITask::renderCurrScreen() {
     // render message preview
     _display->setCursor(0, 0);
     _display->setTextSize(1);
+    _display->setColor(DisplayDriver::GREEN);
     _display->print(_node_name);
 
     _display->setCursor(0, 12);
+    _display->setColor(DisplayDriver::YELLOW);
     _display->print(_origin);
     _display->setCursor(0, 24);
+    _display->setColor(DisplayDriver::LIGHT);
     _display->print(_msg);
 
-    _display->setCursor(100, 9);
+    _display->setCursor(_display->width() - 28, 9);
     _display->setTextSize(2);
+    _display->setColor(DisplayDriver::ORANGE);
     sprintf(tmp, "%d", _msgcount);
     _display->print(tmp);
   } else {
     // render 'home' screen
+    _display->setColor(DisplayDriver::BLUE);
     _display->drawXbm(0, 0, meshcore_logo, 128, 13);
     _display->setCursor(0, 20);
     _display->setTextSize(1);
-    _display->print(_node_name);
 
-    sprintf(tmp, "Build: %s", _build_date);
+    _display->setColor(DisplayDriver::LIGHT);
+    _display->print(_node_name);
+    
     _display->setCursor(0, 32);
-    _display->print(tmp);
+    _display->print(_version_info);
 
     if (_connected) {
       //_display->printf("freq : %03.2f sf %d\n", _prefs.freq, _prefs.sf);
       //_display->printf("bw   : %03.2f cr %d\n", _prefs.bw, _prefs.cr);
     } else if (_pin_code != 0) {
+      _display->setColor(DisplayDriver::RED);
       _display->setTextSize(2);
       _display->setCursor(0, 43);
       sprintf(tmp, "Pin:%d", _pin_code);
       _display->print(tmp);
     }
   }
+  _need_refresh = false;
 }
 
 void UITask::userLedHandler() {
@@ -148,6 +172,7 @@ void UITask::buttonHandler() {
             clearMsgPreview();
           } else {
             _display->turnOn();
+            _need_refresh = true;
           }
           _auto_off = cur_time + AUTO_OFF_MILLIS;   // extend auto-off timer
         }
@@ -173,7 +198,7 @@ void UITask::loop() {
   userLedHandler();
 
   if (_display != NULL && _display->isOn()) {
-    if (millis() >= _next_refresh) {
+    if (millis() >= _next_refresh && _need_refresh) {
       _display->startFrame();
       renderCurrScreen();
       _display->endFrame();

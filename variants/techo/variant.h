@@ -42,7 +42,6 @@
 
 #define PIN_SERIAL1_RX          (41) // GPS TX
 #define PIN_SERIAL1_TX          (40) // GPS RX
-
 ////////////////////////////////////////////////////////////////////////////////
 // I2C pin definition
 
@@ -66,6 +65,7 @@
 #define LED_GREEN               (33)
 #define LED_BLUE                (14)
 
+#define PIN_STATUS_LED          LED_GREEN
 #define LED_BUILTIN             LED_GREEN
 #define PIN_LED                 LED_BUILTIN
 #define LED_PIN                 LED_BUILTIN
@@ -79,6 +79,7 @@
 
 #define PIN_BUTTON1             (42)
 #define BUTTON_PIN              PIN_BUTTON1
+#define PIN_USER_BTN            BUTTON_PIN
 
 #define PIN_BUTTON2             (11)
 #define BUTTON_PIN2             PIN_BUTTON2
@@ -97,6 +98,36 @@
 #define SX126X_DIO2_AS_RF_SWITCH
 #define SX126X_DIO3_TCXO_VOLTAGE 1.8
 
-#define PIN_SPI1_MISO           (39)
+////////////////////////////////////////////////////////////////////////////////
+// SPI1
+
+#define PIN_SPI1_MISO           (38)
 #define PIN_SPI1_MOSI           (29)
 #define PIN_SPI1_SCK            (31)
+
+// GxEPD2 needs that for a panel that is not even used !
+extern const int MISO;
+extern const int MOSI;
+extern const int SCK;
+
+////////////////////////////////////////////////////////////////////////////////
+// Display
+
+#define DISP_MISO               (38)
+#define DISP_MOSI               (29)
+#define DISP_SCLK               (31)
+#define DISP_CS                 (30)
+#define DISP_DC                 (28)
+#define DISP_RST                (2)
+#define DISP_BUSY               (3)
+#define DISP_BACKLIGHT          (43)
+
+////////////////////////////////////////////////////////////////////////////////
+// GPS
+
+#define PIN_GPS_RX              (41)
+#define PIN_GPS_TX              (40)
+#define PIN_GPS_WAKEUP          (34)
+#define PIN_GPS_RESET           (37)
+#define PIN_GPS_PPS             (36)
+#define PIN_GPS_STANDBY         (34)

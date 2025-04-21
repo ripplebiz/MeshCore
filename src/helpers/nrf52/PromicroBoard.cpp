@@ -14,7 +14,7 @@ void PromicroBoard::begin() {
     pinMode(PIN_VBAT_READ, INPUT);
 
     #ifdef BUTTON_PIN
-      pinMode(BUTTON_PIN, INPUT);
+      pinMode(BUTTON_PIN, INPUT_PULLUP);
     #endif
 
     #if defined(PIN_BOARD_SDA) && defined(PIN_BOARD_SCL)

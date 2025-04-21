@@ -22,11 +22,11 @@
 /* ------------------------------ Config -------------------------------- */
 
 #ifndef FIRMWARE_BUILD_DATE
-  #define FIRMWARE_BUILD_DATE   "7 Apr 2025"
+  #define FIRMWARE_BUILD_DATE   "21 Apr 2025"
 #endif
 
 #ifndef FIRMWARE_VERSION
-  #define FIRMWARE_VERSION   "v1.4.3"
+  #define FIRMWARE_VERSION   "v1.5.1"
 #endif
 
 #ifndef LORA_FREQ
@@ -672,7 +672,7 @@ void setup() {
   the_mesh.begin(fs);
 
 #ifdef DISPLAY_CLASS
-  ui_task.begin(the_mesh.getNodeName(), FIRMWARE_BUILD_DATE);
+  ui_task.begin(the_mesh.getNodeName(), FIRMWARE_BUILD_DATE, FIRMWARE_VERSION);
 #endif
 
   // send out initial Advertisement to the mesh

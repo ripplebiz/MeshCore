@@ -18,7 +18,7 @@ void T1000eBoard::begin() {
 #endif
 
 #if defined(PIN_BOARD_SDA) && defined(PIN_BOARD_SCL)
-  Wire.setPins(PIN_BOARD_SDA, PIN_BOARD_SCL)
+  Wire.setPins(PIN_BOARD_SDA, PIN_BOARD_SCL);
 #endif
 
   Wire.begin();

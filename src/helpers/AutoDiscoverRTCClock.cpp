@@ -8,8 +8,12 @@ static bool ds3231_success = false;
 static Melopero_RV3028 rtc_rv3028;
 static bool rv3028_success = false;
 
+static RTC_PCF8563 rtc_8563;
+static bool rtc_8563_success = false;
+
 #define DS3231_ADDRESS   0x68
 #define RV3028_ADDRESS   0x52
+#define PCF8563_ADDRESS  0x51
 
 bool AutoDiscoverRTCClock::i2c_probe(TwoWire& wire, uint8_t addr) {
   wire.beginTransmission(addr);
@@ -28,6 +32,9 @@ void AutoDiscoverRTCClock::begin(TwoWire& wire) {
 	rtc_rv3028.set24HourMode(); // Set the device to use the 24hour format (default) instead of the 12 hour format
     rv3028_success = true;
   }
+  if(i2c_probe(wire,PCF8563_ADDRESS)){
+    rtc_8563_success = rtc_8563.begin(&wire);
+  }
 }
 
 uint32_t AutoDiscoverRTCClock::getCurrentTime() {
@@ -44,6 +51,9 @@ uint32_t AutoDiscoverRTCClock::getCurrentTime() {
         rtc_rv3028.getSecond()
     ).unixtime();
   }
+  if(rtc_8563_success){
+    return rtc_8563.now().unixtime();
+  }
   return _fallback->getCurrentTime();
 }
 
@@ -52,9 +62,10 @@ void AutoDiscoverRTCClock::setCurrentTime(uint32_t time) {
     rtc_3231.adjust(DateTime(time));
   } else if (rv3028_success) {
     auto dt = DateTime(time);
-	uint8_t weekday = (dt.day() + (uint16_t)((2.6 * dt.month()) - 0.2) - (2 * (dt.year() / 100)) + dt.year() + (uint16_t)(dt.year() / 4) + (uint16_t)(dt.year() / 400)) % 7;
-	
+	  uint8_t weekday = (dt.day() + (uint16_t)((2.6 * dt.month()) - 0.2) - (2 * (dt.year() / 100)) + dt.year() + (uint16_t)(dt.year() / 4) + (uint16_t)(dt.year() / 400)) % 7;
     rtc_rv3028.setTime(dt.year(), dt.month(), weekday, dt.day(), dt.hour(), dt.minute(), dt.second());
+  } else if (rtc_8563_success) {
+    rtc_8563.adjust(DateTime(time));
   } else {
     _fallback->setCurrentTime(time);
   }

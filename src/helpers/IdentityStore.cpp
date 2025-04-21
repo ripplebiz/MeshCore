@@ -50,7 +50,7 @@ bool IdentityStore::save(const char *name, const mesh::LocalIdentity& id) {
   File file = _fs->open(filename, FILE_O_WRITE);
   if (file) { file.seek(0); file.truncate(); }
 #elif defined(RP2040_PLATFORM)
-  File file = _fs->open(filename, "w");
+  File file = _fs->open(filename, "w+");
 #else
   File file = _fs->open(filename, "w", true);
 #endif
@@ -72,7 +72,7 @@ bool IdentityStore::save(const char *name, const mesh::LocalIdentity& id, const 
   File file = _fs->open(filename, FILE_O_WRITE);
   if (file) { file.seek(0); file.truncate(); }
 #elif defined(RP2040_PLATFORM)
-  File file = _fs->open(filename, "w");
+  File file = _fs->open(filename, "w+");
 #else
   File file = _fs->open(filename, "w", true);
 #endif

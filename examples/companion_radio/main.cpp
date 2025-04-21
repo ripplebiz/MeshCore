@@ -3,6 +3,8 @@
 
 #if defined(NRF52_PLATFORM)
   #include <InternalFileSystem.h>
+#elif defined(RP2040_PLATFORM)
+  #include <LittleFS.h>
 #elif defined(ESP32)
   #include <SPIFFS.h>
 #endif
@@ -249,7 +251,11 @@ class MyMesh : public BaseChatMesh {
 
   void loadContacts() {
     if (_fs->exists("/contacts3")) {
+    #if defined(RP2040_PLATFORM)
+      File file = _fs->open("/contacts3", "r");
+    #else
       File file = _fs->open("/contacts3");
+    #endif
       if (file) {
         bool full = false;
         while (!full) {
@@ -284,6 +290,8 @@ class MyMesh : public BaseChatMesh {
 #if defined(NRF52_PLATFORM)
     File file = _fs->open("/contacts3", FILE_O_WRITE);
     if (file) { file.seek(0); file.truncate(); }
+#elif defined(RP2040_PLATFORM)
+    File file = _fs->open("/contacts3", "w+");
 #else
     File file = _fs->open("/contacts3", "w", true);
 #endif
@@ -314,7 +322,11 @@ class MyMesh : public BaseChatMesh {
 
   void loadChannels() {
     if (_fs->exists("/channels2")) {
+    #if defined(RP2040_PLATFORM)
+    File file = _fs->open("/channels2", "r");
+    #else
       File file = _fs->open("/channels2");
+    #endif
       if (file) {
         bool full = false;
         uint8_t channel_idx = 0;
@@ -343,6 +355,8 @@ class MyMesh : public BaseChatMesh {
   #if defined(NRF52_PLATFORM)
     File file = _fs->open("/channels2", FILE_O_WRITE);
     if (file) { file.seek(0); file.truncate(); }
+  #elif defined(RP2040_PLATFORM)
+    File file = _fs->open("/channels2", "w+");
   #else
     File file = _fs->open("/channels2", "w", true);
   #endif
@@ -373,7 +387,11 @@ class MyMesh : public BaseChatMesh {
     sprintf(path, "/bl/%s", fname);
 
     if (_fs->exists(path)) {
+    #if defined(RP2040_PLATFORM)
+      File f = _fs->open(path, "r");
+    #else
       File f = _fs->open(path);
+    #endif
       if (f) {
         int len = f.read(dest_buf, 255);  // currently MAX 255 byte blob len supported!!
         f.close();
@@ -394,6 +412,8 @@ class MyMesh : public BaseChatMesh {
   #if defined(NRF52_PLATFORM)
     File f = _fs->open(path, FILE_O_WRITE);
     if (f) { f.seek(0); f.truncate(); }
+  #elif defined(RP2040_PLATFORM)
+    File f = _fs->open(path, "w+");
   #else
     File f = _fs->open(path, "w", true);
   #endif
@@ -752,7 +772,11 @@ public:
   }
 
   void loadPrefsInt(const char* filename) {
+#if defined(RP2040_PLATFORM)
+    File file = _fs->open(filename, "r");
+#else
     File file = _fs->open(filename);
+#endif
     if (file) {
       uint8_t pad[8];
 
@@ -850,6 +874,8 @@ public:
 #if defined(NRF52_PLATFORM)
     File file = _fs->open("/new_prefs", FILE_O_WRITE);
     if (file) { file.seek(0); file.truncate(); }
+#elif defined(RP2040_PLATFORM)
+    File file = _fs->open("/new_prefs", "w+");
 #else
     File file = _fs->open("/new_prefs", "w", true);
 #endif
@@ -1444,6 +1470,24 @@ public:
     #include <helpers/ArduinoSerialInterface.h>
     ArduinoSerialInterface serial_interface;
   #endif
+#elif defined(RP2040_PLATFORM)
+  //#ifdef WIFI_SSID
+  //  #include <helpers/rp2040/SerialWifiInterface.h>
+  //  SerialWifiInterface serial_interface;
+  //  #ifndef TCP_PORT
+  //    #define TCP_PORT 5000
+  //  #endif
+  // #elif defined(BLE_PIN_CODE)
+  //   #include <helpers/rp2040/SerialBLEInterface.h>
+  //   SerialBLEInterface serial_interface;
+  #if defined(SERIAL_RX)
+    #include <helpers/ArduinoSerialInterface.h>
+    ArduinoSerialInterface serial_interface;
+    HardwareSerial companion_serial(1);
+  #else
+    #include <helpers/ArduinoSerialInterface.h>
+    ArduinoSerialInterface serial_interface;
+  #endif
 #elif defined(NRF52_PLATFORM)
   #ifdef BLE_PIN_CODE
     #include <helpers/nrf52/SerialBLEInterface.h>
@@ -1503,6 +1547,31 @@ void setup() {
   serial_interface.begin(Serial);
 #endif
   the_mesh.startInterface(serial_interface);
+#elif defined(RP2040_PLATFORM)
+  LittleFS.begin();
+  the_mesh.begin(LittleFS,
+    #ifdef HAS_UI
+        disp != NULL
+    #else
+        false
+    #endif
+  );
+
+  //#ifdef WIFI_SSID
+  //  WiFi.begin(WIFI_SSID, WIFI_PWD);
+  //  serial_interface.begin(TCP_PORT);
+  // #elif defined(BLE_PIN_CODE)
+  //   char dev_name[32+16];
+  //   sprintf(dev_name, "%s%s", BLE_NAME_PREFIX, the_mesh.getNodeName());
+  //   serial_interface.begin(dev_name, the_mesh.getBLEPin());
+  #if defined(SERIAL_RX)
+    companion_serial.setPins(SERIAL_RX, SERIAL_TX);
+    companion_serial.begin(115200);
+    serial_interface.begin(companion_serial);
+  #else
+    serial_interface.begin(Serial);
+  #endif
+    the_mesh.startInterface(serial_interface);
 #elif defined(ESP32)
   SPIFFS.begin(true);
   the_mesh.begin(SPIFFS,

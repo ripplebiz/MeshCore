@@ -5,8 +5,7 @@
 #include <Arduino.h>
 #include "XPowersLib.h"
 
-// Defined using AXP2102
-#define XPOWERS_CHIP_AXP2101
+#define XPOWERS_CHIP_AXP192
 
 // LoRa radio module pins for TBeam
 #define  P_LORA_DIO_1   33 // SX1262 IRQ pin
@@ -22,14 +21,16 @@
 #include <driver/rtc_io.h>
 
 class TBeamBoardSX1262 : public ESP32Board {
-  XPowersAXP2101 power;
+  XPowersAXP192 power;
 
 public:
   void begin() {
     ESP32Board::begin();
 
-    power.setALDO2Voltage(3300);
-    power.enableALDO2();    
+    power.setLDO2Voltage(3300);
+    power.enableLDO2();
+
+    power.enableBattVoltageMeasure();
 
     pinMode(38, INPUT_PULLUP);
 
@@ -68,7 +69,7 @@ public:
     esp_deep_sleep_start();   // CPU halts here and never returns!
   }
 
-  uint16_t getBattMilliVolts() override {
+  uint16_t getBattMilliVolts() override  {
     return power.getBattVoltage();
   }
 

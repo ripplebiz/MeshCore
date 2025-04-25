@@ -35,4 +35,14 @@ public:
   void msgRead(int msgcount);
   void newMsg(uint8_t path_len, const char* from_name, const char* text, int msgcount);
   void loop();
+
+
+
+private:
+#ifdef UI_CAN_SHUTDOWN
+    void performShutdown();
+    void showShutdownCountdown(int countdown);
+    void showFinalShutdownPrompt();
+#endif
+
 };

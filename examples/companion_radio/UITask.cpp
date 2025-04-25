@@ -157,41 +157,149 @@ void UITask::userLedHandler() {
 #endif
 }
 
+
+
+
 void UITask::buttonHandler() {
-#ifdef PIN_USER_BTN
-  static int prev_btn_state = !USER_BTN_PRESSED;
-  static unsigned long btn_state_change_time = 0;
-  static unsigned long next_read = 0;
-  int cur_time = millis();
-  if (cur_time >= next_read) {
-    int btn_state = digitalRead(PIN_USER_BTN);
-    if (btn_state != prev_btn_state) {
-      if (btn_state == USER_BTN_PRESSED) {  // pressed?
-        if (_display != NULL) {
-          if (_display->isOn()) {
-            clearMsgPreview();
-          } else {
-            _display->turnOn();
+  #ifdef PIN_USER_BTN
+    static int prev_btn_state = !USER_BTN_PRESSED;
+    static unsigned long btn_state_change_time = 0;
+    static unsigned long next_read = 0;
+    static bool countdown_active = false;
+    static int last_countdown = -1;
+  
+  #ifdef UI_CAN_SHUTDOWN
+    static bool shutdown_ready = false;
+  #endif
+  
+    const unsigned long DEBOUNCE_INTERVAL = 100;
+    const unsigned long COUNTDOWN_START_MS = 1000;
+    const unsigned long SHUTDOWN_TRIGGER_MS = 5000;
+    const int COUNTDOWN_SECONDS = 5;
+  
+    unsigned long cur_time = millis();
+    if (cur_time >= next_read) {
+      int btn_state = digitalRead(PIN_USER_BTN);
+  
+      if (btn_state != prev_btn_state) {
+        btn_state_change_time = cur_time;
+        prev_btn_state = btn_state;
+  
+        if (btn_state == USER_BTN_PRESSED) {
+          if (_display != NULL) {
+            if (_display->isOn()) {
+              clearMsgPreview();
+            } else {
+              _display->turnOn();
+              _need_refresh = true;
+            }
+            _auto_off = cur_time + AUTO_OFF_MILLIS;
+          }
+  
+          countdown_active = true;
+          last_countdown = -1;
+  
+          #ifdef UI_CAN_SHUTDOWN
+                  shutdown_ready = false;
+          #endif
+          
+                } else { // Button released
+                  
+          #ifdef UI_CAN_SHUTDOWN
+                  if (shutdown_ready) {
+                    performShutdown();
+                  }
+          #endif
+                  countdown_active = false;
+                  last_countdown = -1;
+          
+          #ifdef UI_CAN_SHUTDOWN
+                  shutdown_ready = false;
+          #endif
+  
+          if (_display && _display->isOn()) {
             _need_refresh = true;
           }
-          _auto_off = cur_time + AUTO_OFF_MILLIS;   // extend auto-off timer
-        }
-      } else { // unpressed ? check pressed time ...
-        if ((cur_time - btn_state_change_time) > 5000) {
-        #ifdef PIN_STATUS_LED
-          digitalWrite(PIN_STATUS_LED, LOW);
-          delay(10);
-        #endif
-          _board->powerOff();
         }
       }
-      btn_state_change_time = millis();
-      prev_btn_state = btn_state;
+  
+      if (btn_state == USER_BTN_PRESSED && countdown_active) {
+        unsigned long held_time = cur_time - btn_state_change_time;
+  
+  #ifdef UI_CAN_SHUTDOWN
+        if (held_time >= COUNTDOWN_START_MS && held_time < SHUTDOWN_TRIGGER_MS) {
+          int countdown = COUNTDOWN_SECONDS - (held_time / 1000);
+          if (countdown != last_countdown) {
+            showShutdownCountdown(countdown);
+            last_countdown = countdown;
+          }
+        }
+  
+        if (held_time >= SHUTDOWN_TRIGGER_MS && !shutdown_ready) {
+          showFinalShutdownPrompt();
+          shutdown_ready = true;
+        }
+  #endif
+      }
+  
+      next_read = cur_time + DEBOUNCE_INTERVAL;
     }
-    next_read = millis() + 100;  // 10 reads per second
+  #endif
   }
-#endif
-}
+  
+
+  #ifdef UI_CAN_SHUTDOWN
+
+  void UITask::performShutdown() {
+    delay(100);  // debounce
+  
+    if (_display) {
+      _display->startFrame();  // optional clear
+      _display->endFrame();
+    }
+  
+  #ifdef PIN_STATUS_LED
+    digitalWrite(PIN_STATUS_LED, LOW);
+    delay(10);
+  #endif
+  
+    _board->powerOff();  // full shutdown
+  }
+  
+  void UITask::showShutdownCountdown(int countdown) {
+    if (_display && countdown >= 0) {
+      _display->startFrame();
+      _display->setCursor(0, 20);
+      _display->setTextSize(1);
+      _display->setColor(DisplayDriver::RED);
+      _display->print("Shutting down in");
+      _display->setCursor(0, 32);
+      _display->setTextSize(2);
+  
+      char buf[10];
+      sprintf(buf, "%d", countdown);
+      _display->print(buf);
+      _display->endFrame();
+    }
+  }
+  
+  void UITask::showFinalShutdownPrompt() {
+    if (_display) {
+      _display->startFrame();
+      _display->setCursor(0, 20);
+      _display->setTextSize(1);
+      _display->setColor(DisplayDriver::YELLOW);
+      _display->print("Release button to");
+      _display->setCursor(0, 32);
+      _display->print("power down...");
+      _display->endFrame();
+    }
+  }
+  
+  #endif // UI_CAN_SHUTDOWN
+  
+
+
 
 void UITask::loop() {
   buttonHandler();

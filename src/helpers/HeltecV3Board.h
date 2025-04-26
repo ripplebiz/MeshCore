@@ -76,10 +76,46 @@ public:
     esp_deep_sleep_start();   // CPU halts here and never returns!
   }
 
+
+
   void powerOff() override {
-    // TODO: re-enable this when there is a definite wake-up source pin:
-    //  enterDeepSleep(0);
+    // Disable all wake-up sources to avoid unintended wakeups
+    esp_sleep_disable_wakeup_source(ESP_SLEEP_WAKEUP_ALL);
+  
+    // Keep RTC peripherals powered so wake logic works
+    esp_sleep_pd_config(ESP_PD_DOMAIN_RTC_PERIPH, ESP_PD_OPTION_ON);
+  
+    // Wake-up source: GPIO 0 (active LOW, must be RTC capable)
+    const gpio_num_t WAKE_BUTTON_PIN = GPIO_NUM_0;
+  
+    // Configure GPIO 0 for RTC wake
+    rtc_gpio_deinit(WAKE_BUTTON_PIN);
+    rtc_gpio_set_direction(WAKE_BUTTON_PIN, RTC_GPIO_MODE_INPUT_ONLY);
+    rtc_gpio_pullup_en(WAKE_BUTTON_PIN);   // Ensure pin is HIGH when not pressed
+    rtc_gpio_hold_en(WAKE_BUTTON_PIN);     // Retain state during deep sleep
+  
+    // Wait for button release (important to avoid immediate wake)
+    pinMode(WAKE_BUTTON_PIN, INPUT_PULLUP);
+    while (digitalRead(WAKE_BUTTON_PIN) == LOW) {
+      delay(100);  // Polling delay
+    }
+  
+    // Enable EXT0 wakeup on LOW signal
+    esp_sleep_enable_ext0_wakeup(WAKE_BUTTON_PIN, 0);  // 0 = active LOW
+  
+    // Disable boot ROM logging (optional, avoids boot messages)
+    esp_deep_sleep_disable_rom_logging();
+  
+    // Brief delay for system stability before entering sleep
+    delay(100);
+  
+    // Enter deep sleep – will not return until woken by EXT0
+    esp_deep_sleep_start();
   }
+
+
+
+
 
   uint16_t getBattMilliVolts() override {
     analogReadResolution(10);

@@ -59,9 +59,16 @@
 
 #ifdef DISPLAY_CLASS
   #include "UITask.h"
-  #ifdef ST7789
+
+  #if(DISPLAY_CLASS == ST7789)
     #include <helpers/ui/ST7789Display.h>
-  #else
+  #endif
+
+  #if(DISPLAY_CLASS == SH1106Display)
+    #include <helpers/ui/SH1106Display.h>
+  #endif
+
+  #if(DISPLAY_CLASS == SSD1306Display)
     #include <helpers/ui/SSD1306Display.h>
   #endif
   static DISPLAY_CLASS display;

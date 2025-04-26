@@ -1,7 +1,6 @@
 #include "AutoDiscoverRTCClock.h"
 #include "RTClib.h"
 #include <Melopero_RV3028.h>
-#include "pcf8563.h"
 
 static RTC_DS3231 rtc_3231;
 static bool ds3231_success = false;

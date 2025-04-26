@@ -98,8 +98,6 @@ public:
     return 0;
   }
 
-  uint16_t getBattPercent();
-
   const char* getManufacturerName() const override {
     return "LilyGo T-Beam S3 Supreme SX1262";
   }

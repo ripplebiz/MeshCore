@@ -57,9 +57,21 @@
   #define  ADMIN_PASSWORD  "password"
 #endif
 
-#ifdef DISPLAY_CLASS
-  #include <helpers/ui/SSD1306Display.h>
+#include <helpers/ui/SH1106Display.h>
 
+#ifdef DISPLAY_CLASS
+  #if(DISPLAY_CLASS == ST7789)
+    #include <helpers/ui/ST7789Display.h>
+  #endif
+
+  #if(DISPLAY_CLASS == SH1106Display)
+    #include <helpers/ui/SH1106Display.h>
+  #endif
+
+  #if(DISPLAY_CLASS == SSD1306Display)
+    #include <helpers/ui/SSD1306Display.h>
+  #endif
+  
   static DISPLAY_CLASS  display;
 
   #include "UITask.h"

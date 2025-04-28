@@ -148,6 +148,12 @@ void UITask::userLedHandler() {
       blinker = &CONNECTED_BLINK_PATTERN;
       blinker->start(cur_time);
     }
+  } else if (_serial && _serial->isEnabled()) {
+    // Not connected to companion app but ble active (i.e. advertising)
+    if (blinker != &PAIRING_BLINK_PATTERN) {
+      blinker = &PAIRING_BLINK_PATTERN;
+      blinker->start(cur_time);
+    }
   } else if (_msgcount > 0) {
     // Pending messages
     if (blinker != &MESSAGE_BLINK_PATTERN) {
@@ -195,6 +201,10 @@ void UITask::buttonHandler() {
           delay(10);
         #endif
           _board->powerOff();
+        } else if ((cur_time - btn_state_change_time) > 1500) {
+          if (_serial) {
+            _serial->enable();
+          }
         }
       }
       btn_state_change_time = millis();

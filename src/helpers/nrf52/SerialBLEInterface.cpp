@@ -1,5 +1,9 @@
 #include "SerialBLEInterface.h"
 
+// Unfortunately Bluefuit setCallback functions don't support setting a userdata void* on a callback,
+// so need to store the instance of the BLE interface globally.
+SerialBLEInterface* instance = NULL;
+
 void SerialBLEInterface::begin(const char* device_name, uint32_t pin_code) {
   char charpin[20];
   sprintf(charpin, "%d", pin_code);
@@ -13,64 +17,57 @@ void SerialBLEInterface::begin(const char* device_name, uint32_t pin_code) {
   Bluefruit.Security.setMITM(true);
   Bluefruit.Security.setPIN(charpin);
 
-  // To be consistent OTA DFU should be added first if it exists
-  //bledfu.begin();
-}
+  // Configure and start the BLE Uart service
+  bleuart.setPermission(SECMODE_ENC_WITH_MITM, SECMODE_ENC_WITH_MITM);
+  bleuart.begin();
 
-void SerialBLEInterface::startAdv() {
-  // Advertising packet
+  /* Configure BLE Advertising
+   * - Interval:  fast mode = 20 ms, slow mode = 152.5 ms
+   * - Timeout for fast mode is 30 seconds
+   * - Start(timeout) with timeout = 15 will stop advertising after 15s or until connected
+   *
+   * For recommended advertising interval
+   * https://developer.apple.com/library/content/qa/qa1931/_index.html
+   */
+  Bluefruit.Advertising.restartOnDisconnect(true);
   Bluefruit.Advertising.addFlags(BLE_GAP_ADV_FLAGS_LE_ONLY_GENERAL_DISC_MODE);
   Bluefruit.Advertising.addTxPower();
-  
   // Include the BLE UART (AKA 'NUS') 128-bit UUID
   Bluefruit.Advertising.addService(bleuart);
-
   // Secondary Scan Response packet (optional)
   // Since there is no room for 'Name' in Advertising packet
   Bluefruit.ScanResponse.addName();
+  Bluefruit.Advertising.setInterval(32, 244);    // advertisement interval (fast, slow) in unit of 0.625 ms (20ms, 152.5ms)
+  Bluefruit.Advertising.setFastTimeout(30);      // 30 seconds in fast mode
 
-  /* Start Advertising
-   * - Enable auto advertising if disconnected
-   * - Interval:  fast mode = 20 ms, slow mode = 152.5 ms
-   * - Timeout for fast mode is 30 seconds
-   * - Start(timeout) with timeout = 0 will advertise forever (until connected)
-   * 
-   * For recommended advertising interval
-   * https://developer.apple.com/library/content/qa/qa1931/_index.html   
-   */
-  Bluefruit.Advertising.restartOnDisconnect(true);
-  Bluefruit.Advertising.setInterval(32, 244);    // in unit of 0.625 ms
-  Bluefruit.Advertising.setFastTimeout(30);      // number of seconds in fast mode
-  Bluefruit.Advertising.start(0);                // 0 = Don't stop advertising after n seconds 
+  // Configure connect/disconnect/advertise callbacks
+  instance = this; // Yikes, see note above
+  Bluefruit.Periph.setConnectCallback(&SerialBLEInterface::device_connected_callback);
+  Bluefruit.Periph.setDisconnectCallback(&SerialBLEInterface::device_disconnected_callback);
+  Bluefruit.Advertising.setStopCallback(&SerialBLEInterface::adv_timeout_callback);
+
+  // To be consistent OTA DFU should be added first if it exists
+  //bledfu.begin();
 }
 
 // ---------- public methods
 
 void SerialBLEInterface::enable() { 
   if (_isEnabled) return;
-
+  BLE_DEBUG_PRINTLN("SerialBLEInterface::enable");
   _isEnabled = true;
   clearBuffers();
 
-  // Configure and start the BLE Uart service
-  bleuart.setPermission(SECMODE_ENC_WITH_MITM, SECMODE_ENC_WITH_MITM);
-  bleuart.begin();
-
   // Start advertising
   startAdv();
-
-  checkAdvRestart = false;
 }
 
 void SerialBLEInterface::disable() {
   _isEnabled = false;
-
+  instance->clearBuffers();
   BLE_DEBUG_PRINTLN("SerialBLEInterface::disable");
 
-  Bluefruit.Advertising.stop();
-
-  oldDeviceConnected = deviceConnected = false;
-  checkAdvRestart = false;
+  stopAdv();
 }
 
 size_t SerialBLEInterface::writeFrame(const uint8_t src[], size_t len) {
@@ -79,7 +76,7 @@ size_t SerialBLEInterface::writeFrame(const uint8_t src[], size_t len) {
     return 0;
   }
 
-  if (deviceConnected && len > 0) {
+  if (_deviceConnected && len > 0) {
     if (send_queue_len >= FRAME_QUEUE_SIZE) {
       BLE_DEBUG_PRINTLN("writeFrame(), send_queue is full!");
       return 0;
@@ -115,44 +112,49 @@ size_t SerialBLEInterface::checkRecvFrame(uint8_t dest[]) {
   } else {
     int len = bleuart.available();
     if (len > 0) {
-      deviceConnected = true; // should probably use the callback to monitor cx 
       bleuart.readBytes(dest, len);
       BLE_DEBUG_PRINTLN("readBytes: sz=%d, hdr=%d", len, (uint32_t) dest[0]);
       return len;
     }
   }
 
-  if (Bluefruit.connected() == 0)  deviceConnected = false;
-
-  if (deviceConnected != oldDeviceConnected) {
-    if (!deviceConnected) {    // disconnecting
-      clearBuffers();
-
-      BLE_DEBUG_PRINTLN("SerialBLEInterface -> disconnecting...");
-      delay(500); // give the bluetooth stack the chance to get things ready
-
-      checkAdvRestart = true;
-    } else {
-      BLE_DEBUG_PRINTLN("SerialBLEInterface -> stopping advertising");
-      BLE_DEBUG_PRINTLN("SerialBLEInterface -> connecting...");
-      // connecting
-      // do stuff here on connecting
-      Bluefruit.Advertising.stop();
-      checkAdvRestart = false;
-    }
-    oldDeviceConnected = deviceConnected;
-  }
-
-  if (checkAdvRestart) {
-    if (Bluefruit.connected() == 0) {
-      BLE_DEBUG_PRINTLN("SerialBLEInterface -> re-starting advertising");
-      startAdv();
-    }
-    checkAdvRestart = false;
-  }
   return 0;
 }
 
 bool SerialBLEInterface::isConnected() const {
-  return deviceConnected;  //pServer != NULL && pServer->getConnectedCount() > 0;
+  return _deviceConnected;  //pServer != NULL && pServer->getConnectedCount() > 0;
+}
+
+void SerialBLEInterface::startAdv() {
+  if (Bluefruit.Advertising.isRunning()) {
+    return;
+  }
+
+  BLE_DEBUG_PRINTLN("SerialBLEInterface -> starting advertising");
+
+  Bluefruit.Advertising.start(60);               // 60 = Stop advertising after 60 seconds
+}
+
+void SerialBLEInterface::stopAdv() {
+  if (!Bluefruit.Advertising.isRunning()) {
+    return;
+  }
+
+  BLE_DEBUG_PRINTLN("SerialBLEInterface -> stopping advertising");
+  Bluefruit.Advertising.stop();
+}
+
+void SerialBLEInterface::device_connected_callback(uint16_t conn_hdl) {
+  BLE_DEBUG_PRINTLN("SerialBLEInterface -> connected");
+  instance->_deviceConnected = true;
+}
+
+void SerialBLEInterface::device_disconnected_callback(uint16_t conn_hdl, uint8_t reason) {
+  BLE_DEBUG_PRINTLN("SerialBLEInterface -> disconnected");
+  instance->_deviceConnected = false;
+}
+
+void SerialBLEInterface::adv_timeout_callback() {
+  BLE_DEBUG_PRINTLN("SerialBLEInterface::ble_handler -> adv terminated timeout");
+  instance->disable();
 }

@@ -5,9 +5,7 @@
 
 class SerialBLEInterface : public BaseSerialInterface {
   BLEUart bleuart;
-  bool deviceConnected;
-  bool oldDeviceConnected;
-  bool checkAdvRestart;
+  bool _deviceConnected;
   bool _isEnabled;
   unsigned long _last_write;
 
@@ -22,12 +20,15 @@ class SerialBLEInterface : public BaseSerialInterface {
 
   void clearBuffers() { send_queue_len = 0; }
   void startAdv();
+  void stopAdv();
+
+  static void device_connected_callback(uint16_t conn_hdl);
+  static void device_disconnected_callback(uint16_t conn_hdl, uint8_t reason);
+  static void adv_timeout_callback();
 
 public:
   SerialBLEInterface() {
-    deviceConnected = false;
-    oldDeviceConnected = false;
-    checkAdvRestart = false;
+    _deviceConnected = false;
     _isEnabled = false;
     _last_write = 0;
     send_queue_len = 0;

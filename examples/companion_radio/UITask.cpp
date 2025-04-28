@@ -5,9 +5,11 @@
 #define AUTO_OFF_MILLIS   15000   // 15 seconds
 
 #ifdef PIN_STATUS_LED
-#define LED_ON_MILLIS     20
-#define LED_ON_MSG_MILLIS 200
-#define LED_CYCLE_MILLIS  4000
+#include "BlinkPattern.h"
+BlinkPattern IDLE_BLINK_PATTERN(true, (unsigned long[2]){10, 4000}, 2);
+BlinkPattern MESSAGE_BLINK_PATTERN(true, (unsigned long[2]){400, 4000}, 2);
+BlinkPattern CONNECTED_BLINK_PATTERN(true, (unsigned long[4]){10, 250, 260, 4000}, 4);
+BlinkPattern PAIRING_BLINK_PATTERN(true, (unsigned long[2]){1500, 2000}, 2);
 #endif
 
 #ifndef USER_BTN_PRESSED
@@ -31,8 +33,9 @@ static const uint8_t meshcore_logo [] PROGMEM = {
     0xe3, 0xe3, 0x8f, 0xff, 0x1f, 0xfc, 0x3c, 0x0e, 0x1f, 0xf8, 0xff, 0xf8, 0x70, 0x3c, 0x7f, 0xf8, 
 };
 
-void UITask::begin(DisplayDriver* display, const char* node_name, const char* build_date, const char* firmware_version, uint32_t pin_code) {
+void UITask::begin(DisplayDriver* display, BaseSerialInterface* serial, const char* node_name, const char* build_date, const char* firmware_version, uint32_t pin_code) {
   _display = display;
+  _serial = serial;
   _auto_off = millis() + AUTO_OFF_MILLIS;
   clearMsgPreview();
   _node_name = node_name;
@@ -135,25 +138,33 @@ void UITask::renderCurrScreen() {
 
 void UITask::userLedHandler() {
 #ifdef PIN_STATUS_LED
-  static int state = 0;
-  static int next_change = 0;
-  static int last_increment = 0;
+  static BlinkPattern* blinker = NULL;
 
   int cur_time = millis();
-  if (cur_time > next_change) {
-    if (state == 0) {
-      state = 1;
-      if (_msgcount > 0) {
-        last_increment = LED_ON_MSG_MILLIS;
-      } else {
-        last_increment = LED_ON_MILLIS;
-      }
-      next_change = cur_time + last_increment;
-    } else {
-      state = 0;
-      next_change = cur_time + LED_CYCLE_MILLIS - last_increment;
+
+  if (_serial && _serial->isConnected()) {
+    // Connected to companion app
+    if (blinker != &CONNECTED_BLINK_PATTERN) {
+      blinker = &CONNECTED_BLINK_PATTERN;
+      blinker->start(cur_time);
     }
-    digitalWrite(PIN_STATUS_LED, state);
+  } else if (_msgcount > 0) {
+    // Pending messages
+    if (blinker != &MESSAGE_BLINK_PATTERN) {
+        blinker = &MESSAGE_BLINK_PATTERN;
+        blinker->start(cur_time);
+    }
+  } else {
+    // Idle
+    if (blinker != &IDLE_BLINK_PATTERN) {
+      blinker = &IDLE_BLINK_PATTERN;
+      blinker->start(cur_time);
+    }
+  }
+
+  bool change = blinker->loop(cur_time);
+  if (change) {
+    digitalWrite(PIN_STATUS_LED, blinker->state());
   }
 #endif
 }

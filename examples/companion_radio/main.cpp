@@ -867,6 +867,7 @@ public:
 
   const char* getNodeName() { return _prefs.node_name; }
   uint32_t getBLEPin() { return _active_ble_pin; }
+  BaseSerialInterface* getSerialInterface() { return _serial; }
 
   void startInterface(BaseSerialInterface& serial) {
     _serial = &serial;
@@ -1605,7 +1606,7 @@ void setup() {
 #endif
 
 #ifdef HAS_UI
-  ui_task.begin(disp, the_mesh.getNodeName(), FIRMWARE_BUILD_DATE, FIRMWARE_VERSION, the_mesh.getBLEPin());
+  ui_task.begin(disp, the_mesh.getSerialInterface(), the_mesh.getNodeName(), FIRMWARE_BUILD_DATE, FIRMWARE_VERSION, the_mesh.getBLEPin());
 #endif
 }
 

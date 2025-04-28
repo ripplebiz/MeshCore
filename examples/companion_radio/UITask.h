@@ -2,11 +2,13 @@
 
 #include <MeshCore.h>
 #include <helpers/ui/DisplayDriver.h>
+#include <helpers/BaseSerialInterface.h>
 #include <stddef.h>
 
 class UITask {
   DisplayDriver* _display;
   mesh::MainBoard* _board;
+  BaseSerialInterface* _serial;
   unsigned long _next_refresh, _auto_off;
   bool _connected;
   uint32_t _pin_code;
@@ -23,11 +25,11 @@ class UITask {
 
 public:
 
-  UITask(mesh::MainBoard* board) : _board(board), _display(NULL) {
+  UITask(mesh::MainBoard* board) : _board(board), _display(NULL), _serial(NULL) {
       _next_refresh = 0; 
       _connected = false;
   }
-  void begin(DisplayDriver* display, const char* node_name, const char* build_date, const char* firmware_version, uint32_t pin_code);
+  void begin(DisplayDriver* display, BaseSerialInterface* serial, const char* node_name, const char* build_date, const char* firmware_version, uint32_t pin_code);
 
   void setHasConnection(bool connected) { _connected = connected; }
   bool hasDisplay() const { return _display != NULL; }

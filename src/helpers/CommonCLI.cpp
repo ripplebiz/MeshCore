@@ -14,12 +14,26 @@ static uint32_t _atoi(const char* sp) {
 }
 
 void CommonCLI::loadPrefs(FILESYSTEM* fs) {
-  if (fs->exists("/com_prefs")) {
-    loadPrefsInt(fs, "/com_prefs");   // new filename
-  } else if (fs->exists("/node_prefs")) {
-    loadPrefsInt(fs, "/node_prefs");
+  char filename[16] = "/com_prefs";
+  char old_filename[16] = "/node_prefs";
+
+  char suffix[5] = "";
+  if (_index > 0) {
+    suffix[0] = '_';
+    itoa(_index, suffix + 1, 10);
+  }
+
+  size_t p = strlen(suffix);
+  
+  strncpy(filename + 10, suffix, 16 - p);
+  strncpy(old_filename + 11, suffix, 16 - p);  
+
+  if (fs->exists(filename)) {
+    loadPrefsInt(fs, filename);   // new filename
+  } else if (fs->exists(old_filename)) {
+    loadPrefsInt(fs, old_filename);
     savePrefs(fs);  // save to new filename
-    fs->remove("/node_prefs");  // remove old
+    fs->remove(old_filename);  // remove old
   }
 }
 
@@ -73,13 +87,25 @@ void CommonCLI::loadPrefsInt(FILESYSTEM* fs, const char* filename) {
 }
 
 void CommonCLI::savePrefs(FILESYSTEM* fs) {
+  char filename[16] = "/com_prefs";
+
+  char suffix[5] = "";
+  if (_index > 0) {
+    suffix[0] = '_';
+    itoa(_index, suffix + 1, 10);
+  }
+
+  size_t p = strlen(suffix);
+
+  strncpy(filename + 10, suffix, 16 - p);
+
 #if defined(NRF52_PLATFORM)
-  File file = fs->open("/com_prefs", FILE_O_WRITE);
+  File file = fs->open(filename, FILE_O_WRITE);
   if (file) { file.seek(0); file.truncate(); }
 #elif defined(RP2040_PLATFORM)
-  File file = fs->open("/com_prefs", "w");
+  File file = fs->open(filename, "w");
 #else
-  File file = fs->open("/com_prefs", "w", true);
+  File file = fs->open(filename, "w", true);
 #endif
   if (file) {
     uint8_t pad[8];
@@ -206,7 +232,7 @@ void CommonCLI::handleCommand(uint32_t sender_timestamp, const char* command, ch
         sprintf(reply, "> %s", StrHelper::ftoa(_prefs->freq));
       } else if (memcmp(config, "public.key", 10) == 0) {
         strcpy(reply, "> ");
-        mesh::Utils::toHex(&reply[2], _mesh->self_id.pub_key, PUB_KEY_SIZE);
+        // mesh::Utils::toHex(&reply[2], _node->self_id.pub_key, PUB_KEY_SIZE);
       } else if (memcmp(config, "role", 4) == 0) {
         sprintf(reply, "> %s", _callbacks->getRole());
       } else {

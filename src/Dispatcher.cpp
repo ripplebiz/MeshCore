@@ -90,12 +90,13 @@ void Dispatcher::checkRecv() {
       if (pkt == NULL) {
         MESH_DEBUG_PRINTLN("%s Dispatcher::checkRecv(): WARNING: received data, no unused packets available!", getLogDateTime());
       } else {
+        _mgr->take(pkt);
         int i = 0;
 #ifdef NODE_ID
         uint8_t sender_id = raw[i++];
         if (sender_id == NODE_ID - 1 || sender_id == NODE_ID + 1) {  // simulate that NODE_ID can only hear NODE_ID-1 or NODE_ID+1, eg. 3 can't hear 1
         } else {
-          _mgr->free(pkt);  // put back into pool
+          _mgr->release(pkt);  // put back into pool
           return;
         }
 #endif
@@ -111,7 +112,7 @@ void Dispatcher::checkRecv() {
 
         if (pkt->path_len > MAX_PATH_SIZE || i + pkt->path_len > len) {
           MESH_DEBUG_PRINTLN("%s Dispatcher::checkRecv(): partial or corrupt packet received, len=%d", getLogDateTime(), len);
-          _mgr->free(pkt);  // put back into pool
+          _mgr->release(pkt);  // put back into pool
           pkt = NULL;
         } else {
           memcpy(pkt->path, &raw[i], pkt->path_len); i += pkt->path_len;
@@ -119,7 +120,7 @@ void Dispatcher::checkRecv() {
           pkt->payload_len = len - i;  // payload is remainder
           if (pkt->payload_len > sizeof(pkt->payload)) {
             MESH_DEBUG_PRINTLN("%s Dispatcher::checkRecv(): packet payload too big, payload_len=%d", getLogDateTime(), (uint32_t)pkt->payload_len);
-            _mgr->free(pkt);  // put back into pool
+            _mgr->release(pkt);  // put back into pool
             pkt = NULL;  
           } else {
             memcpy(pkt->payload, &raw[i], pkt->payload_len);
@@ -179,7 +180,7 @@ void Dispatcher::checkRecv() {
 void Dispatcher::processRecvPacket(Packet* pkt) {
   DispatcherAction action = onRecvPacket(pkt);
   if (action == ACTION_RELEASE) {
-    _mgr->free(pkt);
+    _mgr->release(pkt);
   } else if (action == ACTION_MANUAL_HOLD) {
     // sub-class is wanting to manually hold Packet instance, and call releasePacket() at appropriate time
   } else {   // ACTION_RETRANSMIT*
@@ -227,7 +228,7 @@ void Dispatcher::checkSend() {
 
     if (len + outbound->payload_len > MAX_TRANS_UNIT) {
       MESH_DEBUG_PRINTLN("%s Dispatcher::checkSend(): FATAL: Invalid packet queued... too long, len=%d", getLogDateTime(), len + outbound->payload_len);
-      _mgr->free(outbound);
+      _mgr->release(outbound);
       outbound = NULL;
     } else {
       memcpy(&raw[len], outbound->payload, outbound->payload_len); len += outbound->payload_len;
@@ -257,20 +258,25 @@ Packet* Dispatcher::obtainNewPacket() {
   if (pkt == NULL) {
     n_full_events++;
   } else {
+    takePacket(pkt);
     pkt->payload_len = pkt->path_len = 0;
     pkt->_snr = 0;
   }
   return pkt;
 }
 
+void Dispatcher::takePacket(Packet* packet) {
+  _mgr->take(packet);
+}
+
 void Dispatcher::releasePacket(Packet* packet) {
-  _mgr->free(packet);
+  _mgr->release(packet);
 }
 
 void Dispatcher::sendPacket(Packet* packet, uint8_t priority, uint32_t delay_millis) {
   if (packet->path_len > MAX_PATH_SIZE || packet->payload_len > MAX_PACKET_PAYLOAD) {
     MESH_DEBUG_PRINTLN("%s Dispatcher::sendPacket(): ERROR: invalid packet... path_len=%d, payload_len=%d", getLogDateTime(), (uint32_t) packet->path_len, (uint32_t) packet->payload_len);
-    _mgr->free(packet);
+    _mgr->release(packet);
   } else {
     _mgr->queueOutbound(packet, priority, futureMillis(delay_millis));
   }

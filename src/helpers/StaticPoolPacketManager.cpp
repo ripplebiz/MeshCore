@@ -57,10 +57,15 @@ void PacketQueue::add(mesh::Packet* packet, uint8_t priority, uint32_t scheduled
   _num++;
 }
 
-StaticPoolPacketManager::StaticPoolPacketManager(int pool_size): unused(pool_size), send_queue(pool_size), rx_queue(pool_size) {
+StaticPoolPacketManager::StaticPoolPacketManager(int pool_size): _size(pool_size), unused(pool_size), send_queue(pool_size), rx_queue(pool_size) {
+  _packets = new mesh::Packet*[pool_size];
+  _reference_table = new uint8_t[pool_size];
   // load up our unusued Packet pool
   for (int i = 0; i < pool_size; i++) {
-    unused.add(new mesh::Packet(), 0, 0);
+    mesh::Packet* packet = new mesh::Packet();
+    _packets[i] = packet;
+    _reference_table[i] = 0;
+    unused.add(packet, 0, 0);
   }
 }
 
@@ -68,8 +73,44 @@ mesh::Packet* StaticPoolPacketManager::allocNew() {
   return unused.removeByIdx(0);  // just get first one (returns NULL if empty)
 }
 
-void StaticPoolPacketManager::free(mesh::Packet* packet) {
-  unused.add(packet, 0, 0);
+int StaticPoolPacketManager::getPacketIndex(mesh::Packet* packet) const {
+  int idx;
+
+  for (idx = 0; idx < _size; idx++) {
+    if (packet == _packets[idx]) {
+      break;
+    }
+  }
+
+  return idx;
+}
+
+void StaticPoolPacketManager::take(mesh::Packet* packet) {
+  int idx = getPacketIndex(packet);
+
+  if (idx >= _size) {
+    return;
+  }
+
+  _reference_table[idx]++;
+}
+
+void StaticPoolPacketManager::release(mesh::Packet* packet) {
+  int idx = getPacketIndex(packet);
+
+  if (idx >= _size) {
+    return;
+  }
+
+  if (_reference_table[idx] == 0) {
+    return;
+  }
+
+  _reference_table[idx]--;
+
+  if (_reference_table[idx] == 0) {
+    unused.add(packet, 0, 0);
+  }
 }
 
 void StaticPoolPacketManager::queueOutbound(mesh::Packet* packet, uint8_t priority, uint32_t scheduled_for) {

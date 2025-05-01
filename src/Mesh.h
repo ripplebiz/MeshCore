@@ -4,6 +4,8 @@
 
 namespace mesh {
 
+class Mesh;
+
 class GroupChannel {
 public:
   uint8_t hash[PATH_HASH_SIZE];
@@ -18,20 +20,8 @@ public:
   virtual bool hasSeen(const Packet* packet) = 0;
 };
 
-/**
- * \brief  The next layer in the basic Dispatcher task, Mesh recognises the particular Payload TYPES,
- *     and provides virtual methods for sub-classes on handling incoming, and also preparing outbound Packets.
-*/
-class Mesh : public Dispatcher {
-  RTCClock* _rtc;
-  RNG* _rng;
-  MeshTables* _tables;
-
+class MeshNode {
 protected:
-  DispatcherAction onRecvPacket(Packet* pkt) override;
-
-  virtual uint32_t getCADFailRetryDelay() const override;
-
   /**
    * \brief  Decide what to do with received packet, ie. discard, forward, or hold
    */
@@ -52,6 +42,19 @@ protected:
    * \returns  number of milliseconds delay to apply to retransmitting the given packet, for DIRECT mode.
    */
   virtual uint32_t getDirectRetransmitDelay(const Packet* packet);
+
+public:
+  MeshNode(Mesh* mesh);
+
+  virtual void begin();
+  virtual void loop();
+
+  virtual const char* getName();
+
+  LocalIdentity self_id;
+  Mesh* mesh;
+
+  virtual DispatcherAction onRecvPacket(Packet* pkt, bool has_seen);
 
   /**
    * \brief  Perform search of local DB of peers/contacts.
@@ -142,30 +145,45 @@ protected:
    *         NOTE: same ACK can be received multiple times, via different routes
   */
   virtual void onAckRecv(Packet* packet, uint32_t ack_crc) { }
+};
+
+/**
+ * \brief  The next layer in the basic Dispatcher task, Mesh recognises the particular Payload TYPES,
+ *     and provides virtual methods for sub-classes on handling incoming, and also preparing outbound Packets.
+*/
+class Mesh : public Dispatcher {
+  RTCClock* _rtc;
+  RNG* _rng;
+  MeshTables* _tables;
+
+protected:
+  virtual DispatcherAction onRecvPacket(Packet* pkt);
+
+  virtual uint32_t getCADFailRetryDelay() const;
 
   Mesh(Radio& radio, MillisecondClock& ms, RNG& rng, RTCClock& rtc, PacketManager& mgr, MeshTables& tables)
     : Dispatcher(radio, ms, mgr), _rng(&rng), _rtc(&rtc), _tables(&tables)
   {
   }
 
-  MeshTables* getTables() const { return _tables; }
-
 public:
+  MeshNode** _nodes = NULL;
+  uint8_t _node_count = 0;
+
   void begin();
   void loop();
 
-  LocalIdentity self_id;
-
+  MeshTables* getTables() const { return _tables; }
   RNG* getRNG() const { return _rng; }
   RTCClock* getRTCClock() const { return _rtc; }
 
   Packet* createAdvert(const LocalIdentity& id, const uint8_t* app_data=NULL, size_t app_data_len=0);
-  Packet* createDatagram(uint8_t type, const Identity& dest, const uint8_t* secret, const uint8_t* data, size_t len);
+  Packet* createDatagram(uint8_t type, const LocalIdentity& source, const Identity& dest, const uint8_t* secret, const uint8_t* data, size_t len);
   Packet* createAnonDatagram(uint8_t type, const LocalIdentity& sender, const Identity& dest, const uint8_t* secret, const uint8_t* data, size_t data_len);
   Packet* createGroupDatagram(uint8_t type, const GroupChannel& channel, const uint8_t* data, size_t data_len);
   Packet* createAck(uint32_t ack_crc);
-  Packet* createPathReturn(const uint8_t* dest_hash, const uint8_t* secret, const uint8_t* path, uint8_t path_len, uint8_t extra_type, const uint8_t*extra, size_t extra_len);
-  Packet* createPathReturn(const Identity& dest, const uint8_t* secret, const uint8_t* path, uint8_t path_len, uint8_t extra_type, const uint8_t*extra, size_t extra_len);
+  Packet* createPathReturn(const LocalIdentity& source, const uint8_t* dest_hash, const uint8_t* secret, const uint8_t* path, uint8_t path_len, uint8_t extra_type, const uint8_t*extra, size_t extra_len);
+  Packet* createPathReturn(const LocalIdentity& source, const Identity& dest, const uint8_t* secret, const uint8_t* path, uint8_t path_len, uint8_t extra_type, const uint8_t*extra, size_t extra_len);
   Packet* createRawData(const uint8_t* data, size_t len);
   Packet* createTrace(uint32_t tag, uint32_t auth_code, uint8_t flags = 0);
 

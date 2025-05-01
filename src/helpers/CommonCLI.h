@@ -43,13 +43,14 @@ public:
 };
 
 class CommonCLI {
-  mesh::Mesh* _mesh;
+  mesh::MeshNode* _node;
   NodePrefs* _prefs;
   CommonCLICallbacks* _callbacks;
   mesh::MainBoard* _board;
+  uint8_t _index;
   char tmp[80];
 
-  mesh::RTCClock* getRTCClock() { return _mesh->getRTCClock(); }
+  mesh::RTCClock* getRTCClock() { return _node->mesh->getRTCClock(); }
   void savePrefs() { _callbacks->savePrefs(); }
 
   void checkAdvertInterval();
@@ -57,8 +58,8 @@ class CommonCLI {
   void loadPrefsInt(FILESYSTEM* _fs, const char* filename);
 
 public:
-  CommonCLI(mesh::MainBoard& board, mesh::Mesh* mesh, NodePrefs* prefs, CommonCLICallbacks* callbacks)
-      : _board(&board), _mesh(mesh), _prefs(prefs), _callbacks(callbacks) { }
+  CommonCLI(mesh::MainBoard& board, mesh::MeshNode* node, NodePrefs* prefs, CommonCLICallbacks* callbacks, uint8_t index=0)
+      : _board(&board), _node(node), _prefs(prefs), _callbacks(callbacks), _index(index) { }
 
   void loadPrefs(FILESYSTEM* _fs);
   void savePrefs(FILESYSTEM* _fs);

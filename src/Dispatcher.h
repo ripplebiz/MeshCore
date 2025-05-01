@@ -71,7 +71,8 @@ public:
 class PacketManager {
 public:
   virtual Packet* allocNew() = 0;
-  virtual void free(Packet* packet) = 0;
+  virtual void take(Packet* packet) = 0;
+  virtual void release(Packet* packet) = 0;
 
   virtual void queueOutbound(Packet* packet, uint8_t priority, uint32_t scheduled_for) = 0;
   virtual Packet* getNextOutbound(uint32_t now) = 0;    // by priority
@@ -132,10 +133,15 @@ protected:
   virtual uint32_t getCADFailMaxDuration() const;
 
 public:
+  Radio* getRadio() { return _radio; }
+  PacketManager* getManager() { return _mgr; }
+  MillisecondClock* getClock() { return _ms; }
+
   void begin();
   void loop();
 
   Packet* obtainNewPacket();
+  void takePacket(Packet* packet);
   void releasePacket(Packet* packet);
   void sendPacket(Packet* packet, uint8_t priority, uint32_t delay_millis=0);
 

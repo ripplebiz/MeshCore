@@ -143,11 +143,93 @@ struct ServerStats {
   uint16_t n_posted, n_post_push;
 };
 
-class MyMesh : public mesh::Mesh, public CommonCLICallbacks {
+class MyMesh : public mesh::Mesh {
+
+protected:
+  // float getAirtimeBudgetFactor() const override {
+  //   return _prefs.airtime_factor;
+  // }
+
+  // void logRxRaw(float snr, float rssi, const uint8_t raw[], int len) override {
+  //   #if MESH_PACKET_LOGGING
+  //     Serial.print(getLogDateTime());
+  //     Serial.print(" RAW: ");
+  //     mesh::Utils::printHex(Serial, raw, len);
+  //     Serial.println();
+  //   #endif
+  // }
+
+  // void logRx(mesh::Packet* pkt, int len, float score) override {
+  //   if (_logging) {
+  //     File f = openAppend(PACKET_LOG_FILE);
+  //     if (f) {
+  //       f.print(getLogDateTime());
+  //       f.printf(": RX, len=%d (type=%d, route=%s, payload_len=%d) SNR=%d RSSI=%d score=%d",
+  //         len, pkt->getPayloadType(), pkt->isRouteDirect() ? "D" : "F", pkt->payload_len,
+  //         (int)_radio->getLastSNR(), (int)_radio->getLastRSSI(), (int)(score*1000));
+
+  //       if (pkt->getPayloadType() == PAYLOAD_TYPE_PATH || pkt->getPayloadType() == PAYLOAD_TYPE_REQ
+  //         || pkt->getPayloadType() == PAYLOAD_TYPE_RESPONSE || pkt->getPayloadType() == PAYLOAD_TYPE_TXT_MSG) {
+  //         f.printf(" [%02X -> %02X]\n", (uint32_t)pkt->payload[1], (uint32_t)pkt->payload[0]);
+  //       } else {
+  //         f.printf("\n");
+  //       }
+  //       f.close();
+  //     }
+  //   }
+  // }
+  // void logTx(mesh::Packet* pkt, int len) override {
+  //   if (_logging) {
+  //     File f = openAppend(PACKET_LOG_FILE);
+  //     if (f) {
+  //       f.print(getLogDateTime());
+  //       f.printf(": TX, len=%d (type=%d, route=%s, payload_len=%d)",
+  //         len, pkt->getPayloadType(), pkt->isRouteDirect() ? "D" : "F", pkt->payload_len);
+
+  //       if (pkt->getPayloadType() == PAYLOAD_TYPE_PATH || pkt->getPayloadType() == PAYLOAD_TYPE_REQ
+  //         || pkt->getPayloadType() == PAYLOAD_TYPE_RESPONSE || pkt->getPayloadType() == PAYLOAD_TYPE_TXT_MSG) {
+  //         f.printf(" [%02X -> %02X]\n", (uint32_t)pkt->payload[1], (uint32_t)pkt->payload[0]);
+  //       } else {
+  //         f.printf("\n");
+  //       }
+  //       f.close();
+  //     }
+  //   }
+  // }
+  // void logTxFail(mesh::Packet* pkt, int len) override {
+  //   if (_logging) {
+  //     File f = openAppend(PACKET_LOG_FILE);
+  //     if (f) {
+  //       f.print(getLogDateTime());
+  //       f.printf(": TX FAIL!, len=%d (type=%d, route=%s, payload_len=%d)\n",
+  //         len, pkt->getPayloadType(), pkt->isRouteDirect() ? "D" : "F", pkt->payload_len);
+  //       f.close();
+  //     }
+  //   }
+  // }
+
+  // int calcRxDelay(float score, uint32_t air_time) const override {
+  //   if (_prefs.rx_delay_base <= 0.0f) return 0;
+  //   return (int) ((pow(_prefs.rx_delay_base, 0.85f - score) - 1.0) * air_time);
+  // }
+
+  // const char* getLogDateTime() override {
+  //   static char tmp[32];
+  //   uint32_t now = getRTCClock()->getCurrentTime();
+  //   DateTime dt = DateTime(now);
+  //   sprintf(tmp, "%02d:%02d:%02d - %d/%d/%d U", dt.hour(), dt.minute(), dt.second(), dt.day(), dt.month(), dt.year());
+  //   return tmp;
+  // }
+
+public:
+  MyMesh(mesh::MainBoard& board, mesh::Radio& radio, mesh::MillisecondClock& ms, mesh::RNG& rng, mesh::RTCClock& rtc, mesh::MeshTables& tables)
+     : mesh::Mesh(radio, ms, rng, rtc, *new StaticPoolPacketManager(32), tables) {}
+};
+
+class RoomNode : public mesh::MeshNode, public CommonCLICallbacks {
   FILESYSTEM* _fs;
   unsigned long next_local_advert, next_flood_advert;
   bool _logging;
-  NodePrefs _prefs;
   CommonCLI _cli;
   uint8_t reply_data[MAX_PACKET_PAYLOAD];
   int num_clients;
@@ -196,10 +278,10 @@ class MyMesh : public mesh::Mesh, public CommonCLICallbacks {
     posts[next_post_idx].author = client->id;    // add to cyclic queue
     StrHelper::strncpy(posts[next_post_idx].text, postData, MAX_POST_TEXT_LEN);
 
-    posts[next_post_idx].post_timestamp = getRTCClock()->getCurrentTimeUnique();
+    posts[next_post_idx].post_timestamp = mesh->getRTCClock()->getCurrentTimeUnique();
     next_post_idx = (next_post_idx + 1) % MAX_UNSYNCED_POSTS;
 
-    next_push = futureMillis(PUSH_NOTIFY_DELAY_MILLIS);
+    next_push = mesh->futureMillis(PUSH_NOTIFY_DELAY_MILLIS);
     _num_posted++;  // stats
   }
 
@@ -218,14 +300,14 @@ class MyMesh : public mesh::Mesh, public CommonCLICallbacks {
     mesh::Utils::sha256((uint8_t *)&client->pending_ack, 4, reply_data, len, client->id.pub_key, PUB_KEY_SIZE);
     client->push_post_timestamp = post.post_timestamp;
 
-    auto reply = createDatagram(PAYLOAD_TYPE_TXT_MSG, client->id, client->secret, reply_data, len);
+    auto reply = mesh->createDatagram(PAYLOAD_TYPE_TXT_MSG, self_id, client->id, client->secret, reply_data, len);
     if (reply) {
       if (client->out_path_len < 0) {
-        sendFlood(reply);
-        client->ack_timeout = futureMillis(PUSH_ACK_TIMEOUT_FLOOD);
+        mesh->sendFlood(reply);
+        client->ack_timeout = mesh->futureMillis(PUSH_ACK_TIMEOUT_FLOOD);
       } else {
-        sendDirect(reply, client->out_path, client->out_path_len);
-        client->ack_timeout = futureMillis(PUSH_TIMEOUT_BASE + PUSH_ACK_TIMEOUT_FACTOR * (client->out_path_len + 1));
+        mesh->sendDirect(reply, client->out_path, client->out_path_len);
+        client->ack_timeout = mesh->futureMillis(PUSH_TIMEOUT_BASE + PUSH_ACK_TIMEOUT_FACTOR * (client->out_path_len + 1));
       }
       _num_post_pushes++;  // stats
     } else {
@@ -266,7 +348,7 @@ class MyMesh : public mesh::Mesh, public CommonCLICallbacks {
       app_data_len = builder.encodeTo(app_data);
     }
 
-   return createAdvert(self_id, app_data, app_data_len);
+   return mesh->createAdvert(self_id, app_data, app_data_len);
   }
 
   File openAppend(const char* fname) {
@@ -280,88 +362,13 @@ class MyMesh : public mesh::Mesh, public CommonCLICallbacks {
     }
 
 protected:
-  float getAirtimeBudgetFactor() const override {
-    return _prefs.airtime_factor;
-  }
-
-  void logRxRaw(float snr, float rssi, const uint8_t raw[], int len) override {
-    #if MESH_PACKET_LOGGING
-      Serial.print(getLogDateTime());
-      Serial.print(" RAW: ");
-      mesh::Utils::printHex(Serial, raw, len);
-      Serial.println();
-    #endif
-  }
-
-  void logRx(mesh::Packet* pkt, int len, float score) override {
-    if (_logging) {
-      File f = openAppend(PACKET_LOG_FILE);
-      if (f) {
-        f.print(getLogDateTime());
-        f.printf(": RX, len=%d (type=%d, route=%s, payload_len=%d) SNR=%d RSSI=%d score=%d",
-          len, pkt->getPayloadType(), pkt->isRouteDirect() ? "D" : "F", pkt->payload_len,
-          (int)_radio->getLastSNR(), (int)_radio->getLastRSSI(), (int)(score*1000));
-
-        if (pkt->getPayloadType() == PAYLOAD_TYPE_PATH || pkt->getPayloadType() == PAYLOAD_TYPE_REQ
-          || pkt->getPayloadType() == PAYLOAD_TYPE_RESPONSE || pkt->getPayloadType() == PAYLOAD_TYPE_TXT_MSG) {
-          f.printf(" [%02X -> %02X]\n", (uint32_t)pkt->payload[1], (uint32_t)pkt->payload[0]);
-        } else {
-          f.printf("\n");
-        }
-        f.close();
-      }
-    }
-  }
-  void logTx(mesh::Packet* pkt, int len) override {
-    if (_logging) {
-      File f = openAppend(PACKET_LOG_FILE);
-      if (f) {
-        f.print(getLogDateTime());
-        f.printf(": TX, len=%d (type=%d, route=%s, payload_len=%d)",
-          len, pkt->getPayloadType(), pkt->isRouteDirect() ? "D" : "F", pkt->payload_len);
-
-        if (pkt->getPayloadType() == PAYLOAD_TYPE_PATH || pkt->getPayloadType() == PAYLOAD_TYPE_REQ
-          || pkt->getPayloadType() == PAYLOAD_TYPE_RESPONSE || pkt->getPayloadType() == PAYLOAD_TYPE_TXT_MSG) {
-          f.printf(" [%02X -> %02X]\n", (uint32_t)pkt->payload[1], (uint32_t)pkt->payload[0]);
-        } else {
-          f.printf("\n");
-        }
-        f.close();
-      }
-    }
-  }
-  void logTxFail(mesh::Packet* pkt, int len) override {
-    if (_logging) {
-      File f = openAppend(PACKET_LOG_FILE);
-      if (f) {
-        f.print(getLogDateTime());
-        f.printf(": TX FAIL!, len=%d (type=%d, route=%s, payload_len=%d)\n",
-          len, pkt->getPayloadType(), pkt->isRouteDirect() ? "D" : "F", pkt->payload_len);
-        f.close();
-      }
-    }
-  }
-
-  int calcRxDelay(float score, uint32_t air_time) const override {
-    if (_prefs.rx_delay_base <= 0.0f) return 0;
-    return (int) ((pow(_prefs.rx_delay_base, 0.85f - score) - 1.0) * air_time);
-  }
-
-  const char* getLogDateTime() override {
-    static char tmp[32];
-    uint32_t now = getRTCClock()->getCurrentTime();
-    DateTime dt = DateTime(now);
-    sprintf(tmp, "%02d:%02d:%02d - %d/%d/%d U", dt.hour(), dt.minute(), dt.second(), dt.day(), dt.month(), dt.year());
-    return tmp;
-  }
-
   uint32_t getRetransmitDelay(const mesh::Packet* packet) override {
-    uint32_t t = (_radio->getEstAirtimeFor(packet->path_len + packet->payload_len + 2) * _prefs.tx_delay_factor);
-    return getRNG()->nextInt(0, 6)*t;
+    uint32_t t = (mesh->getRadio()->getEstAirtimeFor(packet->path_len + packet->payload_len + 2) * _prefs.tx_delay_factor);
+    return mesh->getRNG()->nextInt(0, 6)*t;
   }
   uint32_t getDirectRetransmitDelay(const mesh::Packet* packet) override {
-    uint32_t t = (_radio->getEstAirtimeFor(packet->path_len + packet->payload_len + 2) * _prefs.direct_tx_delay_factor);
-    return getRNG()->nextInt(0, 6)*t;
+    uint32_t t = (mesh->getRadio()->getEstAirtimeFor(packet->path_len + packet->payload_len + 2) * _prefs.direct_tx_delay_factor);
+    return mesh->getRNG()->nextInt(0, 6)*t;
   }
 
   bool allowPacketForward(const mesh::Packet* packet) override {
@@ -404,10 +411,10 @@ protected:
       client->pending_ack = 0;
       client->push_failures = 0;
 
-      uint32_t now = getRTCClock()->getCurrentTime();
+      uint32_t now = mesh->getRTCClock()->getCurrentTime();
       client->last_activity = now;
 
-      now = getRTCClock()->getCurrentTimeUnique();
+      now = mesh->getRTCClock()->getCurrentTimeUnique();
       memcpy(reply_data, &now, 4);   // response packets always prefixed with timestamp
       // TODO: maybe reply with count of messages waiting to be synced for THIS client?
       reply_data[4] = RESP_SERVER_LOGIN_OK;
@@ -416,20 +423,20 @@ protected:
       reply_data[7] = getUnsyncedCount(client);  // NEW
       memcpy(&reply_data[8], "OK", 2);  // REVISIT: not really needed
 
-      next_push = futureMillis(PUSH_NOTIFY_DELAY_MILLIS);  // delay next push, give RESPONSE packet time to arrive first
+      next_push = mesh->futureMillis(PUSH_NOTIFY_DELAY_MILLIS);  // delay next push, give RESPONSE packet time to arrive first
 
       if (packet->isRouteFlood()) {
         // let this sender know path TO here, so they can use sendDirect(), and ALSO encode the response
-        mesh::Packet* path = createPathReturn(sender, client->secret, packet->path, packet->path_len,
+        mesh::Packet* path = mesh->createPathReturn(self_id, sender, client->secret, packet->path, packet->path_len,
                                               PAYLOAD_TYPE_RESPONSE, reply_data, 8 + 2);
-        if (path) sendFlood(path);
+        if (path) mesh->sendFlood(path);
       } else {
-        mesh::Packet* reply = createDatagram(PAYLOAD_TYPE_RESPONSE, sender, client->secret, reply_data, 8 + 2);
+        mesh::Packet* reply = mesh->createDatagram(PAYLOAD_TYPE_RESPONSE, self_id, sender, client->secret, reply_data, 8 + 2);
         if (reply) {
           if (client->out_path_len >= 0) {  // we have an out_path, so send DIRECT
-            sendDirect(reply, client->out_path, client->out_path_len);
+            mesh->sendDirect(reply, client->out_path, client->out_path_len);
           } else {
-            sendFlood(reply);
+            mesh->sendFlood(reply);
           }
         }
       }
@@ -476,7 +483,7 @@ protected:
         bool is_retry = (sender_timestamp == client->last_timestamp);
         client->last_timestamp = sender_timestamp;
 
-        uint32_t now = getRTCClock()->getCurrentTimeUnique();
+        uint32_t now = mesh->getRTCClock()->getCurrentTimeUnique();
         client->last_activity = now;
         client->push_failures = 0;  // reset so push can resume (if prev failed)
 
@@ -516,12 +523,12 @@ protected:
 
         uint32_t delay_millis;
         if (send_ack) {
-          mesh::Packet* ack = createAck(ack_hash);
+          mesh::Packet* ack = mesh->createAck(ack_hash);
           if (ack) {
             if (client->out_path_len < 0) {
-              sendFlood(ack);
+              mesh->sendFlood(ack);
             } else {
-              sendDirect(ack, client->out_path, client->out_path_len);
+              mesh->sendDirect(ack, client->out_path, client->out_path_len);
             }
           }
           delay_millis = REPLY_DELAY_MILLIS;
@@ -540,12 +547,12 @@ protected:
           // calc expected ACK reply
           //mesh::Utils::sha256((uint8_t *)&expected_ack_crc, 4, temp, 5 + text_len, self_id.pub_key, PUB_KEY_SIZE);
 
-          auto reply = createDatagram(PAYLOAD_TYPE_TXT_MSG, client->id, secret, temp, 5 + text_len);
+          auto reply = mesh->createDatagram(PAYLOAD_TYPE_TXT_MSG, self_id, client->id, secret, temp, 5 + text_len);
           if (reply) {
             if (client->out_path_len < 0) {
-              sendFlood(reply, delay_millis);
+              mesh->sendFlood(reply, delay_millis);
             } else {
-              sendDirect(reply, client->out_path, client->out_path_len, delay_millis);
+              mesh->sendDirect(reply, client->out_path, client->out_path_len, delay_millis);
             }
           }
         }
@@ -560,7 +567,7 @@ protected:
       } else {
         client->last_timestamp = sender_timestamp;
 
-        uint32_t now = getRTCClock()->getCurrentTime();
+        uint32_t now = mesh->getRTCClock()->getCurrentTime();
         client->last_activity = now;   // <-- THIS will keep client connection alive
         client->push_failures = 0;  // reset so push can resume (if prev failed)
 
@@ -585,50 +592,50 @@ protected:
             uint32_t ack_hash;    // calc ACK to prove to sender that we got request
             mesh::Utils::sha256((uint8_t *) &ack_hash, 4, data, 9, client->id.pub_key, PUB_KEY_SIZE);
 
-            auto reply = createAck(ack_hash);
+            auto reply = mesh->createAck(ack_hash);
             if (reply) {
               reply->payload[reply->payload_len++] = getUnsyncedCount(client);  // NEW: add unsynced counter to end of ACK packet
-              sendDirect(reply, client->out_path, client->out_path_len);
+              mesh->sendDirect(reply, client->out_path, client->out_path_len);
             }
           }
         } else if (data[4] == REQ_TYPE_GET_STATUS) {
           ServerStats stats;
           stats.batt_milli_volts = board.getBattMilliVolts();
-          stats.curr_tx_queue_len = _mgr->getOutboundCount();
-          stats.curr_free_queue_len = _mgr->getFreeCount();
+          stats.curr_tx_queue_len = mesh->getManager()->getOutboundCount();
+          stats.curr_free_queue_len = mesh->getManager()->getFreeCount();
           stats.last_rssi = (int16_t) radio_driver.getLastRSSI();
           stats.n_packets_recv = radio_driver.getPacketsRecv();
           stats.n_packets_sent = radio_driver.getPacketsSent();
-          stats.total_air_time_secs = getTotalAirTime() / 1000;
-          stats.total_up_time_secs = _ms->getMillis() / 1000;
-          stats.n_sent_flood = getNumSentFlood();
-          stats.n_sent_direct = getNumSentDirect();
-          stats.n_recv_flood = getNumRecvFlood();
-          stats.n_recv_direct = getNumRecvDirect();
-          stats.n_full_events = getNumFullEvents();
+          stats.total_air_time_secs = mesh->getTotalAirTime() / 1000;
+          stats.total_up_time_secs = mesh->getClock()->getMillis() / 1000;
+          stats.n_sent_flood = mesh->getNumSentFlood();
+          stats.n_sent_direct = mesh->getNumSentDirect();
+          stats.n_recv_flood = mesh->getNumRecvFlood();
+          stats.n_recv_direct = mesh->getNumRecvDirect();
+          stats.n_full_events = mesh->getNumFullEvents();
           stats.last_snr = (int16_t)(radio_driver.getLastSNR() * 4);
-          stats.n_direct_dups = ((SimpleMeshTables *)getTables())->getNumDirectDups();
-          stats.n_flood_dups = ((SimpleMeshTables *)getTables())->getNumFloodDups();
+          stats.n_direct_dups = ((SimpleMeshTables *)mesh->getTables())->getNumDirectDups();
+          stats.n_flood_dups = ((SimpleMeshTables *)mesh->getTables())->getNumFloodDups();
           stats.n_posted = _num_posted;
           stats.n_post_push = _num_post_pushes;
 
-          now = getRTCClock()->getCurrentTimeUnique();
+          now = mesh->getRTCClock()->getCurrentTimeUnique();
           memcpy(reply_data, &now, 4);   // response packets always prefixed with timestamp
           memcpy(&reply_data[4], &stats, sizeof(stats));
           uint8_t reply_len = 4 + sizeof(stats);
 
           if (packet->isRouteFlood()) {
             // let this sender know path TO here, so they can use sendDirect(), and ALSO encode the response
-            mesh::Packet* path = createPathReturn(client->id, secret, packet->path, packet->path_len,
+            mesh::Packet* path = mesh->createPathReturn(self_id, client->id, secret, packet->path, packet->path_len,
                                                   PAYLOAD_TYPE_RESPONSE, reply_data, reply_len);
-            if (path) sendFlood(path);
+            if (path) mesh->sendFlood(path);
           } else {
-            mesh::Packet* reply = createDatagram(PAYLOAD_TYPE_RESPONSE, client->id, secret, reply_data, reply_len);
+            mesh::Packet* reply = mesh->createDatagram(PAYLOAD_TYPE_RESPONSE, self_id, client->id, secret, reply_data, reply_len);
             if (reply) {
               if (client->out_path_len >= 0) {  // we have an out_path, so send DIRECT
-                sendDirect(reply, client->out_path, client->out_path_len);
+                mesh->sendDirect(reply, client->out_path, client->out_path_len);
               } else {
-                sendFlood(reply);
+                mesh->sendFlood(reply);
               }
             }
           }
@@ -665,9 +672,11 @@ protected:
   }
 
 public:
-  MyMesh(mesh::MainBoard& board, mesh::Radio& radio, mesh::MillisecondClock& ms, mesh::RNG& rng, mesh::RTCClock& rtc, mesh::MeshTables& tables)
-     : mesh::Mesh(radio, ms, rng, rtc, *new StaticPoolPacketManager(32), tables),
-      _cli(board, this, &_prefs, this)
+  NodePrefs _prefs;
+
+  RoomNode(mesh::Mesh* mesh, int index)
+    : mesh::MeshNode(mesh)
+    , _cli(board, this, &_prefs, this, index)
   {
     next_local_advert = next_flood_advert = 0;
     _logging = false;
@@ -690,9 +699,9 @@ public:
     _prefs.advert_interval = 1;  // default to 2 minutes for NEW installs
     _prefs.flood_advert_interval = 3;   // 3 hours
     _prefs.flood_max = 64;
-  #ifdef ROOM_PASSWORD
+    #ifdef ROOM_PASSWORD
     StrHelper::strncpy(_prefs.guest_password, ROOM_PASSWORD, sizeof(_prefs.guest_password));
-  #endif
+    #endif
 
     num_clients = 0;
     next_post_idx = 0;
@@ -705,13 +714,12 @@ public:
   CommonCLI* getCLI() { return &_cli; }
 
   void begin(FILESYSTEM* fs) {
-    mesh::Mesh::begin();
     _fs = fs;
     // load persisted prefs
-    _cli.loadPrefs(_fs);
+    // _cli.loadPrefs(_fs);
 
-    radio_set_params(_prefs.freq, _prefs.bw, _prefs.sf, _prefs.cr);
-    radio_set_tx_power(_prefs.tx_power_dbm);
+    // radio_set_params(_prefs.freq, _prefs.bw, _prefs.sf, _prefs.cr);
+    // radio_set_tx_power(_prefs.tx_power_dbm);
 
     updateAdvertTimer();
     updateFloodAdvertTimer();
@@ -720,10 +728,10 @@ public:
   const char* getFirmwareVer() override { return FIRMWARE_VERSION; }
   const char* getBuildDate() override { return FIRMWARE_BUILD_DATE; }
   const char* getRole() override { return FIRMWARE_ROLE; }
-  const char* getNodeName() { return _prefs.node_name; }
+  const char* getName() override { return _prefs.node_name; }
 
   void savePrefs() override {
-    _cli.savePrefs(_fs);
+    // _cli.savePrefs(_fs);
   }
 
   bool formatFileSystem() override {
@@ -742,7 +750,7 @@ public:
   void sendSelfAdvertisement(int delay_millis) override {
     mesh::Packet* pkt = createSelfAdvert();
     if (pkt) {
-      sendFlood(pkt, delay_millis);
+      mesh->sendFlood(pkt, delay_millis);
     } else {
       MESH_DEBUG_PRINTLN("ERROR: unable to create advertisement packet!");
     }
@@ -750,14 +758,14 @@ public:
 
   void updateAdvertTimer() override {
     if (_prefs.advert_interval > 0) {  // schedule local advert timer
-      next_local_advert = futureMillis((uint32_t)_prefs.advert_interval * 2 * 60 * 1000);
+      next_local_advert = mesh->futureMillis((uint32_t)_prefs.advert_interval * 2 * 60 * 1000);
     } else {
       next_local_advert = 0;  // stop the timer
     }
   }
   void updateFloodAdvertTimer() override {
     if (_prefs.flood_advert_interval > 0) {  // schedule flood advert timer
-      next_flood_advert = futureMillis( ((uint32_t)_prefs.flood_advert_interval) * 60 * 60 * 1000);
+      next_flood_advert = mesh->futureMillis( ((uint32_t)_prefs.flood_advert_interval) * 60 * 60 * 1000);
     } else {
       next_flood_advert = 0;  // stop the timer
     }
@@ -789,14 +797,14 @@ public:
     radio_set_tx_power(power_dbm);
   }
 
-  void loop() {
-    mesh::Mesh::loop();
+  void loop() override {
+    mesh::MeshNode::loop();
 
-    if (millisHasNowPassed(next_push) && num_clients > 0) {
+    if (mesh->millisHasNowPassed(next_push) && num_clients > 0) {
       // check for ACK timeouts
       for (int i = 0; i < num_clients; i++) {
         auto c = &known_clients[i];
-        if (c->pending_ack && millisHasNowPassed(c->ack_timeout)) {
+        if (c->pending_ack && mesh->millisHasNowPassed(c->ack_timeout)) {
           c->push_failures++;
           c->pending_ack = 0;   // reset  (TODO: keep prev expected_ack's in a list, incase they arrive LATER, after we retry)
           MESH_DEBUG_PRINTLN("pending ACK timed out: push_failures: %d", (uint32_t)c->push_failures);
@@ -824,22 +832,22 @@ public:
       next_client_idx = (next_client_idx + 1) % num_clients;  // round robin polling for each client
 
       if (did_push) {
-        next_push = futureMillis(SYNC_PUSH_INTERVAL);
+        next_push = mesh->futureMillis(SYNC_PUSH_INTERVAL);
       } else {
         // were no unsynced posts for curr client, so proccess next client much quicker! (in next loop())
-        next_push = futureMillis(SYNC_PUSH_INTERVAL / 8);
+        next_push = mesh->futureMillis(SYNC_PUSH_INTERVAL / 8);
       }
     }
 
-    if (next_flood_advert && millisHasNowPassed(next_flood_advert)) {
+    if (next_flood_advert && mesh->millisHasNowPassed(next_flood_advert)) {
       mesh::Packet* pkt = createSelfAdvert();
-      if (pkt) sendFlood(pkt);
+      if (pkt) mesh->sendFlood(pkt);
 
       updateFloodAdvertTimer();   // schedule next flood advert
       updateAdvertTimer();   // also schedule local advert (so they don't overlap)
-    } else if (next_local_advert && millisHasNowPassed(next_local_advert)) {
+    } else if (next_local_advert && mesh->millisHasNowPassed(next_local_advert)) {
       mesh::Packet* pkt = createSelfAdvert();
-      if (pkt) sendZeroHop(pkt);
+      if (pkt) mesh->sendZeroHop(pkt);
 
       updateAdvertTimer();   // schedule next local advert
     }
@@ -855,6 +863,8 @@ public:
 StdRNG fast_rng;
 SimpleMeshTables tables;
 MyMesh the_mesh(board, radio_driver, *new ArduinoMillis(), fast_rng, rtc_clock, tables);
+const int N_ROOMS = 3;
+mesh::MeshNode* room_nodes[N_ROOMS];
 
 void halt() {
   while (1) ;
@@ -897,28 +907,67 @@ void setup() {
 #else
   #error "need to define filesystem"
 #endif
-  if (!store.load("_main", the_mesh.self_id)) {
-    the_mesh.self_id = radio_new_identity();   // create new random identity
-    int count = 0;
-    while (count < 10 && (the_mesh.self_id.pub_key[0] == 0x00 || the_mesh.self_id.pub_key[0] == 0xFF)) {  // reserved id hashes
-      the_mesh.self_id = radio_new_identity(); count++;
+
+  for (int i = 0; i < N_ROOMS; ++i) {
+    RoomNode* node = new RoomNode(&the_mesh, i);
+
+    char identity_key[10];
+
+    char suffix[5] = "_";
+    itoa(i, suffix + 1, 10);
+  
+    size_t p = strlen(suffix);
+  
+    strncpy(identity_key, "_main", 10);
+    strncpy(identity_key + 5, suffix, 10 - 5);
+
+    if (!store.load(identity_key, node->self_id)) {
+      node->self_id = radio_new_identity();   // create new random identity
+      int count = 0;
+      while (count < 10 && (node->self_id.pub_key[0] == 0x00 || node->self_id.pub_key[0] == 0xFF)) {  // reserved id hashes
+        node->self_id = radio_new_identity(); count++;
+      }
+      store.save(identity_key, node->self_id);
     }
-    store.save("_main", the_mesh.self_id);
+
+    // node->self_id = radio_new_identity();   // create new random identity
+
+    strncpy(node->_prefs.node_name, "Room", 32);
+    strncpy(node->_prefs.node_name + 4, suffix, 32 - 4);
+
+    Serial.print("ROOM");
+    Serial.print("  name: ");
+    Serial.print(node->_prefs.node_name);
+    Serial.print("  identity_key: ");
+    Serial.print(identity_key);
+
+    Serial.print("  ID: ");
+    mesh::Utils::printHex(Serial, node->self_id.pub_key, PUB_KEY_SIZE);
+    
+    Serial.println();
+
+    node->begin(fs);
+
+    room_nodes[i] = node;
   }
 
-  Serial.print("Room ID: ");
-  mesh::Utils::printHex(Serial, the_mesh.self_id.pub_key, PUB_KEY_SIZE); Serial.println();
+  the_mesh.begin();
+  radio_set_params(910.525, 250.0, 11, 5);
+  radio_set_tx_power(22);
 
   command[0] = 0;
 
-  the_mesh.begin(fs);
-
 #ifdef DISPLAY_CLASS
-  ui_task.begin(the_mesh.getNodeName(), FIRMWARE_BUILD_DATE, FIRMWARE_VERSION);
+  ui_task.begin(room_nodes[0]->getName(), FIRMWARE_BUILD_DATE, FIRMWARE_VERSION);
 #endif
 
-  // send out initial Advertisement to the mesh
-  the_mesh.sendSelfAdvertisement(16000);
+  the_mesh._nodes = room_nodes;
+  the_mesh._node_count = N_ROOMS;
+
+  for (int i = 0; i < N_ROOMS; ++i) {
+    // send out initial Advertisement to the mesh
+    ((RoomNode*)room_nodes[i])->sendSelfAdvertisement(16000);
+  }
 }
 
 void loop() {
@@ -937,11 +986,11 @@ void loop() {
 
   if (len > 0 && command[len - 1] == '\r') {  // received complete line
     command[len - 1] = 0;  // replace newline with C string null terminator
-    char reply[160];
-    the_mesh.getCLI()->handleCommand(0, command, reply);  // NOTE: there is no sender_timestamp via serial!
-    if (reply[0]) {
-      Serial.print("  -> "); Serial.println(reply);
-    }
+    // char reply[160];
+    // the_mesh.getCLI()->handleCommand(0, command, reply);  // NOTE: there is no sender_timestamp via serial!
+    // if (reply[0]) {
+    //   Serial.print("  -> "); Serial.println(reply);
+    // }
 
     command[0] = 0;  // reset command buffer
   }

@@ -23,7 +23,7 @@ WRAPPER_CLASS radio_driver(radio, board);
 
 ESP32RTCClock fallback_clock;
 AutoDiscoverRTCClock rtc_clock(fallback_clock);
-
+SensorManager sensors;
 
 static void setPMUIntFlag(){
   pmuIntFlag = true;

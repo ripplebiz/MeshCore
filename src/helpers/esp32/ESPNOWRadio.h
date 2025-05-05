@@ -9,7 +9,7 @@ protected:
 public:
   ESPNOWRadio() { n_recv = n_sent = 0; }
 
-  void begin() override;
+  void init();
   int recvRaw(uint8_t* bytes, int sz) override;
   uint32_t getEstAirtimeFor(int len_bytes) override;
   void startSendRaw(const uint8_t* bytes, int len) override;

@@ -22,7 +22,7 @@ static void OnDataRecv(const uint8_t *mac, const uint8_t *data, int len) {
   last_rx_len = len;
 }
 
-void ESPNOWRadio::begin() {
+void ESPNOWRadio::init() {
   // Set device as a Wi-Fi Station
   WiFi.mode(WIFI_STA);
   // Long Range mode
@@ -72,6 +72,7 @@ void ESPNOWRadio::startSendRaw(const uint8_t* bytes, int len) {
   is_send_complete = false;
   esp_err_t result = esp_now_send(broadcastAddress, bytes, len);
   if (result == ESP_OK) {
+    n_sent++;
     ESPNOW_DEBUG_PRINTLN("Send success");
   } else {
     last_send_result = result;
@@ -94,6 +95,7 @@ int ESPNOWRadio::recvRaw(uint8_t* bytes, int sz) {
   if (last_rx_len > 0) {
     memcpy(bytes, rx_buf, last_rx_len);
     last_rx_len = 0;
+    n_recv++;
   }
   return len;
 }

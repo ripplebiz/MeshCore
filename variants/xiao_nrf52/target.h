@@ -6,10 +6,12 @@
 #include <helpers/nrf52/XiaoNrf52Board.h>
 #include <helpers/CustomSX1262Wrapper.h>
 #include <helpers/ArduinoHelpers.h>
+#include <helpers/SensorManager.h>
 
 extern XiaoNrf52Board board;
 extern WRAPPER_CLASS radio_driver;
 extern VolatileRTCClock rtc_clock;
+extern SensorManager sensors;
 
 bool radio_init();
 uint32_t radio_get_rng_seed();

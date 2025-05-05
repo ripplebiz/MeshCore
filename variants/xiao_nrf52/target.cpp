@@ -9,6 +9,7 @@ RADIO_CLASS radio = new Module(P_LORA_NSS, P_LORA_DIO_1, P_LORA_RESET, P_LORA_BU
 WRAPPER_CLASS radio_driver(radio, board);
 
 VolatileRTCClock rtc_clock;
+SensorManager sensors;
 
 #ifndef LORA_CR
   #define LORA_CR      5

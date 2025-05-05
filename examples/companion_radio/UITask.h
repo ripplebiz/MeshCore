@@ -4,13 +4,15 @@
 #include <helpers/ui/DisplayDriver.h>
 #include <stddef.h>
 
+#include "NodePrefs.h"
+
 class UITask {
   DisplayDriver* _display;
   mesh::MainBoard* _board;
   unsigned long _next_refresh, _auto_off;
   bool _connected;
   uint32_t _pin_code;
-  const char* _node_name;
+  NodePrefs* _node_prefs;
   char _version_info[32];
   char _origin[62];
   char _msg[80];
@@ -27,7 +29,7 @@ public:
       _next_refresh = 0; 
       _connected = false;
   }
-  void begin(DisplayDriver* display, const char* node_name, const char* build_date, const char* firmware_version, uint32_t pin_code);
+  void begin(DisplayDriver* display, NodePrefs* node_prefs, const char* build_date, const char* firmware_version, uint32_t pin_code);
 
   void setHasConnection(bool connected) { _connected = connected; }
   bool hasDisplay() const { return _display != NULL; }

@@ -52,6 +52,7 @@ bool Packet::readFrom(const uint8_t src[], uint8_t len) {
   memcpy(path, &src[i], path_len); i += path_len;
   if (i >= len) return false;   // bad encoding
   payload_len = len - i;
+  if (payload_len > sizeof(payload)) return false;  // bad encoding
   memcpy(payload, &src[i], payload_len); //i += payload_len;
   return true;   // success
 }

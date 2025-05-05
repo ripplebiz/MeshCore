@@ -3,6 +3,8 @@
 
 #if defined(NRF52_PLATFORM)
   #include <InternalFileSystem.h>
+#elif defined(RP2040_PLATFORM)
+  #include <LittleFS.h>
 #elif defined(ESP32)
   #include <SPIFFS.h>
 #endif
@@ -20,11 +22,11 @@
 /* ------------------------------ Config -------------------------------- */
 
 #ifndef FIRMWARE_BUILD_DATE
-  #define FIRMWARE_BUILD_DATE   "7 Apr 2025"
+  #define FIRMWARE_BUILD_DATE   "21 Apr 2025"
 #endif
 
 #ifndef FIRMWARE_VERSION
-  #define FIRMWARE_VERSION   "v1.4.3"
+  #define FIRMWARE_VERSION   "v1.5.1"
 #endif
 
 #ifndef LORA_FREQ
@@ -129,8 +131,9 @@ struct PostInfo {
 
 #define CLIENT_KEEP_ALIVE_SECS   128
 
-#define REQ_TYPE_GET_STATUS      0x01   // same as _GET_STATS
-#define REQ_TYPE_KEEP_ALIVE      0x02
+#define REQ_TYPE_GET_STATUS          0x01   // same as _GET_STATS
+#define REQ_TYPE_KEEP_ALIVE          0x02
+#define REQ_TYPE_GET_TELEMETRY_DATA  0x03
 
 #define RESP_SERVER_LOGIN_OK      0   // response to ANON_REQ
 
@@ -165,6 +168,7 @@ class MyMesh : public mesh::Mesh, public CommonCLICallbacks {
   int next_client_idx;  // for round-robin polling
   int next_post_idx;
   PostInfo posts[MAX_UNSYNCED_POSTS];   // cyclic queue
+  CayenneLPP telemetry;
 
   ClientInfo* putClient(const mesh::Identity& id) {
     for (int i = 0; i < num_clients; i++) {
@@ -280,11 +284,58 @@ class MyMesh : public mesh::Mesh, public CommonCLICallbacks {
   File openAppend(const char* fname) {
     #if defined(NRF52_PLATFORM)
       return _fs->open(fname, FILE_O_WRITE);
+    #elif defined(RP2040_PLATFORM)
+      return _fs->open(fname, "a");
     #else
       return _fs->open(fname, "a", true);
     #endif
     }
 
+  int handleRequest(ClientInfo* sender, uint32_t sender_timestamp, uint8_t* payload, size_t payload_len) {
+    // uint32_t now = getRTCClock()->getCurrentTimeUnique();
+    // memcpy(reply_data, &now, 4);   // response packets always prefixed with timestamp
+    memcpy(reply_data, &sender_timestamp, 4);   // reflect sender_timestamp back in response packet (kind of like a 'tag')
+   
+    switch (payload[0]) {
+      case REQ_TYPE_GET_STATUS: {
+        ServerStats stats;
+        stats.batt_milli_volts = board.getBattMilliVolts();
+        stats.curr_tx_queue_len = _mgr->getOutboundCount();
+        stats.curr_free_queue_len = _mgr->getFreeCount();
+        stats.last_rssi = (int16_t) radio_driver.getLastRSSI();
+        stats.n_packets_recv = radio_driver.getPacketsRecv();
+        stats.n_packets_sent = radio_driver.getPacketsSent();
+        stats.total_air_time_secs = getTotalAirTime() / 1000;
+        stats.total_up_time_secs = _ms->getMillis() / 1000;
+        stats.n_sent_flood = getNumSentFlood();
+        stats.n_sent_direct = getNumSentDirect();
+        stats.n_recv_flood = getNumRecvFlood();
+        stats.n_recv_direct = getNumRecvDirect();
+        stats.n_full_events = getNumFullEvents();
+        stats.last_snr = (int16_t)(radio_driver.getLastSNR() * 4);
+        stats.n_direct_dups = ((SimpleMeshTables *)getTables())->getNumDirectDups();
+        stats.n_flood_dups = ((SimpleMeshTables *)getTables())->getNumFloodDups();
+        stats.n_posted = _num_posted;
+        stats.n_post_push = _num_post_pushes;
+
+        memcpy(&reply_data[4], &stats, sizeof(stats));
+        return 4 + sizeof(stats);
+      }
+
+      case REQ_TYPE_GET_TELEMETRY_DATA: {
+        telemetry.reset();
+        telemetry.addVoltage(TELEM_CHANNEL_SELF, (float)board.getBattMilliVolts() / 1000.0f);
+        // query other sensors -- target specific
+        sensors.querySensors(sender->permission == RoomPermission::ADMIN ? 0xFF : 0x00, telemetry);
+
+        uint8_t tlen = telemetry.getSize();
+        memcpy(&reply_data[4], telemetry.getBuffer(), tlen);
+        return 4 + tlen;  // reply_len
+      }
+    }
+    return 0;  // unknown command
+  }
+   
 protected:
   float getAirtimeBudgetFactor() const override {
     return _prefs.airtime_factor;
@@ -597,44 +648,22 @@ protected:
               sendDirect(reply, client->out_path, client->out_path_len);
             }
           }
-        } else if (data[4] == REQ_TYPE_GET_STATUS) {
-          ServerStats stats;
-          stats.batt_milli_volts = board.getBattMilliVolts();
-          stats.curr_tx_queue_len = _mgr->getOutboundCount();
-          stats.curr_free_queue_len = _mgr->getFreeCount();
-          stats.last_rssi = (int16_t) radio_driver.getLastRSSI();
-          stats.n_packets_recv = radio_driver.getPacketsRecv();
-          stats.n_packets_sent = radio_driver.getPacketsSent();
-          stats.total_air_time_secs = getTotalAirTime() / 1000;
-          stats.total_up_time_secs = _ms->getMillis() / 1000;
-          stats.n_sent_flood = getNumSentFlood();
-          stats.n_sent_direct = getNumSentDirect();
-          stats.n_recv_flood = getNumRecvFlood();
-          stats.n_recv_direct = getNumRecvDirect();
-          stats.n_full_events = getNumFullEvents();
-          stats.last_snr = (int16_t)(radio_driver.getLastSNR() * 4);
-          stats.n_direct_dups = ((SimpleMeshTables *)getTables())->getNumDirectDups();
-          stats.n_flood_dups = ((SimpleMeshTables *)getTables())->getNumFloodDups();
-          stats.n_posted = _num_posted;
-          stats.n_post_push = _num_post_pushes;
-
-          now = getRTCClock()->getCurrentTimeUnique();
-          memcpy(reply_data, &now, 4);   // response packets always prefixed with timestamp
-          memcpy(&reply_data[4], &stats, sizeof(stats));
-          uint8_t reply_len = 4 + sizeof(stats);
-
-          if (packet->isRouteFlood()) {
-            // let this sender know path TO here, so they can use sendDirect(), and ALSO encode the response
-            mesh::Packet* path = createPathReturn(client->id, secret, packet->path, packet->path_len,
-                                                  PAYLOAD_TYPE_RESPONSE, reply_data, reply_len);
-            if (path) sendFlood(path);
-          } else {
-            mesh::Packet* reply = createDatagram(PAYLOAD_TYPE_RESPONSE, client->id, secret, reply_data, reply_len);
-            if (reply) {
-              if (client->out_path_len >= 0) {  // we have an out_path, so send DIRECT
-                sendDirect(reply, client->out_path, client->out_path_len);
-              } else {
-                sendFlood(reply);
+        } else {
+          int reply_len = handleRequest(client, sender_timestamp, &data[4], len - 4);
+          if (reply_len > 0) {  // valid command
+            if (packet->isRouteFlood()) {
+              // let this sender know path TO here, so they can use sendDirect(), and ALSO encode the response
+              mesh::Packet* path = createPathReturn(client->id, secret, packet->path, packet->path_len,
+                                                    PAYLOAD_TYPE_RESPONSE, reply_data, reply_len);
+              if (path) sendFlood(path);
+            } else {
+              mesh::Packet* reply = createDatagram(PAYLOAD_TYPE_RESPONSE, client->id, secret, reply_data, reply_len);
+              if (reply) {
+                if (client->out_path_len >= 0) {  // we have an out_path, so send DIRECT
+                  sendDirect(reply, client->out_path, client->out_path_len);
+                } else {
+                  sendFlood(reply);
+                }
               }
             }
           }
@@ -673,7 +702,7 @@ protected:
 public:
   MyMesh(mesh::MainBoard& board, mesh::Radio& radio, mesh::MillisecondClock& ms, mesh::RNG& rng, mesh::RTCClock& rtc, mesh::MeshTables& tables)
      : mesh::Mesh(radio, ms, rng, rtc, *new StaticPoolPacketManager(32), tables),
-      _cli(board, this, &_prefs, this)
+      _cli(board, this, &_prefs, this), telemetry(MAX_PACKET_PAYLOAD - 4)
   {
     next_local_advert = next_flood_advert = 0;
     _logging = false;
@@ -727,6 +756,9 @@ public:
   const char* getBuildDate() override { return FIRMWARE_BUILD_DATE; }
   const char* getRole() override { return FIRMWARE_ROLE; }
   const char* getNodeName() { return _prefs.node_name; }
+  NodePrefs* getNodePrefs() { 
+    return &_prefs; 
+  }
 
   void savePrefs() override {
     _cli.savePrefs(_fs);
@@ -735,6 +767,8 @@ public:
   bool formatFileSystem() override {
     #if defined(NRF52_PLATFORM)
       return InternalFS.format();
+    #elif defined(RP2040_PLATFORM)
+      return LittleFS.format();
     #elif defined(ESP32)
       return SPIFFS.format();
     #else
@@ -774,7 +808,11 @@ public:
   }
 
   void dumpLogFile() override {
+  #if defined(RP2040_PLATFORM)
+    File f = _fs->open(PACKET_LOG_FILE, "r");
+  #else
     File f = _fs->open(PACKET_LOG_FILE);
+  #endif
     if (f) {
       while (f.available()) {
         int c = f.read();
@@ -787,6 +825,10 @@ public:
 
   void setTxPower(uint8_t power_dbm) override {
     radio_set_tx_power(power_dbm);
+  }
+
+  void formatNeighborsReply(char *reply) override {
+    strcpy(reply, "not supported");
   }
 
   void loop() {
@@ -885,6 +927,11 @@ void setup() {
   InternalFS.begin();
   fs = &InternalFS;
   IdentityStore store(InternalFS, "");
+#elif defined(RP2040_PLATFORM)
+  LittleFS.begin();
+  fs = &LittleFS;
+  IdentityStore store(LittleFS, "/identity");
+  store.begin();
 #elif defined(ESP32)
   SPIFFS.begin(true);
   fs = &SPIFFS;
@@ -906,10 +953,12 @@ void setup() {
 
   command[0] = 0;
 
+  sensors.begin();
+
   the_mesh.begin(fs);
 
 #ifdef DISPLAY_CLASS
-  ui_task.begin(the_mesh.getNodeName(), FIRMWARE_BUILD_DATE, FIRMWARE_VERSION);
+  ui_task.begin(the_mesh.getNodePrefs(), FIRMWARE_BUILD_DATE, FIRMWARE_VERSION);
 #endif
 
   // send out initial Advertisement to the mesh
@@ -942,4 +991,5 @@ void loop() {
   }
 
   the_mesh.loop();
+  sensors.loop();
 }

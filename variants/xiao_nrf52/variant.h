@@ -98,14 +98,14 @@ static const uint8_t A5  = PIN_A5;
 #define PIN_SPI_MOSI            (10)
 #define PIN_SPI_SCK             (8)
 
-static const uint8_t SS   = D3; // NSS for sx ?
-static const uint8_t MOSI = PIN_SPI_MOSI;
-static const uint8_t MISO = PIN_SPI_MISO;
-static const uint8_t SCK  = PIN_SPI_SCK ;
-
 #define PIN_SPI1_MISO           (25)
 #define PIN_SPI1_MOSI           (26)
 #define PIN_SPI1_SCK            (29)
+
+// Lora SPI is on SPI0
+#define  P_LORA_SCLK            PIN_SPI_SCK
+#define  P_LORA_MISO            PIN_SPI_MISO
+#define  P_LORA_MOSI            PIN_SPI_MOSI
 
 // Wire Interfaces
 #define WIRE_INTERFACES_COUNT   (1)

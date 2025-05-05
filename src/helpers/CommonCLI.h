@@ -40,6 +40,7 @@ public:
   virtual void eraseLogFile() = 0;
   virtual void dumpLogFile() = 0;
   virtual void setTxPower(uint8_t power_dbm) = 0;
+  virtual void formatNeighborsReply(char *reply) = 0;
 };
 
 class CommonCLI {

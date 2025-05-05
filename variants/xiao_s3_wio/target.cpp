@@ -14,6 +14,7 @@ WRAPPER_CLASS radio_driver(radio, board);
 
 ESP32RTCClock fallback_clock;
 AutoDiscoverRTCClock rtc_clock(fallback_clock);
+SensorManager sensors;
 
 #ifndef LORA_CR
   #define LORA_CR      5
@@ -22,7 +23,9 @@ AutoDiscoverRTCClock rtc_clock(fallback_clock);
 bool radio_init() {
   fallback_clock.begin();
   rtc_clock.begin(Wire);
-  
+  pinMode(21, INPUT);
+  pinMode(48, OUTPUT);
+
 #ifdef SX126X_DIO3_TCXO_VOLTAGE
   float tcxo = SX126X_DIO3_TCXO_VOLTAGE;
 #else

@@ -6,10 +6,12 @@
 #include <helpers/HeltecV2Board.h>
 #include <helpers/CustomSX1276Wrapper.h>
 #include <helpers/AutoDiscoverRTCClock.h>
+#include <helpers/SensorManager.h>
 
 extern HeltecV2Board board;
 extern WRAPPER_CLASS radio_driver;
 extern AutoDiscoverRTCClock rtc_clock;
+extern SensorManager sensors;
 
 bool radio_init();
 uint32_t radio_get_rng_seed();

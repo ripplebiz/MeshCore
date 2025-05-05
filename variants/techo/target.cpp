@@ -10,6 +10,7 @@ WRAPPER_CLASS radio_driver(radio, board);
 
 VolatileRTCClock fallback_clock;
 AutoDiscoverRTCClock rtc_clock(fallback_clock);
+SensorManager sensors;
 
 #ifndef LORA_CR
   #define LORA_CR      5

@@ -6,10 +6,12 @@
 #include <helpers/nrf52/RAK4631Board.h>
 #include <helpers/CustomSX1262Wrapper.h>
 #include <helpers/AutoDiscoverRTCClock.h>
+#include <helpers/SensorManager.h>
 
 extern RAK4631Board board;
 extern WRAPPER_CLASS radio_driver;
 extern AutoDiscoverRTCClock rtc_clock;
+extern SensorManager sensors;
 
 bool radio_init();
 uint32_t radio_get_rng_seed();

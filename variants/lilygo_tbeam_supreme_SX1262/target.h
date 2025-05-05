@@ -5,10 +5,12 @@
 #include <helpers/TBeamS3SupremeBoard.h>
 #include <helpers/CustomSX1262Wrapper.h>
 #include <helpers/AutoDiscoverRTCClock.h>
+#include <helpers/SensorManager.h>
 
 extern TBeamS3SupremeBoard board;
 extern WRAPPER_CLASS radio_driver;
 extern AutoDiscoverRTCClock rtc_clock;
+extern SensorManager sensors;
 
 bool power_init();
 bool radio_init();

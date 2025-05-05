@@ -6,10 +6,12 @@
 #include <helpers/nrf52/T114Board.h>
 #include <helpers/CustomSX1262Wrapper.h>
 #include <helpers/AutoDiscoverRTCClock.h>
+#include <helpers/SensorManager.h>
 
 extern T114Board board;
 extern WRAPPER_CLASS radio_driver;
 extern AutoDiscoverRTCClock rtc_clock;
+extern SensorManager sensors;
 
 bool radio_init();
 uint32_t radio_get_rng_seed();

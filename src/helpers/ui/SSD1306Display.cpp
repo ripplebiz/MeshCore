@@ -62,6 +62,13 @@ void SSD1306Display::drawXbm(int x, int y, const uint8_t* bits, int w, int h) {
   display.drawBitmap(x, y, bits, w, h, SSD1306_WHITE);
 }
 
+uint16_t SSD1306Display::getTextWidth(const char* str) {
+  int16_t x1, y1;
+  uint16_t w, h;
+  display.getTextBounds(str, 0, 0, &x1, &y1, &w, &h);
+  return w;
+}
+
 void SSD1306Display::endFrame() {
   display.display();
 }

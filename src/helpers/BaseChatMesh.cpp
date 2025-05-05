@@ -178,6 +178,27 @@ void BaseChatMesh::onPeerDataRecv(mesh::Packet* packet, uint8_t type, int sender
     } else {
       MESH_DEBUG_PRINTLN("onPeerDataRecv: unsupported message type: %u", (uint32_t) flags);
     }
+  } else if (type == PAYLOAD_TYPE_REQ && len > 4) {
+    uint32_t sender_timestamp;
+    memcpy(&sender_timestamp, data, 4);
+    uint8_t reply_len = onContactRequest(from, sender_timestamp, &data[4], len - 4, temp_buf);
+    if (reply_len > 0) {
+      if (packet->isRouteFlood()) {
+        // let this sender know path TO here, so they can use sendDirect(), and ALSO encode the response
+        mesh::Packet* path = createPathReturn(from.id, secret, packet->path, packet->path_len,
+                                              PAYLOAD_TYPE_RESPONSE, temp_buf, reply_len);
+        if (path) sendFlood(path);
+      } else {
+        mesh::Packet* reply = createDatagram(PAYLOAD_TYPE_RESPONSE, from.id, secret, temp_buf, reply_len);
+        if (reply) {
+          if (from.out_path_len >= 0) {  // we have an out_path, so send DIRECT
+            sendDirect(reply, from.out_path, from.out_path_len);
+          } else {
+            sendFlood(reply);
+          }
+        }
+      }
+    }
   } else if (type == PAYLOAD_TYPE_RESPONSE && len > 0) {
     onContactResponse(from, data, len);
   }
@@ -393,11 +414,11 @@ int BaseChatMesh::sendLogin(const ContactInfo& recipient, const char* password, 
   return MSG_SEND_FAILED;
 }
 
-int  BaseChatMesh::sendStatusRequest(const ContactInfo& recipient, uint32_t& est_timeout) {
+int  BaseChatMesh::sendRequest(const ContactInfo& recipient, uint8_t req_type, uint32_t& tag, uint32_t& est_timeout) {
   uint8_t temp[13];
-  uint32_t now = getRTCClock()->getCurrentTimeUnique();
-  memcpy(temp, &now, 4);   // mostly an extra blob to help make packet_hash unique
-  temp[4] = REQ_TYPE_GET_STATUS;
+  tag = getRTCClock()->getCurrentTimeUnique();
+  memcpy(temp, &tag, 4);   // mostly an extra blob to help make packet_hash unique
+  temp[4] = req_type;
   memset(&temp[5], 0, 4);  // reserved (possibly for 'since' param)
   getRNG()->random(&temp[9], 4);   // random blob to help make packet-hash unique
 

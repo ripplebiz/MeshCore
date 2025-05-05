@@ -24,7 +24,11 @@ void CommonCLI::loadPrefs(FILESYSTEM* fs) {
 }
 
 void CommonCLI::loadPrefsInt(FILESYSTEM* fs, const char* filename) {
+#if defined(RP2040_PLATFORM)
+  File file = fs->open(filename, "r");
+#else
   File file = fs->open(filename);
+#endif
   if (file) {
     uint8_t pad[8];
 
@@ -72,6 +76,8 @@ void CommonCLI::savePrefs(FILESYSTEM* fs) {
 #if defined(NRF52_PLATFORM)
   File file = fs->open("/com_prefs", FILE_O_WRITE);
   if (file) { file.seek(0); file.truncate(); }
+#elif defined(RP2040_PLATFORM)
+  File file = fs->open("/com_prefs", "w");
 #else
   File file = fs->open("/com_prefs", "w", true);
 #endif
@@ -155,6 +161,8 @@ void CommonCLI::handleCommand(uint32_t sender_timestamp, const char* command, ch
       } else {
         strcpy(reply, "(ERR: clock cannot go backwards)");
       }
+    } else if (memcmp(command, "neighbors", 9) == 0) {
+      _callbacks->formatNeighborsReply(reply);
     } else if (memcmp(command, "password ", 9) == 0) {
       // change admin password
       StrHelper::strncpy(_prefs->password, &command[9], sizeof(_prefs->password));

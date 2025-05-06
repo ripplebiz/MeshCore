@@ -1506,6 +1506,7 @@ public:
       }
       _serial->writeFrame(out_frame, dp - (char *)out_frame);
     } else if (cmd_frame[0] == CMD_SET_CUSTOM_VAR && len >= 4) {
+      cmd_frame[len] =  0;
       char* sp = (char *) &cmd_frame[1];
       char* np = strchr(sp, ':');  // look for separator char
       if (np) {

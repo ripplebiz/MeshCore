@@ -187,7 +187,7 @@ const char* T1000SensorManager::getSettingValue(int i) const {
 bool T1000SensorManager::setSettingValue(const char* name, const char* value) {
   if (strcmp(name, "gps") == 0) {
     if (strcmp(value, "0") == 0) {
-      stop_gps();   // or should this be sleep_gps() ??
+      sleep_gps(); // sleep for faster fix !
     } else {
       start_gps();
     }

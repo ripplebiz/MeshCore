@@ -876,6 +876,11 @@ public:
 
     loadMainIdentity();
 
+    // use hex of first 4 bytes of identity public key as default node name
+    char pub_key_hex[10];
+    mesh::Utils::toHex(pub_key_hex, self_id.pub_key, 4);
+    strcpy(_prefs.node_name, pub_key_hex);
+
     // load persisted prefs
     if (_fs->exists("/new_prefs")) {
       loadPrefsInt("/new_prefs");   // new filename

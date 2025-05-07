@@ -91,7 +91,7 @@
 #define LED_A_ON HIGH
 #define rtos_free free
 #define rtos_malloc malloc
-//SPIClass SPI1(HSPI);
+SPIClass SPI1(HSPI);
 #endif
 class ST7789Spi : public OLEDDisplay {
   private:

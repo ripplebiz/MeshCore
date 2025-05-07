@@ -61,29 +61,21 @@
 #define  PUBLIC_GROUP_PSK  "izOH6cXN6mrJ5e26oRXNcg=="
 
 #ifdef DISPLAY_CLASS
-  #include "UITask.h"
 
-  #if(DISPLAY_CLASS == ST7789)
+  #if defined(ST7789_Display)
     #include <helpers/ui/ST7789Display.h>
   #elif defined(HAS_GxEPD)
     #include <helpers/ui/GxEPDDisplay.h>
-  #endif
-
-  #if(DISPLAY_CLASS == SH1106Display)
+  #elif defined(SH1106_DISPLAY)
     #include <helpers/ui/SH1106Display.h>
-  #endif
-
-  #if(DISPLAY_CLASS == SSD1306Display)
+  #else
     #include <helpers/ui/SSD1306Display.h>
   #endif
-  static DISPLAY_CLASS display;
-  #define HAS_UI
-#endif
 
-#if defined(HAS_UI)
   #include "UITask.h"
 
-  static UITask ui_task(&board);
+  static DISPLAY_CLASS display;
+  static UITask ui_task(display);
 #endif
 
 // Believe it or not, this std C function is busted on some platforms!

@@ -1,5 +1,6 @@
 #include <Arduino.h>
 #include "target.h"
+#include <helpers/sensors/MicroNMEALocationProvider.h>
 
 T1000eBoard board;
 

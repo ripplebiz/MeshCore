@@ -2,22 +2,21 @@
 
 #define RADIOLIB_STATIC_ONLY 1
 #include <RadioLib.h>
-#include <helpers/radiolib/RadioLibWrappers.h>
-#include <T1000eBoard.h>
-#include <helpers/radiolib/CustomLR1110Wrapper.h>
-#include <helpers/ArduinoHelpers.h>
+#include <helpers/RadioLibWrappers.h>
+#include <helpers/HeltecV3Board.h>
+#include <helpers/CustomSX1262Wrapper.h>
+#include <helpers/AutoDiscoverRTCClock.h>
 #include <helpers/SensorManager.h>
 #include <helpers/sensors/LocationProvider.h>
 
-class T1000SensorManager: public SensorManager {
+class HWTSensorManager : public SensorManager {
   bool gps_active = false;
-  LocationProvider * _nmea;
+  LocationProvider * _location;
 
   void start_gps();
-  void sleep_gps();
   void stop_gps();
 public:
-  T1000SensorManager(LocationProvider &nmea): _nmea(&nmea) { }
+  HWTSensorManager(LocationProvider &location): _location(&location) { }
   bool begin() override;
   bool querySensors(uint8_t requester_permissions, CayenneLPP& telemetry) override;
   void loop() override;
@@ -27,10 +26,10 @@ public:
   bool setSettingValue(const char* name, const char* value) override;
 };
 
-extern T1000eBoard board;
+extern HeltecV3Board board;
 extern WRAPPER_CLASS radio_driver;
-extern VolatileRTCClock rtc_clock;
-extern T1000SensorManager sensors;
+extern AutoDiscoverRTCClock rtc_clock;
+extern HWTSensorManager sensors;
 
 bool radio_init();
 uint32_t radio_get_rng_seed();

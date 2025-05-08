@@ -9,7 +9,7 @@ public:
   const char* getManufacturerName() const override {
     return "LILYGO T-LoRa V2.1-1.6";
   }
-  
+
   uint16_t getBattMilliVolts() override {
     analogReadResolution(12);
 

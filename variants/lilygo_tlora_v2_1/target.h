@@ -2,9 +2,9 @@
 
 #define RADIOLIB_STATIC_ONLY 1
 #include <RadioLib.h>
-#include <helpers/RadioLibWrappers.h>
-#include <helpers/LilyGoTLoraBoard.h>
-#include <helpers/CustomSX1276Wrapper.h>
+#include <helpers/radiolib/RadioLibWrappers.h>
+#include <LilyGoTLoraBoard.h>
+#include <helpers/radiolib/CustomSX1276Wrapper.h>
 #include <helpers/AutoDiscoverRTCClock.h>
 #include <helpers/SensorManager.h>
 

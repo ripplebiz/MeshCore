@@ -1,6 +1,6 @@
 #pragma once
 
-#include <helpers/ESP32Board.h>
+#include <ESP32Board.h>
 #include <helpers/esp32/ESPNOWRadio.h>
 #include <helpers/SensorManager.h>
 

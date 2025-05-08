@@ -2,44 +2,27 @@
 
 #include <Arduino.h>
 
-// LoRa radio module pins for Heltec V3
-#define  P_LORA_DIO_1   14
-#define  P_LORA_NSS      8
-#define  P_LORA_RESET   RADIOLIB_NC
-#define  P_LORA_BUSY    13
-#define  P_LORA_SCLK     9
-#define  P_LORA_MISO    11
-#define  P_LORA_MOSI    10
+// LoRa radio module pins for Heltec V2
+#define  P_LORA_DIO_1   26    // DIO0
+#define  P_LORA_NSS     18
+#define  P_LORA_RESET   RADIOLIB_NC  // 14
+#define  P_LORA_BUSY    RADIOLIB_NC
+#define  P_LORA_SCLK     5
+#define  P_LORA_MISO    19
+#define  P_LORA_MOSI    27
 
 // built-ins
-#define  PIN_VBAT_READ    1
-#define  PIN_ADC_CTRL    37
-#define  PIN_ADC_CTRL_ACTIVE    LOW
-#define  PIN_ADC_CTRL_INACTIVE  HIGH
-#define  PIN_LED_BUILTIN 35
-#define  PIN_VEXT_EN     36
+#define  PIN_VBAT_READ   37
+#define  PIN_LED_BUILTIN 25
 
 #include "ESP32Board.h"
 
 #include <driver/rtc_io.h>
 
-class HeltecV3Board : public ESP32Board {
-private:
-  bool adc_active_state;
-
+class HeltecV2Board : public ESP32Board {
 public:
   void begin() {
     ESP32Board::begin();
-
-    // Auto-detect correct ADC_CTRL pin polarity (different for boards >3.2)
-    pinMode(PIN_ADC_CTRL, INPUT);
-    adc_active_state = !digitalRead(PIN_ADC_CTRL);
-    
-    pinMode(PIN_ADC_CTRL, OUTPUT);
-    digitalWrite(PIN_ADC_CTRL, !adc_active_state); // Initially inactive
-
-    pinMode(PIN_VEXT_EN, OUTPUT);
-    digitalWrite(PIN_VEXT_EN, LOW);  // for V3.2 boards
 
     esp_reset_reason_t reason = esp_reset_reason();
     if (reason == ESP_RST_DEEPSLEEP) {
@@ -56,7 +39,7 @@ public:
   void enterDeepSleep(uint32_t secs, int pin_wake_btn = -1) {
     esp_sleep_pd_config(ESP_PD_DOMAIN_RTC_PERIPH, ESP_PD_OPTION_ON);
 
-    // Make sure the DIO1 and NSS GPIOs are hold on required levels during deep sleep 
+    // Make sure the DIO1 and NSS GPIOs are hold on required levels during deep sleep
     rtc_gpio_set_direction((gpio_num_t)P_LORA_DIO_1, RTC_GPIO_MODE_INPUT_ONLY);
     rtc_gpio_pulldown_en((gpio_num_t)P_LORA_DIO_1);
 
@@ -76,14 +59,8 @@ public:
     esp_deep_sleep_start();   // CPU halts here and never returns!
   }
 
-  void powerOff() override {
-    // TODO: re-enable this when there is a definite wake-up source pin:
-    //  enterDeepSleep(0);
-  }
-
   uint16_t getBattMilliVolts() override {
     analogReadResolution(10);
-    digitalWrite(PIN_ADC_CTRL, adc_active_state);
 
     uint32_t raw = 0;
     for (int i = 0; i < 8; i++) {
@@ -91,12 +68,10 @@ public:
     }
     raw = raw / 8;
 
-    digitalWrite(PIN_ADC_CTRL, !adc_active_state);
-
-    return (5.2 * (3.3 / 1024.0) * raw) * 1000;
+    return (1.883 * (2 / 1024.0) * raw) * 1000;
   }
 
   const char* getManufacturerName() const override {
-    return "Heltec V3";
+    return "Heltec V2";
   }
 };

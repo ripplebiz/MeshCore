@@ -3,10 +3,11 @@
 #include "ESP32Board.h"
 
 #if defined(ADMIN_PASSWORD)   // Repeater or Room Server only
+
 #include <WiFi.h>
 #include <AsyncTCP.h>
 #include <ESPAsyncWebServer.h>
-#include <AsyncElegantOTA.h>
+#include <ElegantOTA.h>
 
 bool ESP32Board::startOTAUpdate(const char* id, char reply[]) {
   WiFi.softAP("MeshCore-OTA", NULL);
@@ -25,8 +26,8 @@ bool ESP32Board::startOTAUpdate(const char* id, char reply[]) {
     request->send(200, "text/html", home_buf);
   });
 
-  AsyncElegantOTA.setID(id_buf);
-  AsyncElegantOTA.begin(server);    // Start ElegantOTA
+  //ElegantOTA.setID(id_buf);
+  ElegantOTA.begin(server);    // Start ElegantOTA
   server->begin();
 
   return true;

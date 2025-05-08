@@ -1,6 +1,6 @@
 #pragma once
 
-#include <helpers/ESP32Board.h>
+#include <ESP32Board.h>
 #include <Arduino.h>
 
 // LoRa radio module pins for custom Seeduino XiaoC3 build

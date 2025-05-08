@@ -53,9 +53,9 @@ class TBeamS3SupremeBoard : public ESP32Board {
 
 public:
   void begin() {
-    
+
     bool power_init();
-    
+
     ESP32Board::begin();
 
     esp_reset_reason_t reason = esp_reset_reason();

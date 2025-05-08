@@ -11,10 +11,10 @@
 #define  P_LORA_SCLK      19
 #define  P_LORA_MISO      23
 #define  P_LORA_MOSI      22
-#define  SX126X_POWER_EN  37
+#define  SX126X_POWER_EN  21
 
 #define SX126X_DIO2_AS_RF_SWITCH  true
-#define SX126X_DIO3_TCXO_VOLTAGE   1.8
+#define SX126X_DIO3_TCXO_VOLTAGE   3.3
 
 // built-ins
 #define VBAT_MV_PER_LSB   (0.73242188F)   // 3.0V ADC range and 12-bit ADC resolution = 3000mV/4096

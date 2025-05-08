@@ -1,9 +1,9 @@
 #pragma once
 
 #include <RadioLib.h>
-#include <helpers/RadioLibWrappers.h>
-#include <helpers/TBeamS3SupremeBoard.h>
-#include <helpers/CustomSX1262Wrapper.h>
+#include <helpers/radiolib/RadioLibWrappers.h>
+#include <TBeamS3SupremeBoard.h>
+#include <helpers/radiolib/CustomSX1262Wrapper.h>
 #include <helpers/AutoDiscoverRTCClock.h>
 #include <helpers/SensorManager.h>
 

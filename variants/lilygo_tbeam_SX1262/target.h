@@ -2,9 +2,9 @@
 
 #define RADIOLIB_STATIC_ONLY 1
 #include <RadioLib.h>
-#include <helpers/RadioLibWrappers.h>
-#include <helpers/TBeamBoardSX1262.h>
-#include <helpers/CustomSX1262Wrapper.h>
+#include <helpers/radiolib/RadioLibWrappers.h>
+#include <TBeamBoardSX1262.h>
+#include <helpers/radiolib/CustomSX1262Wrapper.h>
 #include <helpers/AutoDiscoverRTCClock.h>
 #include <helpers/SensorManager.h>
 

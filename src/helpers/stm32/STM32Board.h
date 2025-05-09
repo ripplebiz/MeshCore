@@ -25,5 +25,5 @@ public:
   void reboot() override {
   }
 
-  bool startOTAUpdate(const char* id, char reply[]) override {};
+  bool startOTAUpdate(const char* id, char reply[]) override { return false; };
 };

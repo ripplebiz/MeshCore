@@ -1,6 +1,6 @@
 Import("env")
 
-# Custom HEX from ELF
+# Make custom HEX from ELF
 env.AddPostAction(
     "$BUILD_DIR/${PROGNAME}.elf",
     env.VerboseAction(" ".join([

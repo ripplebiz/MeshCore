@@ -144,7 +144,7 @@ void UITask::renderCurrScreen() {
     // version info
     _display->setColor(DisplayDriver::LIGHT);
     _display->setTextSize(1);
-    int textWidth = strlen(_version_info) * 5; // Assuming each character is 5 pixels wide
+    uint16_t textWidth = _display->getTextWidth(_version_info);
     _display->setCursor((_display->width() - textWidth) / 2, 22);
     _display->print(_version_info);
   } else {  // home screen

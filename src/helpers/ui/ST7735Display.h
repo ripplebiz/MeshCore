@@ -2,26 +2,34 @@
 
 #include "DisplayDriver.h"
 #include <Wire.h>
+#include <SPI.h>
 #include <Adafruit_GFX.h>
-#define SSD1306_NO_SPLASH
-#include <Adafruit_SSD1306.h>
+#include <Adafruit_ST7735.h>
+#include <helpers/RefCountedDigitalPin.h>
 
-#ifndef PIN_OLED_RESET
-  #define PIN_OLED_RESET        21 // Reset pin # (or -1 if sharing Arduino reset pin)
-#endif
-
-#ifndef DISPLAY_ADDRESS
-  #define DISPLAY_ADDRESS   0x3C
-#endif
-
-class SSD1306Display : public DisplayDriver {
-  Adafruit_SSD1306 display;
+class ST7735Display : public DisplayDriver {
+  Adafruit_ST7735 display;
   bool _isOn;
-  uint8_t _color;
+  uint16_t _color;
+  RefCountedDigitalPin* _peripher_power;
 
   bool i2c_probe(TwoWire& wire, uint8_t addr);
 public:
-  SSD1306Display() : DisplayDriver(128, 64), display(128, 64, &Wire, PIN_OLED_RESET) { _isOn = false; }
+#ifdef USE_PIN_TFT
+  ST7735Display(RefCountedDigitalPin* peripher_power=NULL) : DisplayDriver(128, 64), 
+      display(PIN_TFT_CS, PIN_TFT_DC, PIN_TFT_SDA, PIN_TFT_SCL, PIN_TFT_RST),
+      _peripher_power(peripher_power)
+  {
+    _isOn = false;
+  }
+#else
+  ST7735Display(RefCountedDigitalPin* peripher_power=NULL) : DisplayDriver(128, 64),
+      display(&SPI1, PIN_TFT_CS, PIN_TFT_DC, PIN_TFT_RST),
+      _peripher_power(peripher_power)
+  {
+    _isOn = false;
+  }
+#endif
   bool begin();
 
   bool isOn() override { return _isOn; }

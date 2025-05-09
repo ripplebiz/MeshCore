@@ -51,14 +51,14 @@ void UITask::renderCurrScreen() {
     // version info
     _display->setColor(DisplayDriver::LIGHT);
     _display->setTextSize(1);
-    int versionWidth = strlen(_version_info) * 6;
+    uint16_t versionWidth = _display->getTextWidth(_version_info);
     _display->setCursor((_display->width() - versionWidth) / 2, 22);
     _display->print(_version_info);
 
     // node type
     const char* node_type = "< Repeater >";
-    int nodeTypeWidth = strlen(node_type) * 6;
-    _display->setCursor((_display->width() - nodeTypeWidth) / 2, 35);
+    uint16_t typeWidth = _display->getTextWidth(node_type);
+    _display->setCursor((_display->width() - typeWidth) / 2, 35);
     _display->print(node_type);
   } else {  // home screen
     // node name

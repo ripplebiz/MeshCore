@@ -14,9 +14,8 @@ class ST7789Display : public DisplayDriver {
 
   bool i2c_probe(TwoWire& wire, uint8_t addr);
 public:
-  ST7789Display() : DisplayDriver(135, 240), display(&SPI1, PIN_TFT_RST, PIN_TFT_DC, PIN_TFT_CS, GEOMETRY_RAWMODE, 240, 135) {_isOn = false;}
+  ST7789Display() : DisplayDriver(128, 64), display(&SPI1, PIN_TFT_RST, PIN_TFT_DC, PIN_TFT_CS, GEOMETRY_RAWMODE, 240, 135) {_isOn = false;}
 
-//  ST7789Display() : DisplayDriver(135, 240), display(PIN_TFT_CS, PIN_TFT_DC, PIN_TFT_SDA, PIN_TFT_SCL, PIN_TFT_RST) { _isOn = false; }
   bool begin();
 
   bool isOn() override { return _isOn; }
@@ -31,5 +30,6 @@ public:
   void fillRect(int x, int y, int w, int h) override;
   void drawRect(int x, int y, int w, int h) override;
   void drawXbm(int x, int y, const uint8_t* bits, int w, int h) override;
+  uint16_t getTextWidth(const char* str) override;
   void endFrame() override;
 };

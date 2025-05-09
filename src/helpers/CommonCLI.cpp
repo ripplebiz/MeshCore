@@ -208,7 +208,7 @@ void CommonCLI::handleCommand(uint32_t sender_timestamp, const char* command, ch
         sprintf(reply, "> %s", StrHelper::ftoa(_prefs->freq));
       } else if (memcmp(config, "public.key", 10) == 0) {
         strcpy(reply, "> ");
-        mesh::Utils::toHex(&reply[2], _mesh->self_id.pub_key, PUB_KEY_SIZE);
+        mesh::Utils::toHex(&reply[2], _callbacks->getSelfIdPubKey(), PUB_KEY_SIZE);
       } else if (memcmp(config, "role", 4) == 0) {
         sprintf(reply, "> %s", _callbacks->getRole());
       } else {

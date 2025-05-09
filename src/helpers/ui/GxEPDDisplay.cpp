@@ -1,11 +1,23 @@
 
 #include "GxEPDDisplay.h"
 
+#ifndef DISPLAY_ROTATION
+  #define DISPLAY_ROTATION 3
+#endif
+
+#ifdef TECHO_ZOOM
+  #define SCALE_X   (1.5625f * 1.5f)   //  200 / 128  (with 1.5 scale)
+  #define SCALE_Y   (1.5625f * 1.5f)   //  200 / 128  (with 1.5 scale)
+#else
+  #define SCALE_X   1.5625f   //  200 / 128
+  #define SCALE_Y   1.5625f   //  200 / 128
+#endif
+
 bool GxEPDDisplay::begin() {
   display.epd2.selectSPI(SPI1, SPISettings(4000000, MSBFIRST, SPI_MODE0));
   SPI1.begin();
   display.init(115200, true, 2, false);
-  display.setRotation(3);
+  display.setRotation(DISPLAY_ROTATION);
   #ifdef TECHO_ZOOM
     display.setFont(&FreeMono9pt7b);
   #endif
@@ -53,11 +65,7 @@ void GxEPDDisplay::setColor(Color c) {
 }
 
 void GxEPDDisplay::setCursor(int x, int y) {
-#ifdef TECHO_ZOOM
-  x = x + (x >> 1);
-  y = y + (y >> 1);
-#endif
-  display.setCursor(x, (y+10));
+  display.setCursor(x*SCALE_X, (y+10)*SCALE_Y);
 }
 
 void GxEPDDisplay::print(const char* str) {
@@ -65,33 +73,22 @@ void GxEPDDisplay::print(const char* str) {
 }
 
 void GxEPDDisplay::fillRect(int x, int y, int w, int h) {
-#ifdef TECHO_ZOOM
-  x = x + (x >> 1);
-  y = y + (y >> 1);
-  w = w + (w >> 1);
-  h = h + (h >> 1);
-#endif
-  display.fillRect(x, y, w, h, GxEPD_BLACK);
+  display.fillRect(x*SCALE_X, y*SCALE_Y, w*SCALE_X, h*SCALE_Y, GxEPD_BLACK);
 }
 
 void GxEPDDisplay::drawRect(int x, int y, int w, int h) {
-#ifdef TECHO_ZOOM
-  x = x + (x >> 1);
-  y = y + (y >> 1);
-  w = w + (w >> 1);
-  h = h + (h >> 1);
-#endif
-  display.drawRect(x, y, w, h, GxEPD_BLACK);
+  display.drawRect(x*SCALE_X, y*SCALE_Y, w*SCALE_X, h*SCALE_Y, GxEPD_BLACK);
 }
 
 void GxEPDDisplay::drawXbm(int x, int y, const uint8_t* bits, int w, int h) {
-#ifdef TECHO_ZOOM
-  x = x + (x >> 1);
-  y = y + (y >> 1);
-  w = w + (w >> 1);
-  h = h + (h >> 1);
-#endif
-  display.drawBitmap(x*1.5, (y*1.5) + 10, bits, w, h, GxEPD_BLACK);
+  display.drawBitmap(x*SCALE_X, (y*SCALE_Y) + 10, bits, w, h, GxEPD_BLACK);
+}
+
+uint16_t GxEPDDisplay::getTextWidth(const char* str) {
+  int16_t x1, y1;
+  uint16_t w, h;
+  display.getTextBounds(str, 0, 0, &x1, &y1, &w, &h);
+  return w / SCALE_X;
 }
 
 void GxEPDDisplay::endFrame() {

@@ -242,7 +242,7 @@ class ST7789Spi : public OLEDDisplay {
     }
 
  virtual void resetOrientation() {
-	uint8_t madctl = ST77XX_MADCTL_RGB|ST77XX_MADCTL_MV|ST77XX_MADCTL_MX;
+	uint8_t madctl = ST77XX_MADCTL_RGB|ST77XX_MADCTL_MV;
 	sendCommand(ST77XX_MADCTL);
 	WriteData(madctl);
 	delay(10);
@@ -263,13 +263,13 @@ class ST7789Spi : public OLEDDisplay {
   }
 
   virtual void landscapeScreen() {
-
-    
-    uint8_t madctl = ST77XX_MADCTL_RGB;
+    // For landscape mode rotated 180 degrees with correct text direction
+    // MV swaps rows/columns for landscape orientation
+    // Adding MX (instead of MY) flips X axis and rotates 180 degrees
+    uint8_t madctl = ST77XX_MADCTL_RGB | ST77XX_MADCTL_MV | ST77XX_MADCTL_MX;
     sendCommand(ST77XX_MADCTL);
     WriteData(madctl);
     delay(10);
-
     }
   
 
@@ -325,20 +325,25 @@ class ST7789Spi : public OLEDDisplay {
         WriteData(0x55); 
         delay(10);
         
-        sendCommand(ST77XX_MADCTL); //  4: Mem access ctrl (directions), Row/col addr, bottom-top refresh
-        WriteData(0x08); 
+        // Initialize with landscape orientation rotated 180 degrees
+        uint8_t madctl = ST77XX_MADCTL_RGB | ST77XX_MADCTL_MV | ST77XX_MADCTL_MX;
+        sendCommand(ST77XX_MADCTL); //  4: Mem access ctrl (directions)
+        WriteData(madctl);
+        delay(10);
         
-        sendCommand(ST77XX_CASET); //   5: Column addr set, 
+        // Set column address range for landscape orientation (240 pixels wide)
+        sendCommand(ST77XX_CASET); //   5: Column addr set
         WriteData(0x00); 
         WriteData(0x00);         //    XSTART = 0
         WriteData(0x00); 
         WriteData(240);          //     XEND = 240
         
-        sendCommand(ST77XX_RASET); //   6: Row addr set, 
+        // Set row address range for landscape orientation (135 pixels tall)
+        sendCommand(ST77XX_RASET); //   6: Row addr set
         WriteData(0x00); 
         WriteData(0x00);         //    YSTART = 0
-        WriteData(320>>8); 
-        WriteData(320&0xFF);          //    YSTART = 320
+        WriteData(0x00);
+        WriteData(135);          //    YEND = 135
         
         sendCommand(ST77XX_SLPOUT); //  7: hack
         delay(10);
@@ -352,11 +357,8 @@ class ST7789Spi : public OLEDDisplay {
         sendCommand(ST77XX_INVON); //  10: invert
         delay(10);
 
-        //uint8_t madctl = ST77XX_MADCTL_RGB|ST77XX_MADCTL_MX;
-        uint8_t madctl = ST77XX_MADCTL_RGB|ST77XX_MADCTL_MV|ST77XX_MADCTL_MX;
-        sendCommand(ST77XX_MADCTL);
-        WriteData(madctl);
-        delay(10);
+        // Use landscape mode instead of portrait
+        landscapeScreen();
         setRGB(ST77XX_GREEN);
     }
 
@@ -366,6 +368,7 @@ class ST7789Spi : public OLEDDisplay {
    void setAddrWindow(uint16_t x, uint16_t y, uint16_t w, uint16_t h) {
     x += (320-displayWidth)/2;
     y += (240-displayHeight)/2;
+    
     uint32_t xa = ((uint32_t)x << 16) | (x + w - 1);
     uint32_t ya = ((uint32_t)y << 16) | (y + h - 1);
 

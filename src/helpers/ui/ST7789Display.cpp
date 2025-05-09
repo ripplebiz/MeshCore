@@ -3,8 +3,15 @@
 #include "ST7789Display.h"
 
 #ifndef X_OFFSET
-#define X_OFFSET 16
+#define X_OFFSET 0  // No offset needed for landscape
 #endif
+
+#ifndef Y_OFFSET
+#define Y_OFFSET 1  // Vertical offset to prevent top row cutoff
+#endif
+
+#define SCALE_X  1.875f     // 240 / 128
+#define SCALE_Y  2.109375f   // 135 / 64
 
 bool ST7789Display::begin() {
   if(!_isOn) {
@@ -46,13 +53,13 @@ void ST7789Display::startFrame(Color bkg) {
 void ST7789Display::setTextSize(int sz) {
   switch(sz) {
     case 1 :
-      display.setFont(ArialMT_Plain_10);
+      display.setFont(ArialMT_Plain_16);
       break;
     case 2 :
       display.setFont(ArialMT_Plain_24);
       break;
     default:
-      display.setFont(ArialMT_Plain_10);
+      display.setFont(ArialMT_Plain_16);
   }
 }
 
@@ -87,8 +94,8 @@ void ST7789Display::setColor(Color c) {
 }
 
 void ST7789Display::setCursor(int x, int y) {
-  _x = x + X_OFFSET;
-  _y = y;
+  _x = x*SCALE_X + X_OFFSET;
+  _y = y*SCALE_Y + Y_OFFSET;
 }
 
 void ST7789Display::print(const char* str) {
@@ -96,15 +103,51 @@ void ST7789Display::print(const char* str) {
 }
 
 void ST7789Display::fillRect(int x, int y, int w, int h) {
-  display.fillRect(x + X_OFFSET, y, w, h);
+  display.fillRect(x*SCALE_X + X_OFFSET, y*SCALE_Y + Y_OFFSET, w*SCALE_X, h*SCALE_Y);
 }
 
 void ST7789Display::drawRect(int x, int y, int w, int h) {
-  display.drawRect(x + X_OFFSET, y, w, h);
+  display.drawRect(x*SCALE_X + X_OFFSET, y*SCALE_Y + Y_OFFSET, w*SCALE_X, h*SCALE_Y);
 }
 
 void ST7789Display::drawXbm(int x, int y, const uint8_t* bits, int w, int h) {
-  display.drawBitmap(x+X_OFFSET, y, w, h, bits);
+  // Calculate the base position in display coordinates
+  uint16_t startX = x * SCALE_X + X_OFFSET;
+  uint16_t startY = y * SCALE_Y + Y_OFFSET;
+  
+  // Width in bytes for bitmap processing
+  uint16_t widthInBytes = (w + 7) / 8;
+  
+  // Process the bitmap row by row
+  for (uint16_t by = 0; by < h; by++) {
+    // Calculate the target y-coordinates for this logical row
+    int y1 = startY + (int)(by * SCALE_Y);
+    int y2 = startY + (int)((by + 1) * SCALE_Y);
+    int block_h = y2 - y1;
+    
+    // Scan across the row bit by bit
+    for (uint16_t bx = 0; bx < w; bx++) {
+      // Calculate the target x-coordinates for this logical column
+      int x1 = startX + (int)(bx * SCALE_X);
+      int x2 = startX + (int)((bx + 1) * SCALE_X);
+      int block_w = x2 - x1;
+      
+      // Get the current bit
+      uint16_t byteOffset = (by * widthInBytes) + (bx / 8);
+      uint8_t bitMask = 0x80 >> (bx & 7);
+      bool bitSet = pgm_read_byte(bits + byteOffset) & bitMask;
+      
+      // If the bit is set, draw a block of pixels
+      if (bitSet) {
+        // Draw the block as a filled rectangle
+        display.fillRect(x1, y1, block_w, block_h);
+      }
+    }
+  }
+}
+
+uint16_t ST7789Display::getTextWidth(const char* str) {
+  return display.getStringWidth(str) / SCALE_X;
 }
 
 void ST7789Display::endFrame() {

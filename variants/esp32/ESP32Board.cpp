@@ -9,6 +9,8 @@
 #include <ESPAsyncWebServer.h>
 #include <ElegantOTA.h>
 
+#include <SPIFFS.h>
+
 bool ESP32Board::startOTAUpdate(const char* id, char reply[]) {
   WiFi.softAP("MeshCore-OTA", NULL);
 
@@ -24,6 +26,9 @@ bool ESP32Board::startOTAUpdate(const char* id, char reply[]) {
 
   server->on("/", HTTP_GET, [](AsyncWebServerRequest *request) {
     request->send(200, "text/html", home_buf);
+  });
+  server->on("/log", HTTP_GET, [](AsyncWebServerRequest *request) {
+    request->send(SPIFFS, "/packet_log", "text/plain");
   });
 
   //ElegantOTA.setID(id_buf);

@@ -1,7 +1,7 @@
 #include <Arduino.h>   // needed for PlatformIO
 #include <Mesh.h>
 
-#if defined(NRF52_PLATFORM)
+#if defined(NRF52_PLATFORM) || defined(STM32_PLATFORM)
   #include <InternalFileSystem.h>
 #elif defined(RP2040_PLATFORM)
   #include <LittleFS.h>
@@ -280,7 +280,7 @@ class MyMesh : public BaseChatMesh {
   }
 
   void saveContacts() {
-#if defined(NRF52_PLATFORM)
+#if defined(NRF52_PLATFORM) || defined(STM32_PLATFORM)
     File file = _fs->open("/contacts3", FILE_O_WRITE);
     if (file) { file.seek(0); file.truncate(); }
 #elif defined(RP2040_PLATFORM)
@@ -345,7 +345,7 @@ class MyMesh : public BaseChatMesh {
   }
 
   void saveChannels() {
-  #if defined(NRF52_PLATFORM)
+  #if defined(NRF52_PLATFORM) || defined(STM32_PLATFORM)
     File file = _fs->open("/channels2", FILE_O_WRITE);
     if (file) { file.seek(0); file.truncate(); }
   #elif defined(RP2040_PLATFORM)
@@ -402,7 +402,7 @@ class MyMesh : public BaseChatMesh {
     mesh::Utils::toHex(fname, key, key_len);
     sprintf(path, "/bl/%s", fname);
 
-  #if defined(NRF52_PLATFORM)
+  #if defined(NRF52_PLATFORM) || defined(STM32_PLATFORM)
     File f = _fs->open(path, FILE_O_WRITE);
     if (f) { f.seek(0); f.truncate(); }
   #elif defined(RP2040_PLATFORM)
@@ -895,7 +895,7 @@ public:
   }
 
   void savePrefs() {
-#if defined(NRF52_PLATFORM)
+#if defined(NRF52_PLATFORM) || defined(STM32_PLATFORM)
     File file = _fs->open("/new_prefs", FILE_O_WRITE);
     if (file) { file.seek(0); file.truncate(); }
 #elif defined(RP2040_PLATFORM)
@@ -1540,6 +1540,9 @@ public:
     #include <helpers/ArduinoSerialInterface.h>
     ArduinoSerialInterface serial_interface;
   #endif
+#elif defined(STM32_PLATFORM)
+  #include <helpers/ArduinoSerialInterface.h>
+  ArduinoSerialInterface serial_interface;
 #else
   #error "need to define a serial interface"
 #endif
@@ -1573,7 +1576,7 @@ void setup() {
 
   fast_rng.begin(radio_get_rng_seed());
 
-#if defined(NRF52_PLATFORM)
+#if defined(NRF52_PLATFORM) || defined(STM32_PLATFORM)
   InternalFS.begin();
   the_mesh.begin(InternalFS,
     #ifdef HAS_UI

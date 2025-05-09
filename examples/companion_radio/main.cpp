@@ -833,7 +833,7 @@ public:
 
     BaseChatMesh::begin();
 
-  #if defined(NRF52_PLATFORM)
+  #if defined(NRF52_PLATFORM) || defined(STM32_PLATFORM)
     _identity_store = new IdentityStore(fs, "");
   #elif defined(RP2040_PLATFORM)
     _identity_store = new IdentityStore(fs, "/identity");

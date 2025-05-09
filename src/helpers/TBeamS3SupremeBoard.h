@@ -38,6 +38,8 @@
 #define P_GPS_WAKE  7   //GPS Wakeup pin
 #define P_GPS_1PPS  6   //GPS 1PPS pin
 
+#define GPS_BAUD_RATE 9600
+
 //I2C Wire addresses
 #define I2C_BME280_ADD    0x76  //BME280 sensor I2C address on Wire
 #define I2C_OLED_ADD      0x3C  //SH1106 OLED I2C address on Wire
@@ -93,10 +95,13 @@ public:
     esp_deep_sleep_start();   // CPU halts here and never returns!
   }
 
-  uint16_t getBattMilliVolts() override {
-
-    return 0;
-  }
+  // uint16_t getBattMilliVolts() override {
+  //   PMU->enableBattVoltageMeasure();
+  //   uint16_t batVolt = PMU->getBattVoltage();
+  //   PMU->disableBattVoltageMeasure();
+  //   Serial.println("Battery Voltage: "+ batVolt);
+  //   return batVolt;
+  // }
 
   const char* getManufacturerName() const override {
     return "LilyGo T-Beam S3 Supreme SX1262";

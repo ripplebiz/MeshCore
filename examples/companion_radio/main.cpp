@@ -60,9 +60,11 @@
 
 #define  PUBLIC_GROUP_PSK  "izOH6cXN6mrJ5e26oRXNcg=="
 
-#ifdef DISPLAY_CLASS
-
-  #if defined(ST7789_Display)
+#ifdef DISPLAY_CLASS      // TODO: refactor this -- move to variants/*/target
+  #include "UITask.h"
+  #ifdef ST7735_Display
+    #include <helpers/ui/ST7735Display.h>
+  #elif defined(ST7789_Display)
     #include <helpers/ui/ST7789Display.h>
   #elif defined(HAS_GxEPD)
     #include <helpers/ui/GxEPDDisplay.h>
@@ -72,9 +74,12 @@
     #include <helpers/ui/SSD1306Display.h>
   #endif
 
-  #include "UITask.h"
+  #if defined(HELTEC_LORA_V3) && defined(ST7735)
+    static DISPLAY_CLASS display(&board.periph_power);   // peripheral power pin is shared
+  #else
+    static DISPLAY_CLASS display;
+  #endif
 
-  static DISPLAY_CLASS display;
   static UITask ui_task(display);
 #endif
 
@@ -1489,9 +1494,20 @@ public:
         writeErrFrame(ERR_CODE_TABLE_FULL);
       }
     } else if (cmd_frame[0] == CMD_SET_DEVICE_PIN && len >= 5) {
-      memcpy(&_prefs.ble_pin, &cmd_frame[1], 4);
-      savePrefs();
-      writeOKFrame();
+
+      // get pin from command frame
+      uint32_t pin;
+      memcpy(&pin, &cmd_frame[1], 4);
+
+      // ensure pin is zero, or a valid 6 digit pin
+      if(pin == 0 || (pin >= 100000 && pin <= 999999)){
+        _prefs.ble_pin = pin;
+        savePrefs();
+        writeOKFrame();
+      } else {
+        writeErrFrame(ERR_CODE_ILLEGAL_ARG);
+      }
+      
     } else if (cmd_frame[0] == CMD_GET_CUSTOM_VARS) {
       out_frame[0] = RESP_CODE_CUSTOM_VARS;
       char* dp = (char *) &out_frame[1];

@@ -1,15 +1,30 @@
 #include <Arduino.h>
 #include "target.h"
+#include <helpers/sensors/MicroNMEALocationProvider.h>
 
-#ifndef LORA_CR
-  #define LORA_CR      5
-#endif
+TBeamS3SupremeBoard board;
 
 #if defined(P_LORA_SCLK)
   static SPIClass spi;
   RADIO_CLASS radio = new Module(P_LORA_NSS, P_LORA_DIO_1, P_LORA_RESET, P_LORA_BUSY, spi);
 #else
   RADIO_CLASS radio = new Module(P_LORA_NSS, P_LORA_DIO_1, P_LORA_RESET, P_LORA_BUSY);
+#endif
+
+WRAPPER_CLASS radio_driver(radio, board);
+
+ESP32RTCClock fallback_clock;
+AutoDiscoverRTCClock rtc_clock(fallback_clock);
+MicroNMEALocationProvider nmea = MicroNMEALocationProvider(Serial1);
+TbeamSupSensorManager sensors = TbeamSupSensorManager(nmea);
+
+#ifndef LORA_CR
+  #define LORA_CR      5
+#endif
+
+#ifdef HAS_GPS
+static bool find_gps = false;
+String gps_model = "None";
 #endif
 
 #ifdef HAS_PMU
@@ -22,12 +37,68 @@ static void setPmuFlag()
 }
 #endif
 
-WRAPPER_CLASS radio_driver(radio, board);
-TBeamS3SupremeBoard board;
-ESP32RTCClock fallback_clock;
-AutoDiscoverRTCClock rtc_clock(fallback_clock);
-SensorManager sensors;
+uint32_t deviceOnline = 0x00;
 
+
+void scanDevices(TwoWire *w)
+{
+    uint8_t err, addr;
+    int nDevices = 0;
+    uint32_t start = 0;
+
+    Serial.println("I2C Devices scanning");
+    for (addr = 1; addr < 127; addr++) {
+        start = millis();
+        w->beginTransmission(addr); delay(2);
+        err = w->endTransmission();
+        if (err == 0) {
+            nDevices++;
+            switch (addr) {
+            case 0x77:
+            case 0x76:
+                Serial.println("\tFind BMX280 Sensor!");
+                deviceOnline |= BME280_ONLINE;
+                break;
+            case 0x34:
+                Serial.println("\tFind AXP192/AXP2101 PMU!");
+                deviceOnline |= POWERMANAGE_ONLINE;
+                break;
+            case 0x3C:
+                Serial.println("\tFind SSD1306/SH1106 dispaly!");
+                deviceOnline |= DISPLAY_ONLINE;
+                break;
+            case 0x51:
+                Serial.println("\tFind PCF8563 RTC!");
+                deviceOnline |= PCF8563_ONLINE;
+                break;
+            case 0x1C:
+                Serial.println("\tFind QMC6310 MAG Sensor!");
+                deviceOnline |= QMC6310_ONLINE;
+                break;
+            default:
+                Serial.print("\tI2C device found at address 0x");
+                if (addr < 16) {
+                    Serial.print("0");
+                }
+                Serial.print(addr, HEX);
+                Serial.println(" !");
+                break;
+            }
+
+        } else if (err == 4) {
+            Serial.print("Unknow error at address 0x");
+            if (addr < 16) {
+                Serial.print("0");
+            }
+            Serial.println(addr, HEX);
+        }
+    }
+    if (nDevices == 0)
+        Serial.println("No I2C devices found\n");
+
+    Serial.println("Scan devices done.");
+    Serial.println("\n");
+}
 
 bool power_init() {
   #ifdef HAS_PMU
@@ -44,6 +115,8 @@ bool power_init() {
   if (!PMU) {
      return false;
   }
+
+  deviceOnline |= POWERMANAGE_ONLINE;
 
   PMU->setChargingLedMode(XPOWERS_CHG_LED_CTRL_CHG);
 
@@ -206,11 +279,149 @@ bool radio_init() {
   return true;  // success
 }
 
+bool l76kProbe()
+{
+    bool result = false;
+    uint32_t startTimeout ;
+    Serial1.write("$PCAS03,0,0,0,0,0,0,0,0,0,0,,,0,0*02\r\n");
+    delay(5);
+    // Get version information
+    startTimeout = millis() + 3000;
+    Serial.print("Try to init L76K . Wait stop .");
+    // Serial1.flush();
+    while (Serial1.available()) {
+        int c = Serial1.read();
+        // Serial.write(c);
+        // Serial.print(".");
+        // Serial.flush();
+        // Serial1.flush();
+        if (millis() > startTimeout) {
+            Serial.println("Wait L76K stop NMEA timeout!");
+            return false;
+        }
+    };
+    Serial.println();
+    Serial1.flush();
+    delay(200);
+
+    Serial1.write("$PCAS06,0*1B\r\n");
+    startTimeout = millis() + 500;
+    String ver = "";
+    while (!Serial1.available()) {
+        if (millis() > startTimeout) {
+            Serial.println("Get L76K timeout!");
+            return false;
+        }
+    }
+    Serial1.setTimeout(10);
+    ver = Serial1.readStringUntil('\n');
+    if (ver.startsWith("$GPTXT,01,01,02")) {
+        Serial.println("L76K GNSS init succeeded, using L76K GNSS Module\n");
+        result = true;
+    }
+    delay(500);
+
+    // Initialize the L76K Chip, use GPS + GLONASS
+    Serial1.write("$PCAS04,5*1C\r\n");
+    delay(250);
+    // only ask for RMC and GGA
+    Serial1.write("$PCAS03,1,0,0,0,1,0,0,0,0,0,,,0,0*02\r\n");
+    delay(250);
+    // Switch to Vehicle Mode, since SoftRF enables Aviation < 2g
+    Serial1.write("$PCAS11,3*1E\r\n");
+    return result;
+}
+
+void TbeamSupSensorManager::start_gps()
+{
+  gps_active = true;
+  pinMode(P_GPS_WAKE, OUTPUT);
+  digitalWrite(P_GPS_WAKE, HIGH);
+}
+
+void TbeamSupSensorManager::sleep_gps() {
+  gps_active = false;
+  pinMode(P_GPS_WAKE, OUTPUT);
+  digitalWrite(P_GPS_WAKE, LOW);
+}
+
+bool TbeamSupSensorManager::begin() {
+  // init GPS port
+
+  Serial1.begin(GPS_BAUD_RATE, SERIAL_8N1, P_GPS_RX, P_GPS_TX);
+
+  bool result = false;
+    for ( int i = 0; i < 3; ++i) {
+      result = l76kProbe();
+      if (result) {
+        gps_active = true;
+        return result;
+      }
+    }
+  return result;
+}
+
+bool TbeamSupSensorManager::querySensors(uint8_t requester_permissions, CayenneLPP& telemetry) {
+  if (requester_permissions & TELEM_PERM_LOCATION) {   // does requester have permission?
+    telemetry.addGPS(TELEM_CHANNEL_SELF, node_lat, node_lon, 0.0f);
+  }
+  return true;
+}
+
+void TbeamSupSensorManager::loop() {
+  static long next_gps_update = 0;
+
+  _nmea->loop();
+
+  if (millis() > next_gps_update) {
+    if (_nmea->isValid()) {
+      node_lat = ((double)_nmea->getLatitude())/1000000.;
+      node_lon = ((double)_nmea->getLongitude())/1000000.;
+      //Serial.printf("lat %f lon %f\r\n", _lat, _lon);
+    }
+    next_gps_update = millis() + 1000;
+  }
+}
+
+int TbeamSupSensorManager::getNumSettings() const { return 1; }  // just one supported: "gps" (power switch)
+
+const char* TbeamSupSensorManager::getSettingName(int i) const {
+  return i == 0 ? "gps" : NULL;
+}
+
+const char* TbeamSupSensorManager::getSettingValue(int i) const {
+  if (i == 0) {
+    return gps_active ? "1" : "0";
+  }
+  return NULL;
+}
+
+bool TbeamSupSensorManager::setSettingValue(const char* name, const char* value) {
+  if (strcmp(name, "gps") == 0) {
+    if (strcmp(value, "0") == 0) {
+      sleep_gps();
+    } else {
+      start_gps();
+    }
+    return true;
+  }
+  return false;  // not supported
+}
+
+
 uint16_t getBattPercent() {
   //Read the PMU fuel guage for battery %
   uint16_t battPercent = PMU->getBatteryPercent();
 
   return battPercent;
+}
+
+uint16_t getBattMilliVolts(){
+  PMU->enableBattVoltageMeasure();
+  uint16_t batVolt = PMU->getBattVoltage();
+  PMU->disableBattVoltageMeasure();
+  Serial.println("Battery Voltage: "+ batVolt);
+  return batVolt;
 }
 
 uint32_t radio_get_rng_seed() {

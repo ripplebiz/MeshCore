@@ -46,7 +46,7 @@ void scanDevices(TwoWire *w)
     int nDevices = 0;
     uint32_t start = 0;
 
-    Serial.println("I2C Devices scanning");
+    Serial.println("Scanning I2C for Devices");
     for (addr = 1; addr < 127; addr++) {
         start = millis();
         w->beginTransmission(addr); delay(2);
@@ -56,23 +56,23 @@ void scanDevices(TwoWire *w)
             switch (addr) {
             case 0x77:
             case 0x76:
-                Serial.println("\tFind BMX280 Sensor!");
+                Serial.println("\tFound BMX280 Sensor");
                 deviceOnline |= BME280_ONLINE;
                 break;
             case 0x34:
-                Serial.println("\tFind AXP192/AXP2101 PMU!");
+                Serial.println("\tFound AXP192/AXP2101 PMU");
                 deviceOnline |= POWERMANAGE_ONLINE;
                 break;
             case 0x3C:
-                Serial.println("\tFind SSD1306/SH1106 dispaly!");
+                Serial.println("\tFound SSD1306/SH1106 dispaly");
                 deviceOnline |= DISPLAY_ONLINE;
                 break;
             case 0x51:
-                Serial.println("\tFind PCF8563 RTC!");
+                Serial.println("\tFound PCF8563 RTC");
                 deviceOnline |= PCF8563_ONLINE;
                 break;
             case 0x1C:
-                Serial.println("\tFind QMC6310 MAG Sensor!");
+                Serial.println("\tFound QMC6310 MAG Sensor");
                 deviceOnline |= QMC6310_ONLINE;
                 break;
             default:
@@ -96,7 +96,7 @@ void scanDevices(TwoWire *w)
     if (nDevices == 0)
         Serial.println("No I2C devices found\n");
 
-    Serial.println("Scan devices done.");
+    Serial.println("Scan for devices is complete.");
     Serial.println("\n");
 }
 
@@ -133,7 +133,7 @@ bool power_init() {
 
   //Make sure that conflicting LDOs are off
   if (ESP_SLEEP_WAKEUP_UNDEFINED == esp_sleep_get_wakeup_cause()) {
-      Serial.println("Power cycle ALDO1/2 and BLDO");
+      //Serial.println("Power cycle ALDO1/2 and BLDO");
       PMU->disableALDO1();
       PMU->disableALDO2();
       PMU->disableBLDO1();
@@ -196,66 +196,74 @@ bool power_init() {
   PMU->enableBattVoltageMeasure();
 
   //Verify voltages on each rail
-  Serial.printf("=========================================\n");
-  if (PMU->isChannelAvailable(XPOWERS_DCDC1)) {
-      Serial.printf("DC1  : %s   Voltage: %04u mV \n",  PMU->isEnableDC1()  ? "+" : "-",  PMU->getDC1Voltage());
-  }
-  if (PMU->isChannelAvailable(XPOWERS_DCDC2)) {
-      Serial.printf("DC2  : %s   Voltage: %04u mV \n",  PMU->isEnableDC2()  ? "+" : "-",  PMU->getDC2Voltage());
-  }
-  if (PMU->isChannelAvailable(XPOWERS_DCDC3)) {
-      Serial.printf("DC3  : %s   Voltage: %04u mV \n",  PMU->isEnableDC3()  ? "+" : "-",  PMU->getDC3Voltage());
-  }
-  if (PMU->isChannelAvailable(XPOWERS_DCDC4)) {
-      Serial.printf("DC4  : %s   Voltage: %04u mV \n",  PMU->isEnableDC4()  ? "+" : "-",  PMU->getDC4Voltage());
-  }
-  if (PMU->isChannelAvailable(XPOWERS_DCDC5)) {
-      Serial.printf("DC5  : %s   Voltage: %04u mV \n",  PMU->isEnableDC5()  ? "+" : "-",  PMU->getDC5Voltage());
-  }
-  if (PMU->isChannelAvailable(XPOWERS_ALDO1)) {
-      Serial.printf("ALDO1: %s   Voltage: %04u mV \n",  PMU->isEnableALDO1()  ? "+" : "-",  PMU->getALDO1Voltage());
-  }
-  if (PMU->isChannelAvailable(XPOWERS_ALDO2)) {
-      Serial.printf("ALDO2: %s   Voltage: %04u mV \n",  PMU->isEnableALDO2()  ? "+" : "-",  PMU->getALDO2Voltage());
-  }
-  if (PMU->isChannelAvailable(XPOWERS_ALDO3)) {
-      Serial.printf("ALDO3: %s   Voltage: %04u mV \n",  PMU->isEnableALDO3()  ? "+" : "-",  PMU->getALDO3Voltage());
-  }
-  if (PMU->isChannelAvailable(XPOWERS_ALDO4)) {
-      Serial.printf("ALDO4: %s   Voltage: %04u mV \n",  PMU->isEnableALDO4()  ? "+" : "-",  PMU->getALDO4Voltage());
-  }
-  if (PMU->isChannelAvailable(XPOWERS_BLDO1)) {
-      Serial.printf("BLDO1: %s   Voltage: %04u mV \n",  PMU->isEnableBLDO1()  ? "+" : "-",  PMU->getBLDO1Voltage());
-  }
-  if (PMU->isChannelAvailable(XPOWERS_BLDO2)) {
-      Serial.printf("BLDO2: %s   Voltage: %04u mV \n",  PMU->isEnableBLDO2()  ? "+" : "-",  PMU->getBLDO2Voltage());
-  }
-  Serial.printf("=========================================\n");
+  // Serial.printf("=========================================\n");
+  // if (PMU->isChannelAvailable(XPOWERS_DCDC1)) {
+  //     Serial.printf("DC1  : %s   Voltage: %04u mV \n",  PMU->isEnableDC1()  ? "+" : "-",  PMU->getDC1Voltage());
+  // }
+  // if (PMU->isChannelAvailable(XPOWERS_DCDC2)) {
+  //     Serial.printf("DC2  : %s   Voltage: %04u mV \n",  PMU->isEnableDC2()  ? "+" : "-",  PMU->getDC2Voltage());
+  // }
+  // if (PMU->isChannelAvailable(XPOWERS_DCDC3)) {
+  //     Serial.printf("DC3  : %s   Voltage: %04u mV \n",  PMU->isEnableDC3()  ? "+" : "-",  PMU->getDC3Voltage());
+  // }
+  // if (PMU->isChannelAvailable(XPOWERS_DCDC4)) {
+  //     Serial.printf("DC4  : %s   Voltage: %04u mV \n",  PMU->isEnableDC4()  ? "+" : "-",  PMU->getDC4Voltage());
+  // }
+  // if (PMU->isChannelAvailable(XPOWERS_DCDC5)) {
+  //     Serial.printf("DC5  : %s   Voltage: %04u mV \n",  PMU->isEnableDC5()  ? "+" : "-",  PMU->getDC5Voltage());
+  // }
+  // if (PMU->isChannelAvailable(XPOWERS_ALDO1)) {
+  //     Serial.printf("ALDO1: %s   Voltage: %04u mV \n",  PMU->isEnableALDO1()  ? "+" : "-",  PMU->getALDO1Voltage());
+  // }
+  // if (PMU->isChannelAvailable(XPOWERS_ALDO2)) {
+  //     Serial.printf("ALDO2: %s   Voltage: %04u mV \n",  PMU->isEnableALDO2()  ? "+" : "-",  PMU->getALDO2Voltage());
+  // }
+  // if (PMU->isChannelAvailable(XPOWERS_ALDO3)) {
+  //     Serial.printf("ALDO3: %s   Voltage: %04u mV \n",  PMU->isEnableALDO3()  ? "+" : "-",  PMU->getALDO3Voltage());
+  // }
+  // if (PMU->isChannelAvailable(XPOWERS_ALDO4)) {
+  //     Serial.printf("ALDO4: %s   Voltage: %04u mV \n",  PMU->isEnableALDO4()  ? "+" : "-",  PMU->getALDO4Voltage());
+  // }
+  // if (PMU->isChannelAvailable(XPOWERS_BLDO1)) {
+  //     Serial.printf("BLDO1: %s   Voltage: %04u mV \n",  PMU->isEnableBLDO1()  ? "+" : "-",  PMU->getBLDO1Voltage());
+  // }
+  // if (PMU->isChannelAvailable(XPOWERS_BLDO2)) {
+  //     Serial.printf("BLDO2: %s   Voltage: %04u mV \n",  PMU->isEnableBLDO2()  ? "+" : "-",  PMU->getBLDO2Voltage());
+  // }
+  // Serial.printf("=========================================\n");
 
   //Set up and verify power button hold time
   PMU->setPowerKeyPressOffTime(XPOWERS_POWEROFF_4S);
-  uint8_t opt = PMU->getPowerKeyPressOffTime();
-  Serial.print("PowerKeyPressOffTime:");
-  switch (opt) {
-  case XPOWERS_POWEROFF_4S: Serial.println("4 Second");
-      break;
-  case XPOWERS_POWEROFF_6S: Serial.println("6 Second");
-      break;
-  case XPOWERS_POWEROFF_8S: Serial.println("8 Second");
-      break;
-  case XPOWERS_POWEROFF_10S: Serial.println("10 Second");
-      break;
-  default:
-      break;
-  }
-#endif
+  // uint8_t opt = PMU->getPowerKeyPressOffTime();
+  // Serial.print("PowerKeyPressOffTime:");
+  // switch (opt) {
+  // case XPOWERS_POWEROFF_4S: Serial.println("4 Second");
+  //     break;
+  // case XPOWERS_POWEROFF_6S: Serial.println("6 Second");
+  //     break;
+  // case XPOWERS_POWEROFF_8S: Serial.println("8 Second");
+  //     break;
+  // case XPOWERS_POWEROFF_10S: Serial.println("10 Second");
+  //     break;
+  // default:
+  //     break;
+  // }
+  #endif
 
   return true;
 }
 
 bool radio_init() {
+  
+  power_init();
+
+  //Wire.begin(PIN_BOARD_SDA,PIN_BOARD_SCL);
+  //scanDevices(&Wire);
+  
+  //Wire1.begin(PIN_BOARD_SDA1,PIN_BOARD_SCL1);
+  //scanDevices(&Wire1);
+
   fallback_clock.begin();
-  Wire1.begin(PIN_BOARD_SDA1,PIN_BOARD_SCL1);
   rtc_clock.begin(Wire1);
   
 #ifdef SX126X_DIO3_TCXO_VOLTAGE
@@ -287,7 +295,7 @@ bool l76kProbe()
     delay(5);
     // Get version information
     startTimeout = millis() + 3000;
-    Serial.print("Try to init L76K . Wait stop .");
+    Serial.print("Try to init L76K GPS");
     // Serial1.flush();
     while (Serial1.available()) {
         int c = Serial1.read();
@@ -296,7 +304,7 @@ bool l76kProbe()
         // Serial.flush();
         // Serial1.flush();
         if (millis() > startTimeout) {
-            Serial.println("Wait L76K stop NMEA timeout!");
+            Serial.println("L76K NMEA timeout!");
             return false;
         }
     };

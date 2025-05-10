@@ -41,8 +41,8 @@
 ////////////////////////////////////////////////////////////////////////////////
 // UART pin definition
 
-#define PIN_SERIAL1_RX          (39)
-#define PIN_SERIAL1_TX          (37)
+#define PIN_SERIAL1_RX          (37)
+#define PIN_SERIAL1_TX          (39)
 
 #define PIN_SERIAL2_RX          (9)
 #define PIN_SERIAL2_TX          (10)
@@ -111,6 +111,12 @@
 
 #define PIN_BUZZER              (46)
 
+
+////////////////////////////////////////////////////////////////////////////////
+// GPS
+
+#define GPS_EN                  (21)
+#define GPS_RESET               (38)
 
 ////////////////////////////////////////////////////////////////////////////////
 // TFT

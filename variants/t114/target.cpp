@@ -1,6 +1,7 @@
 #include <Arduino.h>
 #include "target.h"
 #include <helpers/ArduinoHelpers.h>
+#include <helpers/sensors/MicroNMEALocationProvider.h>
 
 T114Board board;
 
@@ -10,7 +11,8 @@ WRAPPER_CLASS radio_driver(radio, board);
 
 VolatileRTCClock fallback_clock;
 AutoDiscoverRTCClock rtc_clock(fallback_clock);
-SensorManager sensors;
+MicroNMEALocationProvider nmea = MicroNMEALocationProvider(Serial1);
+T114SensorManager sensors = T114SensorManager(nmea);
 
 #ifndef LORA_CR
   #define LORA_CR      5
@@ -67,4 +69,70 @@ void radio_set_tx_power(uint8_t dbm) {
 mesh::LocalIdentity radio_new_identity() {
   RadioNoiseListener rng(radio);
   return mesh::LocalIdentity(&rng);  // create new random identity
+}
+
+void T114SensorManager::start_gps() {
+  if (!gps_active) {
+    gps_active = true;
+    _location->begin();
+  }
+}
+
+void T114SensorManager::stop_gps() {
+  if (gps_active) {
+    gps_active = false;
+    _location->stop();
+  }
+}
+
+bool T114SensorManager::begin() {
+  Serial1.begin(9600);
+  return true;
+}
+
+bool T114SensorManager::querySensors(uint8_t requester_permissions, CayenneLPP& telemetry) {
+  if (requester_permissions & TELEM_PERM_LOCATION) {   // does requester have permission?
+    telemetry.addGPS(TELEM_CHANNEL_SELF, node_lat, node_lon, 0.0f);
+  }
+  return true;
+}
+
+void T114SensorManager::loop() {
+  static long next_gps_update = 0;
+
+  _location->loop();
+
+  if (millis() > next_gps_update) {
+    if (_location->isValid()) {
+      node_lat = ((double)_location->getLatitude())/1000000.;
+      node_lon = ((double)_location->getLongitude())/1000000.;
+      MESH_DEBUG_PRINTLN("lat %f lon %f", node_lat, node_lon);
+    }
+    next_gps_update = millis() + 1000;
+  }
+}
+
+int T114SensorManager::getNumSettings() const { return 1; }  // just one supported: "gps" (power switch)
+
+const char* T114SensorManager::getSettingName(int i) const {
+  return i == 0 ? "gps" : NULL;
+}
+
+const char* T114SensorManager::getSettingValue(int i) const {
+  if (i == 0) {
+    return gps_active ? "1" : "0";
+  }
+  return NULL;
+}
+
+bool T114SensorManager::setSettingValue(const char* name, const char* value) {
+  if (strcmp(name, "gps") == 0) {
+    if (strcmp(value, "0") == 0) {
+      stop_gps();
+    } else {
+      start_gps();
+    }
+    return true;
+  }
+  return false;  // not supported
 }

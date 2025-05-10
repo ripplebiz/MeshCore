@@ -62,12 +62,14 @@
 
 #ifdef DISPLAY_CLASS      // TODO: refactor this -- move to variants/*/target
   #include "UITask.h"
-  #ifdef ST7735
+  #ifdef ST7735_Display
     #include <helpers/ui/ST7735Display.h>
-  #elif ST7789
+  #elif defined(ST7789_Display)
     #include <helpers/ui/ST7789Display.h>
   #elif defined(HAS_GxEPD)
     #include <helpers/ui/GxEPDDisplay.h>
+  #elif defined(SH1106_DISPLAY)
+    #include <helpers/ui/SH1106Display.h>
   #else
     #include <helpers/ui/SSD1306Display.h>
   #endif
@@ -78,13 +80,7 @@
     static DISPLAY_CLASS display;
   #endif
 
-  #define HAS_UI
-#endif
-
-#if defined(HAS_UI)
-  #include "UITask.h"
-
-  static UITask ui_task(&board);
+  static UITask ui_task(display);
 #endif
 
 // Believe it or not, this std C function is busted on some platforms!

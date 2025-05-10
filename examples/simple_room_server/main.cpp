@@ -68,11 +68,20 @@
 #endif
 
 #ifdef DISPLAY_CLASS
-  #include <helpers/ui/SSD1306Display.h>
 
-  static DISPLAY_CLASS  display;
+  #if defined(ST7789_Display)
+    #include <helpers/ui/ST7789Display.h>
+  #elif defined(HAS_GxEPD)
+    #include <helpers/ui/GxEPDDisplay.h>
+  #elif defined(SH1106_DISPLAY)
+    #include <helpers/ui/SH1106Display.h>
+  #else
+    #include <helpers/ui/SSD1306Display.h>
+  #endif
 
   #include "UITask.h"
+
+  static DISPLAY_CLASS display;
   static UITask ui_task(display);
 #endif
 

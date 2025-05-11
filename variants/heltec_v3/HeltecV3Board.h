@@ -3,16 +3,6 @@
 #include <Arduino.h>
 #include <helpers/RefCountedDigitalPin.h>
 
-// LoRa radio module pins for Heltec V3
-// Also for Heltec Wireless Tracker
-#define  P_LORA_DIO_1   14
-#define  P_LORA_NSS      8
-#define  P_LORA_RESET   RADIOLIB_NC
-#define  P_LORA_BUSY    13
-#define  P_LORA_SCLK     9
-#define  P_LORA_MISO    11
-#define  P_LORA_MOSI    10
-
 // built-ins
 #define  PIN_VBAT_READ    1
 #ifndef PIN_ADC_CTRL              // set in platformio.ini for Heltec Wireless Tracker (2)

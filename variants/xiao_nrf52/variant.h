@@ -1,22 +1,12 @@
-#ifndef _SEEED_XIAO_NRF52840_H_
-#define _SEEED_XIAO_NRF52840_H_
+#pragma once
+
+#include "WVariant.h"
 
 /** Master clock frequency */
 #define VARIANT_MCK       (64000000ul)
 
 #define USE_LFXO      // Board uses 32khz crystal for LF
 //#define USE_LFRC    // Board uses RC for LF
-
-/*----------------------------------------------------------------------------
- *        Headers
- *----------------------------------------------------------------------------*/
-
-#include "WVariant.h"
-
-#ifdef __cplusplus
-extern "C"
-{
-#endif // __cplusplus
 
 #define PINS_COUNT              (33)
 #define NUM_DIGITAL_PINS        (33)
@@ -40,19 +30,6 @@ extern "C"
 // Buttons
 #define PIN_BUTTON1             (PINS_COUNT)
 
-// Digital PINs
-static const uint8_t D0  = 0 ;
-static const uint8_t D1  = 1 ;
-static const uint8_t D2  = 2 ;
-static const uint8_t D3  = 3 ;
-static const uint8_t D4  = 4 ;
-static const uint8_t D5  = 5 ;
-static const uint8_t D6  = 6 ;
-static const uint8_t D7  = 7 ;
-static const uint8_t D8  = 8 ;
-static const uint8_t D9  = 9 ;
-static const uint8_t D10 = 10;
-
 #define VBAT_ENABLE             (14)    // Output LOW to enable reading of the BAT voltage.
                                         // https://wiki.seeedstudio.com/XIAO_BLE#q3-what-are-the-considerations-when-using-xiao-nrf52840-sense-for-battery-charging
 
@@ -60,12 +37,6 @@ static const uint8_t D10 = 10;
                                         // https://wiki.seeedstudio.com/XIAO_BLE#battery-charging-current
 
 // Analog pins
-#define PIN_A0                  (0)
-#define PIN_A1                  (1)
-#define PIN_A2                  (2)
-#define PIN_A3                  (3)
-#define PIN_A4                  (4)
-#define PIN_A5                  (5)
 #define PIN_VBAT                (32)    // Read the BAT voltage.
                                         // https://wiki.seeedstudio.com/XIAO_BLE#q3-what-are-the-considerations-when-using-xiao-nrf52840-sense-for-battery-charging
 
@@ -73,13 +44,6 @@ static const uint8_t D10 = 10;
 
 #define AREF_VOLTAGE            (3.0)
 #define ADC_MULTIPLIER          (3.0F) // 1M, 512k divider bridge
-
-static const uint8_t A0  = PIN_A0;
-static const uint8_t A1  = PIN_A1;
-static const uint8_t A2  = PIN_A2;
-static const uint8_t A3  = PIN_A3;
-static const uint8_t A4  = PIN_A4;
-static const uint8_t A5  = PIN_A5;
 
 #define ADC_RESOLUTION          (12)
 
@@ -102,22 +66,12 @@ static const uint8_t A5  = PIN_A5;
 #define PIN_SPI1_MOSI           (26)
 #define PIN_SPI1_SCK            (29)
 
-// Lora SPI is on SPI0
-#define  P_LORA_SCLK            PIN_SPI_SCK
-#define  P_LORA_MISO            PIN_SPI_MISO
-#define  P_LORA_MOSI            PIN_SPI_MOSI
-
 // Wire Interfaces
 #define WIRE_INTERFACES_COUNT   (1)
 
 #define PIN_WIRE_SDA            (17) // 4 and 5 are used for the sx1262 !
 #define PIN_WIRE_SCL            (16) // use WIRE1_SDA
 
-static const uint8_t SDA = PIN_WIRE_SDA;
-static const uint8_t SCL = PIN_WIRE_SCL;
-
-//#define PIN_WIRE1_SDA           (17)
-//#define PIN_WIRE1_SCL           (16)
 #define PIN_LSM6DS3TR_C_POWER   (15)
 #define PIN_LSM6DS3TR_C_INT1    (18)
 
@@ -137,13 +91,3 @@ static const uint8_t SCL = PIN_WIRE_SCL;
 // On-board QSPI Flash
 #define EXTERNAL_FLASH_DEVICES  (P25Q16H)
 #define EXTERNAL_FLASH_USE_QSPI
-
-#ifdef __cplusplus
-}
-#endif
-
-/*----------------------------------------------------------------------------
- *        Arduino objects - C++ only
- *----------------------------------------------------------------------------*/
-
-#endif

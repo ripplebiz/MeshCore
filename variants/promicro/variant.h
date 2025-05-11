@@ -7,9 +7,9 @@
  #pragma once
 
  #include "WVariant.h"
- 
+
  ////////////////////////////////////////////////////////////////////////////////
- // Low frequency clock source 
+ // Low frequency clock source
 
 #define VARIANT_MCK       (64000000ul)
 
@@ -23,6 +23,8 @@
 #define EXT_VCC              (PIN_EXT_VCC)
 
 #define BATTERY_PIN          (17)
+#define PIN_VBAT_READ        (BATTERY_PIN)
+
 #define ADC_RESOLUTION       12
 
 ////////////////////////////////////////////////////////////////////////////////
@@ -49,6 +51,31 @@
 #define PIN_WIRE1_SDA        (13)
 #define PIN_WIRE1_SCL        (14)
 
+////////////////////////////////////////////////////////////////////////////////
+// LORA
+#ifdef PROMICROSX1276
+  #define P_LORA_MISO               (2)
+  #define P_LORA_MOSI               (47)
+  #define P_LORA_SCLK               (43)
+  #define P_LORA_NSS                (45)
+  #define P_LORA_DIO_0              (29)
+  #define P_LORA_DIO_1              (10)
+  #define P_LORA_RESET              (9)
+  #define P_LORA_BUSY               (-1)
+#else
+  #define P_LORA_NSS                (13)
+  #define P_LORA_DIO_1              (11)
+  #define P_LORA_RESET              (10)
+  #define P_LORA_BUSY               (16)
+  #define P_LORA_MISO               (15)
+  #define P_LORA_SCLK               (12)
+  #define P_LORA_MOSI               (14)
+  #define SX126X_POWER_EN           (21)
+  #define SX126X_RXEN               (2)
+  #define SX126X_TXEN               (-1)
+  #define SX126X_DIO2_AS_RF_SWITCH  true
+  #define SX126X_DIO3_TCXO_VOLTAGE  (1.8f)
+#endif
 ////////////////////////////////////////////////////////////////////////////////
 // SPI pin definition
 
@@ -78,5 +105,3 @@
 
 #define PIN_BUTTON1          (6)
 #define BUTTON_PIN           PIN_BUTTON1
-
-

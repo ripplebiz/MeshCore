@@ -91,14 +91,14 @@
 ////////////////////////////////////////////////////////////////////////////////
 // LR1110
 
-#define LORA_DIO_1              (33)            // P1.1
-#define LORA_NSS                (PIN_SPI_NSS)   // P0.12
-#define LORA_RESET              (42)            // P1.10
-#define LORA_BUSY               (7)             // P0.7
-#define LORA_SCLK               (PIN_SPI_SCK)   // P0.11
-#define LORA_MISO               (PIN_SPI_MISO)  // P1.8
-#define LORA_MOSI               (PIN_SPI_MOSI)  // P0.9
- 
+#define P_LORA_DIO_1              (33)            // P1.1
+#define P_LORA_NSS                (PIN_SPI_NSS)   // P0.12
+#define P_LORA_RESET              (42)            // P1.10
+#define P_LORA_BUSY               (7)             // P0.7
+#define P_LORA_SCLK               (PIN_SPI_SCK)   // P0.11
+#define P_LORA_MISO               (PIN_SPI_MISO)  // P1.8
+#define P_LORA_MOSI               (PIN_SPI_MOSI)  // P0.9
+
 #define LR11X0_DIO_AS_RF_SWITCH    true
 #define LR11X0_DIO3_TCXO_VOLTAGE   1.6
 

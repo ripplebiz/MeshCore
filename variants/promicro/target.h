@@ -6,6 +6,7 @@
 #include <PromicroBoard.h>
 #include <helpers/radiolib/CustomSX1262Wrapper.h>
 #include <helpers/radiolib/CustomLLCC68Wrapper.h>
+#include <helpers/radiolib/CustomSX1276Wrapper.h>
 #include <helpers/AutoDiscoverRTCClock.h>
 #include <helpers/SensorManager.h>
 

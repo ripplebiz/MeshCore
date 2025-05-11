@@ -19,7 +19,7 @@ SensorManager sensors;
 bool radio_init() {
   fallback_clock.begin();
   rtc_clock.begin(Wire);
-  
+
   spi.begin(P_LORA_SCLK, P_LORA_MISO, P_LORA_MOSI);
   int status = radio.begin(LORA_FREQ, LORA_BW, LORA_SF, LORA_CR, RADIOLIB_SX126X_SYNC_WORD_PRIVATE, LORA_TX_POWER, 8);
   if (status != RADIOLIB_ERR_NONE) {
@@ -28,8 +28,12 @@ bool radio_init() {
     return false;  // fail
   }
 
+#ifdef SX127X_CURRENT_LIMIT
+  radio.setCurrentLimit(SX127X_CURRENT_LIMIT);
+#endif
+
   radio.setCRC(1);
-  
+
   return true;  // success
 }
 

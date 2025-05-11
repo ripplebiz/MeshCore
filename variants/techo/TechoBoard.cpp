@@ -1,5 +1,6 @@
 #include <Arduino.h>
 #include "TechoBoard.h"
+#include "variant.h"
 
 #ifdef LILYGO_TECHO
 

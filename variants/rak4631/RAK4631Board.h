@@ -3,19 +3,6 @@
 #include <MeshCore.h>
 #include <Arduino.h>
 
-// LoRa radio module pins for RAK4631
-#define  P_LORA_DIO_1   47
-#define  P_LORA_NSS     42
-#define  P_LORA_RESET  RADIOLIB_NC   // 38
-#define  P_LORA_BUSY    46
-#define  P_LORA_SCLK    43
-#define  P_LORA_MISO    45
-#define  P_LORA_MOSI    44
-#define  SX126X_POWER_EN  37
- 
-#define SX126X_DIO2_AS_RF_SWITCH  true
-#define SX126X_DIO3_TCXO_VOLTAGE   1.8
-
 // built-ins
 #define  PIN_VBAT_READ    5
 #define  ADC_MULTIPLIER   (3 * 1.73 * 1.187 * 1000)

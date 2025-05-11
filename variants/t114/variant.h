@@ -22,7 +22,9 @@
 #define NRF_APM
 #define PIN_3V3_EN              (38)
 
-#define BATTERY_PIN             (4)
+#define PIN_VBAT_READ           (4)
+#define PIN_BAT_CTL             (6)
+
 #define ADC_MULTIPLIER          (4.90F)
 
 #define ADC_RESOLUTION          (14)
@@ -95,11 +97,15 @@
 // Lora
 
 #define USE_SX1262
-#define LORA_CS                 (24)
-#define SX126X_DIO1             (20)
-#define SX126X_BUSY             (17)
-#define SX126X_RESET            (25)
-#define SX126X_DIO2_AS_RF_SWITCH
+#define SX126X_POWER_EN  PIN_3V3_EN
+#define P_LORA_MISO             (PIN_SPI_MISO)
+#define P_LORA_MOSI             (PIN_SPI_MOSI)
+#define P_LORA_SCLK             (PIN_SPI_SCK)
+#define P_LORA_NSS              (PIN_SPI_NSS)
+#define P_LORA_DIO_1            (20)
+#define P_LORA_BUSY             (17)
+#define P_LORA_RESET            (25)
+#define SX126X_DIO2_AS_RF_SWITCH true
 #define SX126X_DIO3_TCXO_VOLTAGE 1.8
 
 #define PIN_SPI1_MISO           (43)
@@ -111,9 +117,9 @@
 
 #define PIN_BUZZER              (46)
 
-
 ////////////////////////////////////////////////////////////////////////////////
 // TFT
+
 #define PIN_TFT_SCL             (40)
 #define PIN_TFT_SDA             (41)
 #define PIN_TFT_RST             (2)

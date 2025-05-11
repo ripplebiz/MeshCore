@@ -1,27 +1,7 @@
 #pragma once
-
-
 #include <Wire.h>
 #include <Arduino.h>
 #include "XPowersLib.h"
-
-// Defined using AXP2102
-#define XPOWERS_CHIP_AXP2101
-
-// LoRa radio module pins for TBeam
-#define  P_LORA_DIO_0   26
-#define  P_LORA_DIO_2   32
-#define  P_LORA_DIO_1   33
-#define  P_LORA_NSS     18
-#define  P_LORA_RESET   14
-#define  P_LORA_BUSY    RADIOLIB_NC
-#define  P_LORA_SCLK     5
-#define  P_LORA_MISO    19
-#define  P_LORA_MOSI    27
-
-// built-ins
-//#define  PIN_VBAT_READ   37
-//#define  PIN_LED_BUILTIN 25
 
 #include "ESP32Board.h"
 

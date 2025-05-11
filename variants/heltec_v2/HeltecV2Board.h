@@ -2,15 +2,6 @@
 
 #include <Arduino.h>
 
-// LoRa radio module pins for Heltec V2
-#define  P_LORA_DIO_1   26    // DIO0
-#define  P_LORA_NSS     18
-#define  P_LORA_RESET   RADIOLIB_NC  // 14
-#define  P_LORA_BUSY    RADIOLIB_NC
-#define  P_LORA_SCLK     5
-#define  P_LORA_MISO    19
-#define  P_LORA_MOSI    27
-
 // built-ins
 #define  PIN_VBAT_READ   37
 #define  PIN_LED_BUILTIN 25

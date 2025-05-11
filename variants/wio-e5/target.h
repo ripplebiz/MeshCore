@@ -2,9 +2,9 @@
 
 #define RADIOLIB_STATIC_ONLY 1
 #include <RadioLib.h>
-#include <helpers/RadioLibWrappers.h>
-#include <helpers/stm32/STM32Board.h>
-#include <helpers/CustomSTM32WLxWrapper.h>
+#include <helpers/radiolib/RadioLibWrappers.h>
+#include <STM32Board.h>
+#include <helpers/radiolib/CustomSTM32WLxWrapper.h>
 #include <helpers/ArduinoHelpers.h>
 #include <helpers/SensorManager.h>
 

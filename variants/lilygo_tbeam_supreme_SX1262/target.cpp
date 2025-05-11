@@ -1,5 +1,6 @@
 #include <Arduino.h>
 #include "target.h"
+#include "variant.h"
 
 TBeamS3SupremeBoard board;
 
@@ -34,11 +35,11 @@ bool power_init() {
   //Serial.println("Starting Wire1 for PMU");
   //Wire1.begin(I2C_PMU_ADD);
   //Wire1.begin(PIN_BOARD_SDA1,PIN_BOARD_SCL1);
-  
+
   //Set LED to indicate charge state
   Serial.println("Setting charge led");
-  PMU.setChargingLedMode(XPOWERS_CHG_LED_CTRL_CHG);  
-  
+  PMU.setChargingLedMode(XPOWERS_CHG_LED_CTRL_CHG);
+
   //Set up PMU interrupts
   Serial.println("Setting up PMU interrupts");
   pinMode(PIN_PMU_IRQ,INPUT_PULLUP);
@@ -46,13 +47,13 @@ bool power_init() {
 
   //GPS
   Serial.println("Setting and enabling a-ldo4 for GPS");
-  PMU.setALDO4Voltage(3300);  
+  PMU.setALDO4Voltage(3300);
   PMU.enableALDO4();          //disable to save power
-  
+
   //Lora
   Serial.println("Setting and enabling a-ldo3 for LoRa");
-  PMU.setALDO3Voltage(3300);  
-  PMU.enableALDO3();   
+  PMU.setALDO3Voltage(3300);
+  PMU.enableALDO3();
 
   //To avoid SPI bus issues during power up, reset OLED, sensor, and SD card supplies
   Serial.println("Reset a-ldo1&2 and b-ldo1");
@@ -62,13 +63,13 @@ bool power_init() {
     PMU.enableBLDO1();
     delay(250);
   }
- 
+
   //BME280 and OLED
   Serial.println("Setting and enabling a-ldo1 for oled");
   PMU.setALDO1Voltage(3300);
   PMU.enableALDO1();
 
-  //QMC6310U 
+  //QMC6310U
   Serial.println("Setting and enabling a-ldo2 for QMC");
   PMU.setALDO2Voltage(3300);
   PMU.enableALDO2();          //disable to save power
@@ -100,7 +101,7 @@ bool power_init() {
   Serial.println("Disabling unused supplies dcdc2, dldo1 and dldo2");
   PMU.disableDC2();
   PMU.disableDLDO1();
-  PMU.disableDLDO2();  
+  PMU.disableDLDO2();
 
   //Set charge current to 300mA
   Serial.println("Setting battery charge current limit and voltage");
@@ -132,7 +133,7 @@ bool radio_init() {
   fallback_clock.begin();
   Wire1.begin(PIN_BOARD_SDA1,PIN_BOARD_SCL1);
   rtc_clock.begin(Wire1);
-  
+
 #ifdef SX126X_DIO3_TCXO_VOLTAGE
   float tcxo = SX126X_DIO3_TCXO_VOLTAGE;
 #else
@@ -150,7 +151,7 @@ bool radio_init() {
   }
 
   radio.setCRC(1);
-  
+
   return true;  // success
 }
 

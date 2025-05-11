@@ -18,7 +18,7 @@ SensorManager sensors;
 
 bool radio_init() {
   rtc_clock.begin(Wire);
-  
+
 #ifdef SX126X_DIO3_TCXO_VOLTAGE
   float tcxo = SX126X_DIO3_TCXO_VOLTAGE;
 #else
@@ -26,7 +26,9 @@ bool radio_init() {
 #endif
 
   SPI1.setMISO(P_LORA_MISO);
-  //SPI1.setCS(P_LORA_NSS); // Setting CS results in freeze
+#ifdef P_LORA_NSS
+  SPI1.setCS(P_LORA_NSS); // Setting CS results in freeze on picow
+#endif
   SPI1.setSCK(P_LORA_SCLK);
   SPI1.setMOSI(P_LORA_MOSI);
 
@@ -37,9 +39,13 @@ bool radio_init() {
     Serial.println(status);
     return false;  // fail
   }
-  
+
   radio.setCRC(1);
-  
+
+#if defined(SX126X_RXEN) && defined(SX126X_TXEN)
+  radio.setRfSwitchPins(SX126X_RXEN, SX126X_TXEN);
+#endif
+
 #ifdef SX126X_CURRENT_LIMIT
   radio.setCurrentLimit(SX126X_CURRENT_LIMIT);
 #endif

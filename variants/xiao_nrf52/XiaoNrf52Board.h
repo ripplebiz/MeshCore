@@ -3,23 +3,6 @@
 #include <MeshCore.h>
 #include <Arduino.h>
 
-#ifdef XIAO_NRF52
-
-// LoRa radio module pins for Seeed Xiao-nrf52
-#ifdef SX1262_XIAO_S3_VARIANT
-  #undef P_LORA_DIO_1
-  #undef P_LORA_BUSY
-  #undef P_LORA_RESET
-  #undef P_LORA_NSS
-  #define  P_LORA_DIO_1       D0
-  #define  P_LORA_BUSY        D1
-  #define  P_LORA_RESET       D2
-  #define  P_LORA_NSS         D3
-#endif
-//#define  SX126X_POWER_EN  37
-
-
-
 class XiaoNrf52Board : public mesh::MainBoard {
 protected:
   uint8_t startup_reason;
@@ -41,13 +24,13 @@ public:
     // Please read befor going further ;)
     // https://wiki.seeedstudio.com/XIAO_BLE#q3-what-are-the-considerations-when-using-xiao-nrf52840-sense-for-battery-charging
 
-    // We can't drive VBAT_ENABLE to HIGH as long 
+    // We can't drive VBAT_ENABLE to HIGH as long
     // as we don't know wether we are charging or not ...
     // this is a 3mA loss (4/1500)
     digitalWrite(VBAT_ENABLE, LOW);
     int adcvalue = 0;
     analogReadResolution(12);
-    analogReference(AR_INTERNAL_3_0);  
+    analogReference(AR_INTERNAL_3_0);
     delay(10);
     adcvalue = analogRead(PIN_VBAT);
     return (adcvalue * ADC_MULTIPLIER * AREF_VOLTAGE) / 4.096;
@@ -63,5 +46,3 @@ public:
 
   bool startOTAUpdate(const char* id, char reply[]) override;
 };
-
-#endif

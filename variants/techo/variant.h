@@ -19,9 +19,8 @@
 ////////////////////////////////////////////////////////////////////////////////
 // Power
 
-#define PIN_PWR_EN              (12)
+#define PIN_VBAT_READ           (4)
 
-#define BATTERY_PIN             (4)
 #define ADC_MULTIPLIER          (4.90F)
 
 #define ADC_RESOLUTION          (14)
@@ -36,6 +35,7 @@
 #define NUM_DIGITAL_PINS        (48)
 #define NUM_ANALOG_INPUTS       (1)
 #define NUM_ANALOG_OUTPUTS      (0)
+#define PIN_PWR_EN              (12)
 
 ////////////////////////////////////////////////////////////////////////////////
 // UART pin definition
@@ -91,11 +91,16 @@
 // Lora
 
 #define USE_SX1262
-#define LORA_CS                 (24)
-#define SX126X_DIO1             (20)
-#define SX126X_BUSY             (17)
-#define SX126X_RESET            (25)
-#define SX126X_DIO2_AS_RF_SWITCH
+#define LORA_CS                  (24)
+#define P_LORA_DIO_1             (20)
+#define P_LORA_BUSY              (17)
+#define P_LORA_RESET             (25)
+#define P_LORA_MISO              (PIN_SPI_MISO)
+#define P_LORA_MOSI              (PIN_SPI_MOSI)
+#define P_LORA_SCLK              (PIN_SPI_SCK)
+#define P_LORA_NSS               (PIN_SPI_NSS)
+#define SX126X_POWER_EN          (PIN_PWR_EN)
+#define SX126X_DIO2_AS_RF_SWITCH 1
 #define SX126X_DIO3_TCXO_VOLTAGE 1.8
 
 ////////////////////////////////////////////////////////////////////////////////
@@ -105,13 +110,13 @@
 #define PIN_SPI1_MOSI           (29)
 #define PIN_SPI1_SCK            (31)
 
+////////////////////////////////////////////////////////////////////////////////
+// Display
+
 // GxEPD2 needs that for a panel that is not even used !
 extern const int MISO;
 extern const int MOSI;
 extern const int SCK;
-
-////////////////////////////////////////////////////////////////////////////////
-// Display
 
 #define DISP_MISO               (38)
 #define DISP_MOSI               (29)

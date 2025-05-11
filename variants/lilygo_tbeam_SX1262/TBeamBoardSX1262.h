@@ -1,20 +1,8 @@
 #pragma once
 
-
 #include <Wire.h>
 #include <Arduino.h>
 #include "XPowersLib.h"
-
-#define XPOWERS_CHIP_AXP192
-
-// LoRa radio module pins for TBeam
-#define  P_LORA_DIO_1   33 // SX1262 IRQ pin
-#define  P_LORA_NSS     18
-#define  P_LORA_RESET   23
-#define  P_LORA_BUSY    32 // SX1262 Busy pin
-#define  P_LORA_SCLK     5
-#define  P_LORA_MISO    19
-#define  P_LORA_MOSI    27
 
 #include "ESP32Board.h"
 

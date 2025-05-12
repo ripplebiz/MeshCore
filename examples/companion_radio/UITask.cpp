@@ -2,6 +2,7 @@
 #include <Arduino.h>
 #include <helpers/TxtDataHelpers.h>
 #include "NodePrefs.h"
+#include <string>
 
 #define AUTO_OFF_MILLIS     15000   // 15 seconds
 #define BOOT_SCREEN_MILLIS   4000   // 4 seconds
@@ -68,6 +69,14 @@ void UITask::clearMsgPreview() {
   _need_refresh = true;
 }
 
+std::string textWrap(std::string str, int location) {
+  int n = str.rfind(' ', location);
+  if (n != std::string::npos) {
+      str.at(n) = '\n';
+  }
+  return str;
+}
+
 void UITask::newMsg(uint8_t path_len, const char* from_name, const char* text, int msgcount) {
   _msgcount = msgcount;
 
@@ -108,7 +117,7 @@ void renderBatteryIndicator(DisplayDriver* _display, uint16_t batteryMilliVolts)
 
   // fill the battery based on the percentage
   int fillWidth = (batteryPercentage * (iconWidth - 2)) / 100;
-  _display->fillRect(iconX + 1, iconY + 1, fillWidth, iconHeight - 2);
+  _display->fillRect(iconX + 2, iconY + 2, fillWidth, iconHeight - 4);
 }
 
 void UITask::renderCurrScreen() {
@@ -152,7 +161,10 @@ void UITask::renderCurrScreen() {
     _display->setCursor(0, 0);
     _display->setTextSize(1);
     _display->setColor(DisplayDriver::GREEN);
-    _display->print(_node_prefs->node_name);
+    uint16_t textWidth = _display->getTextWidth("H"); // display width of 1 char with this text size
+    int iconX = _display->width() - 24 - 5; //24 = icon width from above
+    int chars = iconX / textWidth;
+    _display->print(textWrap(_node_prefs->node_name, chars).c_str());
 
     // battery voltage
     renderBatteryIndicator(_display, _board->getBattMilliVolts());

@@ -68,6 +68,35 @@ void UITask::clearMsgPreview() {
   _need_refresh = true;
 }
 
+char* word_wrap (char* buffer, char* string, int line_width) {
+    int i = 0;
+    int k, counter;
+    while (i < strlen(string)) {
+        for (counter = 1; counter <= line_width; counter++) {
+            if (i == strlen(string)) {
+                buffer[i] = 0;
+                return buffer;
+            }
+            buffer[i] = string[i];
+            i++;
+        }
+        if (isspace(string[i])) {
+            buffer[i] = '\n';
+            i++;
+        } else {
+            for (k = i; k > 0; k--) {
+                if (isspace(string[k] ) ) {
+                    buffer[k] = '\n';
+                    i = k + 1;
+                    break;
+                }
+            }
+        }
+    }
+    buffer[i] = 0;
+    return buffer;
+  }
+
 void UITask::newMsg(uint8_t path_len, const char* from_name, const char* text, int msgcount) {
   _msgcount = msgcount;
 
@@ -152,7 +181,11 @@ void UITask::renderCurrScreen() {
     _display->setCursor(0, 0);
     _display->setTextSize(1);
     _display->setColor(DisplayDriver::GREEN);
-    _display->print(_node_prefs->node_name);
+    uint16_t textWidth = _display->getTextWidth("H"); // display width of 1 char with this text size
+    int iconX = _display->width() - 24 - 5; //24 = icon width from above
+    int chars = iconX / textWidth;
+    char buffer[32] = {0};
+    _display->print(word_wrap(buffer,_node_prefs->node_name, chars));
 
     // battery voltage
     renderBatteryIndicator(_display, _board->getBattMilliVolts());

@@ -209,40 +209,50 @@ void UITask::userLedHandler() {
 }
 
 void UITask::buttonHandler() {
-#ifdef PIN_USER_BTN
-  static int prev_btn_state = !USER_BTN_PRESSED;
-  static unsigned long btn_state_change_time = 0;
-  static unsigned long next_read = 0;
-  int cur_time = millis();
-  if (cur_time >= next_read) {
-    int btn_state = digitalRead(PIN_USER_BTN);
-    if (btn_state != prev_btn_state) {
-      if (btn_state == USER_BTN_PRESSED) {  // pressed?
-        if (_display != NULL) {
-          if (_display->isOn()) {
-            clearMsgPreview();
-          } else {
-            _display->turnOn();
-            _need_refresh = true;
+  #ifdef PIN_USER_BTN || PIN_USER_BTN_ANA
+    static int prev_btn_state = !USER_BTN_PRESSED;
+    static int prev_btn_state_ana = !USER_BTN_PRESSED;
+    static unsigned long btn_state_change_time = 0;
+    static unsigned long next_read = 0;
+    int cur_time = millis();
+    if (cur_time >= next_read) {
+      int btn_state = 0;
+      int btn_state_ana = 0;
+      #ifdef PIN_USER_BTN
+      btn_state = digitalRead(PIN_USER_BTN);
+      #endif
+      #ifdef PIN_USER_BTN_ANA
+      btn_state_ana = (analogRead(PIN_USER_BTN_ANA) < 20); // analogRead returns a value hopefully below 20 when button is pressed. 
+      #endif
+      //Serial.println(analogRead(PIN_USER_BTN_ANA));
+      if (btn_state != prev_btn_state || btn_state_ana != prev_btn_state_ana) { // check for either digital or analogue button change of state
+        if (btn_state == USER_BTN_PRESSED || btn_state_ana == USER_BTN_PRESSED) {  // pressed?
+          if (_display != NULL) {
+            if (_display->isOn()) {
+              clearMsgPreview();
+            } else {
+              _display->turnOn();
+              _need_refresh = true;
+            }
+            _auto_off = cur_time + AUTO_OFF_MILLIS;   // extend auto-off timer
           }
-          _auto_off = cur_time + AUTO_OFF_MILLIS;   // extend auto-off timer
+        } else { // unpressed ? check pressed time ...
+          if ((cur_time - btn_state_change_time) > 5000) {
+          #ifdef PIN_STATUS_LED
+            digitalWrite(PIN_STATUS_LED, LOW);
+            delay(10);
+          #endif
+            _board->powerOff();
+          }
         }
-      } else { // unpressed ? check pressed time ...
-        if ((cur_time - btn_state_change_time) > 5000) {
-        #ifdef PIN_STATUS_LED
-          digitalWrite(PIN_STATUS_LED, LOW);
-          delay(10);
-        #endif
-          _board->powerOff();
-        }
+        btn_state_change_time = millis();
+        prev_btn_state = btn_state;
+        prev_btn_state_ana = btn_state_ana;
       }
-      btn_state_change_time = millis();
-      prev_btn_state = btn_state;
+      next_read = millis() + 100;  // 10 reads per second
     }
-    next_read = millis() + 100;  // 10 reads per second
+  #endif
   }
-#endif
-}
 
 void UITask::loop() {
   buttonHandler();

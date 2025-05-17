@@ -107,8 +107,8 @@ void renderBatteryIndicator(DisplayDriver* _display, uint16_t batteryMilliVolts)
   _display->fillRect(iconX + iconWidth, iconY + (iconHeight / 4), 3, iconHeight / 2);
 
   // fill the battery based on the percentage
-  int fillWidth = (batteryPercentage * (iconWidth - 2)) / 100;
-  _display->fillRect(iconX + 1, iconY + 1, fillWidth, iconHeight - 2);
+  int fillWidth = (batteryPercentage * (iconWidth - 4)) / 100;
+  _display->fillRect(iconX + 2, iconY + 2, fillWidth, iconHeight - 4);
 }
 
 void UITask::renderCurrScreen() {

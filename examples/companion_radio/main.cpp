@@ -89,6 +89,11 @@
   static UITask ui_task(&board);
 #endif
 
+#ifdef PIN_BUZZER
+  #include "buzzer.h"
+  genericBuzzer buzzer;
+#endif
+
 // Believe it or not, this std C function is busted on some platforms!
 static uint32_t _atoi(const char* sp) {
   uint32_t n = 0;
@@ -507,7 +512,12 @@ class MyMesh : public BaseChatMesh {
   }
 
   void soundBuzzer() {
-    // TODO
+  #if defined(PIN_BUZZER)
+    // gemini's pick
+    buzzer.play("MsgRcv3:d=4,o=6,b=200:32e,32g,32b,16c7");
+    //Serial.println("DBG:  Buzzzzzz");
+  #endif
+
   }
 
 protected:
@@ -1576,6 +1586,11 @@ public:
     ui_task.setHasConnection(_serial->isConnected());
     ui_task.loop();
   #endif
+
+  #ifdef PIN_BUZZER
+    if (buzzer.isPlaying())  buzzer.loop();
+  #endif
+
   }
 };
 
@@ -1643,6 +1658,10 @@ void setup() {
 
   board.begin();
 
+#ifdef PIN_BUZZER
+  buzzer.begin();
+#endif
+
 #ifdef HAS_UI
   DisplayDriver* disp = NULL;
  #ifdef DISPLAY_CLASS
@@ -1654,6 +1673,8 @@ void setup() {
   }
  #endif
 #endif
+
+
 
   if (!radio_init()) { halt(); }
 

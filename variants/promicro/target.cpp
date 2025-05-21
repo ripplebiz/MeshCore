@@ -128,6 +128,10 @@ bool PromicroSensorManager::querySensors(uint8_t requester_permissions, CayenneL
 }
 
 int PromicroSensorManager::getNumSettings() const {
+  // we should probably detect what sensors are available and set this properly
+  if (gps_detected) {
+    return NUM_SENSOR_SETTINGS + 1;
+  }
   return NUM_SENSOR_SETTINGS;
 }
 

@@ -1,6 +1,7 @@
 #include <Arduino.h>
 #include "target.h"
 #include <helpers/ArduinoHelpers.h>
+#include <helpers/sensors/MicroNMEALocationProvider.h>
 
 PromicroBoard board;
 
@@ -10,7 +11,8 @@ WRAPPER_CLASS radio_driver(radio, board);
 
 VolatileRTCClock fallback_clock;
 AutoDiscoverRTCClock rtc_clock(fallback_clock);
-PromicroSensorManager sensors;
+MicroNMEALocationProvider nmea = MicroNMEALocationProvider(Serial1);
+PromicroSensorManager sensors = PromicroSensorManager(nmea);
 
 #ifdef DISPLAY_CLASS
   DISPLAY_CLASS display;
@@ -87,6 +89,7 @@ bool PromicroSensorManager::begin() {
   initINA3221();
   initINA219();
   initAHTX();
+  initGPS();
 
   return true;
 }
@@ -118,7 +121,9 @@ bool PromicroSensorManager::querySensors(uint8_t requester_permissions, CayenneL
       telemetry.addRelativeHumidity(TELEM_CHANNEL_SELF, humidity.relative_humidity);
     }
   }
-
+  if (requester_permissions & TELEM_PERM_LOCATION) {   // does requester have permission?
+    telemetry.addGPS(TELEM_CHANNEL_SELF, node_lat, node_lon, 0.0f);
+  }
   return true;
 }
 
@@ -127,6 +132,7 @@ int PromicroSensorManager::getNumSettings() const {
 }
 
 const char* PromicroSensorManager::getSettingName(int i) const {
+  if (gps_detected && i == 0) return "gps";
   if (i >= 0 && i < NUM_SENSOR_SETTINGS) {
     return INA3221_CHANNEL_NAMES[i];
   }
@@ -134,6 +140,9 @@ const char* PromicroSensorManager::getSettingName(int i) const {
 }
 
 const char* PromicroSensorManager::getSettingValue(int i) const {
+  if (gps_detected && i == 0) {
+    return gps_active ? "1" : "0";
+  }
   if (i >= 0 && i < NUM_SENSOR_SETTINGS) {
     return INA3221_CHANNEL_ENABLED[i] ? "1" : "0";
   }
@@ -141,6 +150,14 @@ const char* PromicroSensorManager::getSettingValue(int i) const {
 }
 
 bool PromicroSensorManager::setSettingValue(const char* name, const char* value) {
+  if (gps_detected && strcmp(name, "gps") == 0) {
+    if (strcmp(value, "0") == 0) {
+      stop_gps();
+    } else {
+      start_gps();
+    }
+    return true;
+  }
   for (int i = 0; i < NUM_SENSOR_SETTINGS; i++) {
     if (strcmp(name, INA3221_CHANNEL_NAMES[i]) == 0) {
       int channelEnabled = INA_3221.getEnableChannel(i);
@@ -194,5 +211,57 @@ void PromicroSensorManager::initAHTX() {
   } else {
     AHTXinitialized = false;
     MESH_DEBUG_PRINTLN("AHT10/AHT20 was not found at I2C address %02X", TELEM_AHTX_ADDRESS);
+  }
+}
+
+void PromicroSensorManager::initGPS() {
+  Serial1.setPins(PIN_GPS_TX, PIN_GPS_RX);
+  Serial1.begin(9600);
+
+  // Try to detect if GPS is physically connected to determine if we should expose the setting
+  pinMode(PIN_GPS_EN, OUTPUT);
+  digitalWrite(PIN_GPS_EN, HIGH);  // Power on GPS
+
+  // Give GPS a moment to power up and send data
+  delay(1000);
+
+  // We'll consider GPS detected if we see any data on Serial1
+  gps_detected = (Serial1.available() > 0);
+
+  if (gps_detected) {
+    MESH_DEBUG_PRINTLN("GPS detected");
+    digitalWrite(PIN_GPS_EN, LOW);  // Power off GPS until the setting is changed
+  } else {
+    MESH_DEBUG_PRINTLN("No GPS detected");
+    digitalWrite(PIN_GPS_EN, LOW);
+  }
+
+}
+
+
+void PromicroSensorManager::start_gps() {
+  gps_active = true;
+  pinMode(PIN_GPS_EN, OUTPUT);
+  digitalWrite(PIN_GPS_EN, HIGH);
+}
+
+void PromicroSensorManager::stop_gps() {
+  gps_active = false;
+  pinMode(PIN_GPS_EN, OUTPUT);
+  digitalWrite(PIN_GPS_EN, LOW);
+}
+
+void PromicroSensorManager::loop() {
+  static long next_gps_update = 0;
+
+  _location->loop();
+
+  if (millis() > next_gps_update) {
+    if (_location->isValid()) {
+      node_lat = ((double)_location->getLatitude())/1000000.;
+      node_lon = ((double)_location->getLongitude())/1000000.;
+      MESH_DEBUG_PRINTLN("lat %f lon %f", node_lat, node_lon);
+    }
+    next_gps_update = millis() + 1000;
   }
 }

@@ -19,6 +19,11 @@
 #define  PIN_VBAT_READ 17
 #define  ADC_MULTIPLIER   (1.815f) // dependent on voltage divider resistors. TODO: more accurate battery tracking
 
+#define PIN_GPS_EN 5  // P0.24
+#define PIN_GPS_RX 3  // P0.20
+#define PIN_GPS_TX 4  // P0.22
+
+
 class PromicroBoard : public mesh::MainBoard {
 protected:
   uint8_t startup_reason;

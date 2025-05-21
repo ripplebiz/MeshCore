@@ -14,6 +14,7 @@
 #ifdef DISPLAY_CLASS
   #include <helpers/ui/SSD1306Display.h>
 #endif
+#include <helpers/sensors/LocationProvider.h>
 
 #define NUM_SENSOR_SETTINGS 3
 
@@ -44,6 +45,10 @@ mesh::LocalIdentity radio_new_identity();
 #define TELEM_INA219_MAX_CURRENT 5
 
 class PromicroSensorManager: public SensorManager {
+  bool gps_active = false;
+  bool gps_detected = false;
+  LocationProvider* _location;
+
   bool INA3221initialized = false;
   bool INA219initialized = false;
   bool AHTXinitialized = false;
@@ -55,14 +60,19 @@ class PromicroSensorManager: public SensorManager {
   void initINA3221();
   void initINA219();
   void initAHTX();
+
+  void initGPS();
+  void start_gps();
+  void stop_gps();
 public:
-  PromicroSensorManager(){};
+  PromicroSensorManager(LocationProvider &location): _location(&location) {};
   bool begin() override;
   bool querySensors(uint8_t requester_permissions, CayenneLPP& telemetry) override;
   int getNumSettings() const override;
   const char* getSettingName(int i) const override;
   const char* getSettingValue(int i) const override;
   bool setSettingValue(const char* name, const char* value) override;
+  void loop() override;
 };
 
 

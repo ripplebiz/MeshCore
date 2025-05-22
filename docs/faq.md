@@ -490,7 +490,7 @@ adafruit-nrfutil --verbose dfu serial --package t1000_e_bootloader-0.9.1-5-g4887
 **A:** Yes.  See the following:
 
 #### 5.14.1. meshcoremqtt
-A Python script to send meshore debug and packet capture data to MQTT for analysis
+A Python script to send MeshCore debug and packet capture data to MQTT for analysis
 https://github.com/Andrew-a-g/meshcoretomqtt
 
 #### 5.14.2. MeshCore for Home Assistant
@@ -498,7 +498,7 @@ A custom Home Assistant integration for MeshCore mesh radio nodes. It allows you
 https://github.com/awolden/meshcore-ha
 
 #### 5.14.3. Python MeshCore
-Bindings to access your MeshCore companion radio nodes in python.
+Bindings to access your MeshCore companion radio nodes in Python.
 https://github.com/fdlamotte/meshcore_py
 
 #### 5.14.4. meshcore-cli  

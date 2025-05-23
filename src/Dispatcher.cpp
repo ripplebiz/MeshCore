@@ -74,6 +74,7 @@ void Dispatcher::loop() {
   }
   checkRecv();
   checkSend();
+  checkBridge();
 }
 
 void Dispatcher::checkRecv() {
@@ -102,6 +103,7 @@ void Dispatcher::checkRecv() {
 
         pkt->header = raw[i++];
         pkt->path_len = raw[i++];
+        pkt->_source = PACKET_SOURCE_LORA;
 
         if (pkt->path_len > MAX_PATH_SIZE || i + pkt->path_len > len) {
           MESH_DEBUG_PRINTLN("%s Dispatcher::checkRecv(): partial or corrupt packet received, len=%d", getLogDateTime(), len);
@@ -170,9 +172,23 @@ void Dispatcher::checkRecv() {
   }
 }
 
-void Dispatcher::onSendPacket(Packet* pkt) {
-  //
+void Dispatcher::checkBridge() {
+  
 }
+
+void Dispatcher::onPacketRx(Packet* pkt) {
+  if(this->_bridge){
+    this->_bridge->onMeshPacketRx(pkt);
+  }
+}
+
+
+void Dispatcher::onPacketTx(Packet* pkt) {
+  if(this->_bridge){
+    this->_bridge->onMeshPacketTx(pkt);
+  }
+}
+
 
 void Dispatcher::processRecvPacket(Packet* pkt) {
   DispatcherAction action = onRecvPacket(pkt);
@@ -209,7 +225,7 @@ void Dispatcher::checkSend() {
 
   outbound = _mgr->getNextOutbound(_ms->getMillis());
   if (outbound) {
-    onSendPacket(outbound);
+    onPacketTx(outbound);
     int len = 0;
     uint8_t raw[MAX_TRANS_UNIT];
 
@@ -254,6 +270,7 @@ Packet* Dispatcher::obtainNewPacket() {
   } else {
     pkt->payload_len = pkt->path_len = 0;
     pkt->_snr = 0;
+    pkt->_source = PACKER_SOURCE_NONE;
   }
   return pkt;
 }

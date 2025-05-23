@@ -32,9 +32,33 @@ bool ESP32Board::startOTAUpdate(const char* id, char reply[]) {
   return true;
 }
 
+bool ESP32Board::startWiFi(char* ssid, char* password, bool apMode=false){
+
+
+  if(apMode){
+    
+    WiFi.disconnect(true);
+    WiFi.mode(WIFI_MODE_AP);
+    WiFi.softAP(ssid, password);
+  
+  } else {
+
+    WiFi.disconnect(true);
+    WiFi.mode(WIFI_MODE_STA);
+    WiFi.begin(ssid, password);
+
+  }
+
+  return true;
+}
+
 #else
 bool ESP32Board::startOTAUpdate(const char* id, char reply[]) {
   return false; // not supported
+}
+
+bool ESP32Board::startWiFi(char* ssid, char* password, bool apMode=false){
+  return false; //not supported
 }
 #endif
 

@@ -5,6 +5,7 @@
 #include <Packet.h>
 #include <Utils.h>
 #include <string.h>
+#include <Bridge.h>
 
 namespace mesh {
 
@@ -109,6 +110,8 @@ protected:
   PacketManager* _mgr;
   Radio* _radio;
   MillisecondClock* _ms;
+  Bridge* _bridge;
+  
 
   Dispatcher(Radio& radio, MillisecondClock& ms, PacketManager& mgr)
     : _radio(&radio), _ms(&ms), _mgr(&mgr)
@@ -118,7 +121,9 @@ protected:
   }
 
   virtual DispatcherAction onRecvPacket(Packet* pkt) = 0;
-  virtual void onSendPacket(Packet* pkt);
+
+  void onPacketRx(Packet* pkt);
+  void onPacketTx(Packet* pkt);
 
   virtual void logRxRaw(float snr, float rssi, const uint8_t raw[], int len) { }   // custom hook
 
@@ -154,6 +159,7 @@ public:
 private:
   void checkRecv();
   void checkSend();
+  void checkBridge();
 };
 
 }

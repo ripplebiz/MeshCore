@@ -78,6 +78,7 @@ public:
   }
 
   bool startOTAUpdate(const char* id, char reply[]) override;
+  bool startWiFi(char* ssid, char* password, bool apMode=false) override;
 };
 
 class ESP32RTCClock : public mesh::RTCClock {

@@ -25,18 +25,52 @@ MeshCore provides the ability to create wireless mesh networks, similar to Mesht
 
 ## 🚀 How to Get Started
 
-Andy Kirby has published a very useful [intro video](https://www.youtube.com/watch?v=t1qne8uJBAc) which explains the steps for beginners.
+- Watch the [MeshCore Intro Video](https://www.youtube.com/watch?v=t1qne8uJBAc) by Andy Kirby.
+- Read through our [Frequently Asked Questions](./docs/faq.md) section.
+- Flash the MeshCore firmware on a supported device.
+- Connect with a supported client.
 
-For developers, install [PlatformIO](https://docs.platformio.org) in Visual Studio Code.
-Download & Open the MeshCore repository.
-Select a Sample Application: Choose from chat, repeater, other example app.
-Monitor & Communicate using the Serial Monitor (e.g., Serial USB Terminal on Android).
+For developers;
 
-📁 Included Example Applications
-* 📡 Terminal Chat: Secure text communication between devices.
-* 📡 Simple Repeater: Extends network coverage by relaying messages.
-* 📡 Companion Radio: For use with an external chat app, over BLE or USB.
-* 📡 Room Server: A simple BBS server for shared Posts.
+- Install [PlatformIO](https://docs.platformio.org) in [Visual Studio Code](https://code.visualstudio.com).
+- Clone and open the MeshCore repository in Visual Studio Code.
+- See the example applications you can modify and run:
+  - [Companion Radio](./examples/companion_radio) - For use with an external chat app, over BLE, USB or WiFi.
+  - [Simple Repeater](./examples/simple_repeater) - Extends network coverage by relaying messages.
+  - [Simple Room Server](./examples/simple_room_server) - A simple BBS server for shared Posts.
+  - [Simple Secure Chat](./examples/simple_secure_chat) - Secure terminal based text communication between devices.
+
+The Simple Secure Chat example can be interacted with through the Serial Monitor in Visual Studio Code, or with a Serial USB Terminal on Android.
+
+## ⚡️ MeshCore Flasher
+
+We have prebuilt firmware ready to flash on supported devices.
+
+- Launch https://flasher.meshcore.co.uk
+- Select a supported device
+- Flash one of the firmware types:
+  - Companion, Repeater or Room Server
+- Once flashing is complete, you can connect with one of the MeshCore clients below.
+
+## 📱 MeshCore Clients
+
+**Companion Firmware**
+
+The companion firmware can be connected to via BLE, USB or WiFi depending on the firmware type you flashed.
+
+- Web: https://app.meshcore.nz
+- Android: https://play.google.com/store/apps/details?id=com.liamcottle.meshcore.android
+- iOS: https://apps.apple.com/us/app/meshcore/id6742354151?platform=iphone
+- NodeJS: https://github.com/liamcottle/meshcore.js
+- Python: https://github.com/fdlamotte/meshcore-cli
+
+**Repeater and Room Server Firmware**
+
+The repeater and room server firmwares can be setup via USB in the web config tool.
+
+- https://config.meshcore.dev
+
+They can also be managed via LoRa in the mobile app by using the Remote Management feature.
 
 ## 🛠 Hardware Compatibility
 
@@ -53,6 +87,7 @@ MeshCore is designed for use with:
 * LilyGo TLora32 v1.6
 
 ## 📜 License
+
 MeshCore is open-source software released under the MIT License. You are free to use, modify, and distribute it for personal and commercial projects.
 
 ## Contributing
@@ -62,9 +97,9 @@ For minor changes just submit your PR and I'll try to review it, but for anythin
 
 ## 📞 Get Support
 
-Check out the GitHub Issues page to report bugs or request features.
-
-You will be able to find additional guides and components at [my site](https://buymeacoffee.com/ripplebiz), or [join Andy Kirby's Discord](https://discord.gg/GBxVx2JMAy) for discussions.
+- Report bugs and request features on the [GitHub Issues](https://github.com/ripplebiz/MeshCore/issues) page.
+- Find additional guides and components on [my site](https://buymeacoffee.com/ripplebiz).
+- Join [Andy Kirby's Discord](https://discord.gg/GBxVx2JMAy) to chat with the developers and get help from the community.
 
 ## RAK Wireless Board Support in PlatformIO
 

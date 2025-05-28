@@ -14,6 +14,11 @@ WRAPPER_CLASS radio_driver(radio, board);
 
 ESP32RTCClock fallback_clock;
 AutoDiscoverRTCClock rtc_clock(fallback_clock);
+SensorManager sensors;
+
+#ifdef DISPLAY_CLASS
+  DISPLAY_CLASS display;
+#endif
 
 #ifndef LORA_CR
   #define LORA_CR      5

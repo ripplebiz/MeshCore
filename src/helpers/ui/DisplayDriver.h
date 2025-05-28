@@ -24,5 +24,6 @@ public:
   virtual void fillRect(int x, int y, int w, int h) = 0;
   virtual void drawRect(int x, int y, int w, int h) = 0;
   virtual void drawXbm(int x, int y, const uint8_t* bits, int w, int h) = 0;
+  virtual uint16_t getTextWidth(const char* str) = 0;
   virtual void endFrame() = 0;
 };

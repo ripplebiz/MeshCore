@@ -127,8 +127,8 @@ class MyMesh : public BaseChatMesh, ContactVisitor {
 
   void saveContacts() {
 #if defined(NRF52_PLATFORM)
+    _fs->remove("/contacts");
     File file = _fs->open("/contacts", FILE_O_WRITE);
-    if (file) { file.seek(0); file.truncate(); }
 #elif defined(RP2040_PLATFORM)
     File file = _fs->open("/contacts", "w");
 #else
@@ -254,6 +254,10 @@ protected:
     Serial.printf("   %s\n", text);
   }
 
+  uint8_t onContactRequest(const ContactInfo& contact, uint32_t sender_timestamp, const uint8_t* data, uint8_t len, uint8_t* reply) override {
+    return 0;  // unknown
+  }
+
   void onContactResponse(const ContactInfo& contact, const uint8_t* data, uint8_t len) override {
     // not supported
   }
@@ -337,8 +341,8 @@ public:
 
   void savePrefs() {
 #if defined(NRF52_PLATFORM)
+    _fs->remove("/node_prefs");
     File file = _fs->open("/node_prefs", FILE_O_WRITE);
-    if (file) { file.seek(0); file.truncate(); }
 #elif defined(RP2040_PLATFORM)
     File file = _fs->open("/node_prefs", "w");
 #else

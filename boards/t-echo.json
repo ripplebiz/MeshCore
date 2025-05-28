@@ -1,32 +1,32 @@
 {
   "build": {
     "arduino": {
-    "ldscript": "nrf52840_s140_v6.ld"
+      "ldscript": "nrf52840_s140_v6.ld"
     },
     "core": "nRF5",
     "cpu": "cortex-m4",
     "extra_flags": "-DARDUINO_NRF52840_PCA10056 -DNRF52840_XXAA",
     "f_cpu": "64000000L",
     "hwids": [
-    [
-      "0x239A",
-      "0x8029"
-    ]
+      [
+        "0x239A",
+        "0x8029"
+      ]
     ],
     "usb_product": "NRF52 DK",
     "mcu": "nrf52840",
     "variant": "pca10056",
     "bsp": {
-    "name": "adafruit"
+      "name": "adafruit"
     },
     "softdevice": {
-    "sd_flags": "-DS140",
-    "sd_name": "s140",
-    "sd_version": "6.1.1",
-    "sd_fwid": "0x00B6"
+      "sd_flags": "-DS140",
+      "sd_name": "s140",
+      "sd_version": "6.1.1",
+      "sd_fwid": "0x00B6"
     },
     "bootloader": {
-    "settings_addr": "0xFF000"
+      "settings_addr": "0xFF000"
     }
   },
   "connectivity": [
@@ -35,9 +35,10 @@
   "debug": {
     "jlink_device": "nRF52840_xxAA",
     "onboard_tools": [
-    "jlink"
+      "jlink"
     ],
-    "svd_path": "nrf52840.svd"
+    "svd_path": "nrf52840.svd",
+    "openocd_target": "nrf52.cfg"
   },
   "frameworks": [
     "arduino"
@@ -50,13 +51,13 @@
     "speed": 115200,
     "protocol": "jlink",
     "protocols": [
-    "jlink",
-    "nrfjprog",
-    "stlink",
-    "cmsis-dap",
-    "blackmagic"
+      "jlink",
+      "nrfjprog",
+      "stlink",
+      "cmsis-dap",
+      "blackmagic"
     ]
   },
   "url": "https://os.mbed.com/platforms/Nordic-nRF52840-DK/",
   "vendor": "Nordic"
-  }
+}

@@ -8,6 +8,8 @@
 #define STATE_TX_DONE    4
 #define STATE_INT_READY 16
 
+#define NUM_NOISE_FLOOR_SAMPLES  64
+
 static volatile uint8_t state = STATE_IDLE;
 
 // this function is called when a complete packet
@@ -28,11 +30,43 @@ void RadioLibWrapper::begin() {
   if (_board->getStartupReason() == BD_STARTUP_RX_PACKET) {  // received a LoRa packet (while in deep sleep)
     setFlag(); // LoRa packet is already received
   }
+
+  _noise_floor = 0;
+  _threshold = 0;
+
+  // start average out some samples
+  _num_floor_samples = 0;
+  _floor_sample_sum = 0;
 }
 
 void RadioLibWrapper::idle() {
   _radio->standby();
   state = STATE_IDLE;   // need another startReceive()
+}
+
+void RadioLibWrapper::triggerNoiseFloorCalibrate(int threshold) {
+  _threshold = threshold;
+  if (threshold > 0 && _num_floor_samples >= NUM_NOISE_FLOOR_SAMPLES) {  // ignore trigger if currently sampling
+    _num_floor_samples = 0;
+    _floor_sample_sum = 0;
+  }
+}
+
+void RadioLibWrapper::loop() {
+  if (state == STATE_RX && _num_floor_samples < NUM_NOISE_FLOOR_SAMPLES) {
+    if (!isReceivingPacket()) {
+      int rssi = getCurrentRSSI();
+      if (rssi < _noise_floor + _threshold) {  // only consider samples below current floor+THRESHOLD
+        _num_floor_samples++;
+        _floor_sample_sum += rssi;
+      }
+    }
+  } else if (_num_floor_samples >= NUM_NOISE_FLOOR_SAMPLES && _floor_sample_sum != 0) {
+    _noise_floor = _floor_sample_sum / NUM_NOISE_FLOOR_SAMPLES;
+    _floor_sample_sum = 0;
+
+    MESH_DEBUG_PRINTLN("RadioLibWrapper: noise_floor = %d", (int)_noise_floor);
+  }
 }
 
 void RadioLibWrapper::startRecv() {
@@ -42,6 +76,10 @@ void RadioLibWrapper::startRecv() {
   } else {
     MESH_DEBUG_PRINTLN("RadioLibWrapper: error: startReceive(%d)", err);
   }
+}
+
+bool RadioLibWrapper::isInRecvMode() const {
+  return (state & ~STATE_INT_READY) == STATE_RX;
 }
 
 int RadioLibWrapper::recvRaw(uint8_t* bytes, int sz) {
@@ -77,13 +115,16 @@ uint32_t RadioLibWrapper::getEstAirtimeFor(int len_bytes) {
   return _radio->getTimeOnAir(len_bytes) / 1000;
 }
 
-void RadioLibWrapper::startSendRaw(const uint8_t* bytes, int len) {
-  state = STATE_TX_WAIT;
+bool RadioLibWrapper::startSendRaw(const uint8_t* bytes, int len) {
   _board->onBeforeTransmit();
   int err = _radio->startTransmit((uint8_t *) bytes, len);
-  if (err != RADIOLIB_ERR_NONE) {
-    MESH_DEBUG_PRINTLN("RadioLibWrapper: error: startTransmit(%d)", err);
+  if (err == RADIOLIB_ERR_NONE) {
+    state = STATE_TX_WAIT;
+    return true;
   }
+  MESH_DEBUG_PRINTLN("RadioLibWrapper: error: startTransmit(%d)", err);
+  idle();   // trigger another startRecv()
+  return false;
 }
 
 bool RadioLibWrapper::isSendComplete() {
@@ -99,6 +140,12 @@ void RadioLibWrapper::onSendFinished() {
   _radio->finishTransmit();
   _board->onAfterTransmit();
   state = STATE_IDLE;
+}
+
+bool RadioLibWrapper::isChannelActive() {
+  return _threshold == 0 
+          ? false    // interference check is disabled
+          : getCurrentRSSI() > _noise_floor + _threshold;
 }
 
 float RadioLibWrapper::getLastRSSI() const {

@@ -10,12 +10,18 @@ namespace mesh {
 
 #define MAX_RX_DELAY_MILLIS   32000  // 32 seconds
 
+#ifndef NOISE_FLOOR_CALIB_INTERVAL
+  #define NOISE_FLOOR_CALIB_INTERVAL   2000     // 2 seconds
+#endif
+
 void Dispatcher::begin() {
   n_sent_flood = n_sent_direct = 0;
   n_recv_flood = n_recv_direct = 0;
-  n_full_events = 0;
+  _err_flags = 0;
+  radio_nonrx_start = _ms->getMillis();
 
   _radio->begin();
+  prev_isrecv_mode = _radio->isInRecvMode();
 }
 
 float Dispatcher::getAirtimeBudgetFactor() const {
@@ -34,6 +40,24 @@ uint32_t Dispatcher::getCADFailMaxDuration() const {
 }
 
 void Dispatcher::loop() {
+  if (millisHasNowPassed(next_floor_calib_time)) {
+    _radio->triggerNoiseFloorCalibrate(getInterferenceThreshold());
+    next_floor_calib_time = futureMillis(NOISE_FLOOR_CALIB_INTERVAL);
+  }
+  _radio->loop();
+
+  // check for radio 'stuck' in mode other than Rx
+  bool is_recv = _radio->isInRecvMode();
+  if (is_recv != prev_isrecv_mode) {
+    prev_isrecv_mode = is_recv;
+    if (!is_recv) {
+      radio_nonrx_start = _ms->getMillis();
+    }
+  }
+  if (!is_recv && _ms->getMillis() - radio_nonrx_start > 8000) {   // radio has not been in Rx mode for 8 seconds!
+    _err_flags |= ERR_EVENT_STARTRX_TIMEOUT;
+  }
+
   if (outbound) {  // waiting for outbound send to be completed
     if (_radio->isSendComplete()) {
       long t = _ms->getMillis() - outbound_start;
@@ -191,7 +215,7 @@ void Dispatcher::processRecvPacket(Packet* pkt) {
 }
 
 void Dispatcher::checkSend() {
-  if (_mgr->getOutboundCount() == 0) return;  // nothing waiting to send
+  if (_mgr->getOutboundCount(_ms->getMillis()) == 0) return;  // nothing waiting to send
   if (!millisHasNowPassed(next_tx_time)) return;   // still in 'radio silence' phase (from airtime budget setting)
   if (_radio->isReceiving()) {   // LBT - check if radio is currently mid-receive, or if channel activity
     if (cad_busy_start == 0) {
@@ -199,6 +223,8 @@ void Dispatcher::checkSend() {
     }
 
     if (_ms->getMillis() - cad_busy_start > getCADFailMaxDuration()) {
+      _err_flags |= ERR_EVENT_CAD_TIMEOUT;
+
       MESH_DEBUG_PRINTLN("%s Dispatcher::checkSend(): CAD busy max duration reached!", getLogDateTime());
       // channel activity has gone on too long... (Radio might be in a bad state)
       // force the pending transmit below...
@@ -234,7 +260,16 @@ void Dispatcher::checkSend() {
 
       uint32_t max_airtime = _radio->getEstAirtimeFor(len)*3/2;
       outbound_start = _ms->getMillis();
-      _radio->startSendRaw(raw, len);
+      bool success = _radio->startSendRaw(raw, len);
+      if (!success) {
+        MESH_DEBUG_PRINTLN("%s Dispatcher::loop(): ERROR: send start failed!", getLogDateTime());
+
+        logTxFail(outbound, outbound->getRawLength());
+  
+        releasePacket(outbound);  // return to pool
+        outbound = NULL;
+        return;
+      }
       outbound_expiry = futureMillis(max_airtime);
 
     #if MESH_PACKET_LOGGING
@@ -255,7 +290,7 @@ void Dispatcher::checkSend() {
 Packet* Dispatcher::obtainNewPacket() {
   auto pkt = _mgr->allocNew();  // TODO: zero out all fields
   if (pkt == NULL) {
-    n_full_events++;
+    _err_flags |= ERR_EVENT_FULL;
   } else {
     pkt->payload_len = pkt->path_len = 0;
     pkt->_snr = 0;

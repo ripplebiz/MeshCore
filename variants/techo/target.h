@@ -6,10 +6,20 @@
 #include <helpers/nrf52/TechoBoard.h>
 #include <helpers/CustomSX1262Wrapper.h>
 #include <helpers/AutoDiscoverRTCClock.h>
+#include <helpers/SensorManager.h>
+#ifdef DISPLAY_CLASS
+  #include <helpers/ui/GxEPDDisplay.h>
+#endif
+
 
 extern TechoBoard board;
 extern WRAPPER_CLASS radio_driver;
 extern AutoDiscoverRTCClock rtc_clock;
+extern SensorManager sensors;
+
+#ifdef DISPLAY_CLASS
+  extern DISPLAY_CLASS display;
+#endif
 
 bool radio_init();
 uint32_t radio_get_rng_seed();

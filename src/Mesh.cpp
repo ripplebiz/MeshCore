@@ -71,7 +71,15 @@ DispatcherAction Mesh::onRecvPacket(Packet* pkt) {
 
       // remove our hash from 'path', then re-broadcast
       pkt->path_len -= PATH_HASH_SIZE;
+  #if 0
       memcpy(pkt->path, &pkt->path[PATH_HASH_SIZE], pkt->path_len);
+  #elif PATH_HASH_SIZE == 1
+      for (int k = 0; k < pkt->path_len; k++) {  // shuffle bytes by 1
+        pkt->path[k] = pkt->path[k + 1];
+      }
+  #else
+      #error "need path remove impl"
+  #endif
 
       uint32_t d = getDirectRetransmitDelay(pkt);
       return ACTION_RETRANSMIT_DELAYED(0, d);  // Routed traffic is HIGHEST priority 

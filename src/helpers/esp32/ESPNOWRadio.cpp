@@ -5,7 +5,7 @@
 
 static uint8_t broadcastAddress[] = {0xFF, 0xFF, 0xFF, 0xFF, 0xFF, 0xFF};
 static esp_now_peer_info_t peerInfo;
-static bool is_send_complete = false;
+static volatile bool is_send_complete = false;
 static esp_err_t last_send_result;
 static uint8_t rx_buf[256];
 static uint8_t last_rx_len = 0;
@@ -44,6 +44,8 @@ void ESPNOWRadio::init() {
   peerInfo.channel = 0;
   peerInfo.encrypt = false;
 
+  is_send_complete = true;
+
   // Add peer        
   if (esp_now_add_peer(&peerInfo) == ESP_OK) {
     ESPNOW_DEBUG_PRINTLN("init success");
@@ -67,24 +69,30 @@ uint32_t ESPNOWRadio::intID() {
   return n + m;
 }
 
-void ESPNOWRadio::startSendRaw(const uint8_t* bytes, int len) {
+bool ESPNOWRadio::startSendRaw(const uint8_t* bytes, int len) {
   // Send message via ESP-NOW
   is_send_complete = false;
   esp_err_t result = esp_now_send(broadcastAddress, bytes, len);
   if (result == ESP_OK) {
     n_sent++;
     ESPNOW_DEBUG_PRINTLN("Send success");
-  } else {
-    last_send_result = result;
-    is_send_complete = true;
-    ESPNOW_DEBUG_PRINTLN("Send failed: %d", result);
+    return true;
   }
+  last_send_result = result;
+  is_send_complete = true;
+  ESPNOW_DEBUG_PRINTLN("Send failed: %d", result);
+  return false;
 }
 
 bool ESPNOWRadio::isSendComplete() {
   return is_send_complete;
 }
 void ESPNOWRadio::onSendFinished() {
+  is_send_complete = true;
+}
+
+bool ESPNOWRadio::isInRecvMode() const {
+  return is_send_complete;    // if NO send in progress, then we're in Rx mode
 }
 
 float ESPNOWRadio::getLastRSSI() const { return 0; }

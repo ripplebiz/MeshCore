@@ -1,8 +1,16 @@
 #include "UITask.h"
 #include <Arduino.h>
 #include <helpers/TxtDataHelpers.h>
+#include "NodePrefs.h"
 
-#define AUTO_OFF_MILLIS   15000   // 15 seconds
+#define AUTO_OFF_MILLIS     15000   // 15 seconds
+#define BOOT_SCREEN_MILLIS   4000   // 4 seconds
+
+#ifdef PIN_STATUS_LED
+#define LED_ON_MILLIS     20
+#define LED_ON_MSG_MILLIS 200
+#define LED_CYCLE_MILLIS  4000
+#endif
 
 #ifndef USER_BTN_PRESSED
 #define USER_BTN_PRESSED LOW
@@ -25,11 +33,11 @@ static const uint8_t meshcore_logo [] PROGMEM = {
     0xe3, 0xe3, 0x8f, 0xff, 0x1f, 0xfc, 0x3c, 0x0e, 0x1f, 0xf8, 0xff, 0xf8, 0x70, 0x3c, 0x7f, 0xf8, 
 };
 
-void UITask::begin(DisplayDriver* display, const char* node_name, const char* build_date, const char* firmware_version, uint32_t pin_code) {
+void UITask::begin(DisplayDriver* display, NodePrefs* node_prefs, const char* build_date, const char* firmware_version, uint32_t pin_code) {
   _display = display;
   _auto_off = millis() + AUTO_OFF_MILLIS;
   clearMsgPreview();
-  _node_name = node_name;
+  _node_prefs = node_prefs;
   _pin_code = pin_code;
   if (_display != NULL) {
     _display->turnOn();
@@ -43,12 +51,33 @@ void UITask::begin(DisplayDriver* display, const char* node_name, const char* bu
     *dash = 0;
   }
 
-  #ifdef PIN_USER_BTN
-    pinMode(PIN_USER_BTN, INPUT);
-  #endif
-
   // v1.2.3 (1 Jan 2025)
   sprintf(_version_info, "%s (%s)", version, build_date);
+
+#ifdef PIN_BUZZER
+  buzzer.begin();
+#endif
+}
+
+void UITask::soundBuzzer(UIEventType bet) {
+#if defined(PIN_BUZZER)
+switch(bet){
+  case UIEventType::contactMessage:
+    // gemini's pick
+    buzzer.play("MsgRcv3:d=4,o=6,b=200:32e,32g,32b,16c7");
+    break;
+  case UIEventType::channelMessage:
+    buzzer.play("kerplop:d=16,o=6,b=120:32g#,32c#");
+    break;
+  case UIEventType::roomMessage:
+  case UIEventType::newContactMessage:
+  case UIEventType::none:
+  default:
+    break;
+}
+#endif
+//  Serial.print("DBG:  Buzzzzzz -> ");
+//  Serial.println((int) bet);
 }
 
 void UITask::msgRead(int msgcount) {
@@ -81,16 +110,42 @@ void UITask::newMsg(uint8_t path_len, const char* from_name, const char* text, i
   }
 }
 
+void UITask::renderBatteryIndicator(uint16_t batteryMilliVolts) {
+  // Convert millivolts to percentage
+  const int minMilliVolts = 3000; // Minimum voltage (e.g., 3.0V)
+  const int maxMilliVolts = 4200; // Maximum voltage (e.g., 4.2V)
+  int batteryPercentage = ((batteryMilliVolts - minMilliVolts) * 100) / (maxMilliVolts - minMilliVolts);
+  if (batteryPercentage < 0) batteryPercentage = 0; // Clamp to 0%
+  if (batteryPercentage > 100) batteryPercentage = 100; // Clamp to 100%
+
+  // battery icon
+  int iconWidth = 24;
+  int iconHeight = 12;
+  int iconX = _display->width() - iconWidth - 5; // Position the icon near the top-right corner
+  int iconY = 0;
+  _display->setColor(DisplayDriver::GREEN);
+
+  // battery outline
+  _display->drawRect(iconX, iconY, iconWidth, iconHeight);
+
+  // battery "cap"
+  _display->fillRect(iconX + iconWidth, iconY + (iconHeight / 4), 3, iconHeight / 2);
+
+  // fill the battery based on the percentage
+  int fillWidth = (batteryPercentage * (iconWidth - 4)) / 100;
+  _display->fillRect(iconX + 2, iconY + 2, fillWidth, iconHeight - 4);
+}
+
 void UITask::renderCurrScreen() {
   if (_display == NULL) return;  // assert() ??
 
   char tmp[80];
-  if (_origin[0] && _msg[0]) {
+  if (_origin[0] && _msg[0]) { // message preview
     // render message preview
     _display->setCursor(0, 0);
     _display->setTextSize(1);
     _display->setColor(DisplayDriver::GREEN);
-    _display->print(_node_name);
+    _display->print(_node_prefs->node_name);
 
     _display->setCursor(0, 12);
     _display->setColor(DisplayDriver::YELLOW);
@@ -104,28 +159,50 @@ void UITask::renderCurrScreen() {
     _display->setColor(DisplayDriver::ORANGE);
     sprintf(tmp, "%d", _msgcount);
     _display->print(tmp);
-  } else {
-    // render 'home' screen
+    _display->setColor(DisplayDriver::YELLOW); // last color will be kept on T114
+  } else if (millis() < BOOT_SCREEN_MILLIS) { // boot screen
+    // meshcore logo
     _display->setColor(DisplayDriver::BLUE);
-    _display->drawXbm(0, 0, meshcore_logo, 128, 13);
-    _display->setCursor(0, 20);
-    _display->setTextSize(1);
+    int logoWidth = 128;
+    _display->drawXbm((_display->width() - logoWidth) / 2, 3, meshcore_logo, logoWidth, 13);
 
+    // version info
     _display->setColor(DisplayDriver::LIGHT);
-    _display->print(_node_name);
-    
-    _display->setCursor(0, 32);
+    _display->setTextSize(1);
+    uint16_t textWidth = _display->getTextWidth(_version_info);
+    _display->setCursor((_display->width() - textWidth) / 2, 22);
     _display->print(_version_info);
+  } else {  // home screen
+    // node name
+    _display->setCursor(0, 0);
+    _display->setTextSize(1);
+    _display->setColor(DisplayDriver::GREEN);
+    _display->print(_node_prefs->node_name);
 
-    if (_connected) {
-      //_display->printf("freq : %03.2f sf %d\n", _prefs.freq, _prefs.sf);
-      //_display->printf("bw   : %03.2f cr %d\n", _prefs.bw, _prefs.cr);
-    } else if (_pin_code != 0) {
+    // battery voltage
+    renderBatteryIndicator(_board->getBattMilliVolts());
+
+    // freq / sf
+    _display->setCursor(0, 20);
+    _display->setColor(DisplayDriver::YELLOW);
+    sprintf(tmp, "FREQ: %06.3f SF%d", _node_prefs->freq, _node_prefs->sf);
+    _display->print(tmp);
+
+    // bw / cr
+    _display->setCursor(0, 30);
+    sprintf(tmp, "BW: %03.2f CR: %d", _node_prefs->bw, _node_prefs->cr);
+    _display->print(tmp);
+
+    // BT pin
+    if (!_connected && _pin_code != 0) {
       _display->setColor(DisplayDriver::RED);
       _display->setTextSize(2);
       _display->setCursor(0, 43);
       sprintf(tmp, "Pin:%d", _pin_code);
       _display->print(tmp);
+      _display->setColor(DisplayDriver::GREEN);
+    } else {
+      _display->setColor(DisplayDriver::LIGHT); 
     }
   }
   _need_refresh = false;
@@ -135,57 +212,45 @@ void UITask::userLedHandler() {
 #ifdef PIN_STATUS_LED
   static int state = 0;
   static int next_change = 0;
-  unsigned long cur_time = millis();
+  static int last_increment = 0;
+
+  int cur_time = millis();
   if (cur_time > next_change) {
     if (state == 0) {
-      state = 1; // led on, short = unread msg
+      state = 1;
       if (_msgcount > 0) {
-        next_change = cur_time + 500;
+        last_increment = LED_ON_MSG_MILLIS;
       } else {
-        next_change = cur_time + 2000;
+        last_increment = LED_ON_MILLIS;
       }
+      next_change = cur_time + last_increment;
     } else {
       state = 0;
-      if (_board->getBattMilliVolts() > 3800) {
-        next_change = cur_time + 2000;
-      } else {
-        next_change = cur_time + 4000; // 4s blank if bat level low
-      }
+      next_change = cur_time + LED_CYCLE_MILLIS - last_increment;
     }
     digitalWrite(PIN_STATUS_LED, state);
   }
 #endif
 }
 
-
-
-
 void UITask::buttonHandler() {
-  #ifdef PIN_USER_BTN
+  #if defined(PIN_USER_BTN) || defined(PIN_USER_BTN_ANA)
     static int prev_btn_state = !USER_BTN_PRESSED;
+    static int prev_btn_state_ana = !USER_BTN_PRESSED;
     static unsigned long btn_state_change_time = 0;
     static unsigned long next_read = 0;
-    static bool countdown_active = false;
-    static int last_countdown = -1;
-  
-  #ifdef UI_CAN_SHUTDOWN
-    static bool shutdown_ready = false;
-  #endif
-  
-    const unsigned long DEBOUNCE_INTERVAL = 100;
-    const unsigned long COUNTDOWN_START_MS = 1000;
-    const unsigned long SHUTDOWN_TRIGGER_MS = 5000;
-    const int COUNTDOWN_SECONDS = 5;
-  
-    unsigned long cur_time = millis();
+    int cur_time = millis();
     if (cur_time >= next_read) {
-      int btn_state = digitalRead(PIN_USER_BTN);
-  
-      if (btn_state != prev_btn_state) {
-        btn_state_change_time = cur_time;
-        prev_btn_state = btn_state;
-  
-        if (btn_state == USER_BTN_PRESSED) {
+      int btn_state = 0;
+      int btn_state_ana = 0;
+      #ifdef PIN_USER_BTN
+      btn_state = digitalRead(PIN_USER_BTN);
+      #endif
+      #ifdef PIN_USER_BTN_ANA
+      btn_state_ana = (analogRead(PIN_USER_BTN_ANA) < 20); // analogRead returns a value hopefully below 20 when button is pressed. 
+      #endif
+      if (btn_state != prev_btn_state || btn_state_ana != prev_btn_state_ana) { // check for either digital or analogue button change of state
+        if (btn_state == USER_BTN_PRESSED || btn_state_ana == USER_BTN_PRESSED) {  // pressed?
           if (_display != NULL) {
             if (_display->isOn()) {
               clearMsgPreview();
@@ -193,119 +258,64 @@ void UITask::buttonHandler() {
               _display->turnOn();
               _need_refresh = true;
             }
-            _auto_off = cur_time + AUTO_OFF_MILLIS;
+            _auto_off = cur_time + AUTO_OFF_MILLIS;   // extend auto-off timer
           }
-  
-          countdown_active = true;
-          last_countdown = -1;
-  
-          #ifdef UI_CAN_SHUTDOWN
-                  shutdown_ready = false;
+        } else { // unpressed ? check pressed time ...
+          if ((cur_time - btn_state_change_time) > 5000) {
+          #ifdef PIN_STATUS_LED
+            digitalWrite(PIN_STATUS_LED, LOW);
+            delay(10);
           #endif
-          
-                } else { // Button released
-                  
-          #ifdef UI_CAN_SHUTDOWN
-                  if (shutdown_ready) {
-                    performShutdown();
-                  }
-          #endif
-                  countdown_active = false;
-                  last_countdown = -1;
-          
-          #ifdef UI_CAN_SHUTDOWN
-                  shutdown_ready = false;
-          #endif
-  
-          if (_display && _display->isOn()) {
-            _need_refresh = true;
+            shutdown(); // without restart
           }
         }
+        btn_state_change_time = millis();
+        prev_btn_state = btn_state;
+        prev_btn_state_ana = btn_state_ana;
       }
-  
-      if (btn_state == USER_BTN_PRESSED && countdown_active) {
-        unsigned long held_time = cur_time - btn_state_change_time;
-  
-  #ifdef UI_CAN_SHUTDOWN
-        if (held_time >= COUNTDOWN_START_MS && held_time < SHUTDOWN_TRIGGER_MS) {
-          int countdown = COUNTDOWN_SECONDS - (held_time / 1000);
-          if (countdown != last_countdown) {
-            showShutdownCountdown(countdown);
-            last_countdown = countdown;
-          }
-        }
-  
-        if (held_time >= SHUTDOWN_TRIGGER_MS && !shutdown_ready) {
-          showFinalShutdownPrompt();
-          shutdown_ready = true;
-        }
-  #endif
-      }
-  
-      next_read = cur_time + DEBOUNCE_INTERVAL;
+      next_read = millis() + 100;  // 10 reads per second
     }
   #endif
   }
-  
-
-  #ifdef UI_CAN_SHUTDOWN
-
-  void UITask::performShutdown() {
-    delay(100);  // debounce
-  
-    if (_display) {
-      _display->startFrame();  // optional clear
-      _display->endFrame();
-    }
-  
-  #ifdef PIN_STATUS_LED
-    digitalWrite(PIN_STATUS_LED, LOW);
-    delay(10);
-  #endif
-  
-    _board->powerOff();  // full shutdown
-  }
-  
-  void UITask::showShutdownCountdown(int countdown) {
-    if (_display && countdown >= 0) {
-      _display->startFrame();
-      _display->setCursor(0, 20);
-      _display->setTextSize(1);
-      _display->setColor(DisplayDriver::RED);
-      _display->print("Shutting down in");
-      _display->setCursor(0, 32);
-      _display->setTextSize(2);
-  
-      char buf[10];
-      sprintf(buf, "%d", countdown);
-      _display->print(buf);
-      _display->endFrame();
-    }
-  }
-  
-  void UITask::showFinalShutdownPrompt() {
-    if (_display) {
-      _display->startFrame();
-      _display->setCursor(0, 20);
-      _display->setTextSize(1);
-      _display->setColor(DisplayDriver::YELLOW);
-      _display->print("Release button to");
-      _display->setCursor(0, 32);
-      _display->print("power down...");
-      _display->endFrame();
-    }
-  }
-  
-  #endif // UI_CAN_SHUTDOWN
-  
 
 
+/* hardware-agnostic pre-shutdown activity should be done here 
+*/
+void UITask::shutdown(bool restart){
+
+  #ifdef PIN_BUZZER
+  /* note: we have a choice here -
+     we can do a blocking buzzer.loop() with non-deterministic consequences
+     or we can set a flag and delay the shutdown for a couple of seconds
+     while a non-blocking buzzer.loop() plays out in UITask::loop()
+  */
+  buzzer.shutdown();
+  uint32_t buzzer_timer = millis(); // fail-safe shutdown
+  while (buzzer.isPlaying() && (millis() - 2500) < buzzer_timer)
+    buzzer.loop();
+
+  #endif // PIN_BUZZER
+
+  if (restart)
+    _board->reboot();
+  else
+    _board->powerOff();
+}
 
 void UITask::loop() {
   buttonHandler();
   userLedHandler();
 
+#ifdef PIN_BUZZER
+  if (buzzer.isPlaying())  buzzer.loop();
+#endif
+
   if (_display != NULL && _display->isOn()) {
+    static bool _firstBoot = true;
+    if(_firstBoot && millis() >= BOOT_SCREEN_MILLIS) {
+      _need_refresh = true;
+      _firstBoot = false;
+    }
     if (millis() >= _next_refresh && _need_refresh) {
       _display->startFrame();
       renderCurrScreen();

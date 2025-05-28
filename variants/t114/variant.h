@@ -41,8 +41,8 @@
 ////////////////////////////////////////////////////////////////////////////////
 // UART pin definition
 
-#define PIN_SERIAL1_RX          (39)
-#define PIN_SERIAL1_TX          (37)
+#define PIN_SERIAL1_RX          (37)
+#define PIN_SERIAL1_TX          (39)
 
 #define PIN_SERIAL2_RX          (9)
 #define PIN_SERIAL2_TX          (10)
@@ -69,10 +69,10 @@
 #define LED_BUILTIN             (35)
 #define PIN_LED                 LED_BUILTIN
 #define LED_RED                 LED_BUILTIN
-#define LED_BLUE                LED_BUILTIN
+#define LED_BLUE                (-1)            // No blue led, prevents Bluefruit flashing the green LED during advertising
 #define LED_PIN                 LED_BUILTIN
 
-#define LED_STATE_ON            HIGH
+#define LED_STATE_ON            LOW
 
 #define PIN_NEOPIXEL            (14)
 #define NEOPIXEL_NUM            (2)
@@ -109,8 +109,14 @@
 ////////////////////////////////////////////////////////////////////////////////
 // Buzzer
 
-#define PIN_BUZZER              (46)
+// #define PIN_BUZZER              (46)
 
+
+////////////////////////////////////////////////////////////////////////////////
+// GPS
+
+#define GPS_EN                  (21)
+#define GPS_RESET               (38)
 
 ////////////////////////////////////////////////////////////////////////////////
 // TFT

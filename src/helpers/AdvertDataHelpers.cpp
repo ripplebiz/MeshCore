@@ -8,8 +8,14 @@
       memcpy(&app_data[i], &_lat, 4); i += 4;
       memcpy(&app_data[i], &_lon, 4); i += 4;
     }
-    // TODO:  BATTERY encoding
-    // TODO:  TEMPERATURE encoding
+    if (_extra1) {
+      app_data[0] |= ADV_FEAT1_MASK;
+      memcpy(&app_data[i], &_extra1, 2); i += 2;
+    }
+    if (_extra2) {
+      app_data[0] |= ADV_FEAT2_MASK;
+      memcpy(&app_data[i], &_extra2, 2); i += 2;
+    }
     if (_name && *_name != 0) { 
       app_data[0] |= ADV_NAME_MASK;
       const char* sp = _name;
@@ -25,17 +31,18 @@
     _lat = _lon = 0;
     _flags = app_data[0];
     _valid = false;
-
+    _extra1 = _extra2 = 0;
+  
     int i = 1;
     if (_flags & ADV_LATLON_MASK) {
       memcpy(&_lat, &app_data[i], 4); i += 4;
       memcpy(&_lon, &app_data[i], 4); i += 4;
     }
-    if (_flags & ADV_BATTERY_MASK) {
-      /* TODO: somewhere to store battery volts? */ i += 2;
+    if (_flags & ADV_FEAT1_MASK) {
+      memcpy(&_extra1, &app_data[i], 2); i += 2;
     }
-    if (_flags & ADV_TEMPERATURE_MASK) {
-      /* TODO: somewhere to store temperature? */ i += 2;
+    if (_flags & ADV_FEAT2_MASK) {
+      memcpy(&_extra2, &app_data[i], 2); i += 2;
     }
 
     if (app_data_len >= i) {

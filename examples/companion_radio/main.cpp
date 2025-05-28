@@ -1,7 +1,7 @@
 #include <Arduino.h>   // needed for PlatformIO
 #include <Mesh.h>
 
-#if defined(NRF52_PLATFORM)
+#if defined(NRF52_PLATFORM) || defined(STM32_PLATFORM)
   #include <InternalFileSystem.h>
 #elif defined(RP2040_PLATFORM)
   #include <LittleFS.h>
@@ -14,6 +14,7 @@
 #include <helpers/SimpleMeshTables.h>
 #include <helpers/IdentityStore.h>
 #include <helpers/BaseSerialInterface.h>
+#include "NodePrefs.h"
 #include <RTClib.h>
 #include <target.h>
 
@@ -56,23 +57,11 @@
 #define FLOOD_SEND_TIMEOUT_FACTOR         16.0f
 #define DIRECT_SEND_PERHOP_FACTOR         6.0f
 #define DIRECT_SEND_PERHOP_EXTRA_MILLIS   250
+#define LAZY_CONTACTS_WRITE_DELAY        5000
 
 #define  PUBLIC_GROUP_PSK  "izOH6cXN6mrJ5e26oRXNcg=="
 
 #ifdef DISPLAY_CLASS
-  #include "UITask.h"
-  #ifdef ST7789
-    #include <helpers/ui/ST7789Display.h>
-  #elif defined(HAS_GxEPD)
-    #include <helpers/ui/GxEPDDisplay.h>
-  #else
-    #include <helpers/ui/SSD1306Display.h>
-  #endif
-  static DISPLAY_CLASS display;
-  #define HAS_UI
-#endif
-
-#if defined(HAS_UI)
   #include "UITask.h"
 
   static UITask ui_task(&board);
@@ -90,14 +79,14 @@ static uint32_t _atoi(const char* sp) {
 
 /*------------ Frame Protocol --------------*/
 
-#define FIRMWARE_VER_CODE    4
+#define FIRMWARE_VER_CODE    5
 
 #ifndef FIRMWARE_BUILD_DATE
-  #define FIRMWARE_BUILD_DATE   "21 Apr 2025"
+  #define FIRMWARE_BUILD_DATE   "24 May 2025"
 #endif
 
 #ifndef FIRMWARE_VERSION
-  #define FIRMWARE_VERSION   "v1.5.1"
+  #define FIRMWARE_VERSION   "v1.6.2"
 #endif
 
 #define CMD_APP_START              1
@@ -138,6 +127,9 @@ static uint32_t _atoi(const char* sp) {
 #define CMD_SEND_TRACE_PATH       36
 #define CMD_SET_DEVICE_PIN        37
 #define CMD_SET_OTHER_PARAMS      38
+#define CMD_SEND_TELEMETRY_REQ    39
+#define CMD_GET_CUSTOM_VARS       40
+#define CMD_SET_CUSTOM_VAR        41
 
 #define RESP_CODE_OK                0
 #define RESP_CODE_ERR               1
@@ -160,6 +152,7 @@ static uint32_t _atoi(const char* sp) {
 #define RESP_CODE_CHANNEL_INFO     18   // a reply to CMD_GET_CHANNEL
 #define RESP_CODE_SIGN_START       19
 #define RESP_CODE_SIGNATURE        20
+#define RESP_CODE_CUSTOM_VARS      21
 
 // these are _pushed_ to client app at any time
 #define PUSH_CODE_ADVERT            0x80
@@ -173,6 +166,7 @@ static uint32_t _atoi(const char* sp) {
 #define PUSH_CODE_LOG_RX_DATA       0x88
 #define PUSH_CODE_TRACE_DATA        0x89
 #define PUSH_CODE_NEW_ADVERT        0x8A
+#define PUSH_CODE_TELEMETRY_RESPONSE  0x8B
 
 #define ERR_CODE_UNSUPPORTED_CMD      1
 #define ERR_CODE_NOT_FOUND            2
@@ -183,23 +177,11 @@ static uint32_t _atoi(const char* sp) {
 
 /* -------------------------------------------------------------------------------------- */
 
-#define MAX_SIGN_DATA_LEN    (8*1024)   // 8K
+#define REQ_TYPE_GET_STATUS          0x01   // same as _GET_STATS
+#define REQ_TYPE_KEEP_ALIVE          0x02
+#define REQ_TYPE_GET_TELEMETRY_DATA  0x03
 
-struct NodePrefs {  // persisted to file
-  float airtime_factor;
-  char node_name[32];
-  double node_lat, node_lon;
-  float freq;
-  uint8_t sf;
-  uint8_t cr;
-  uint8_t reserved1;
-  uint8_t manual_add_contacts;
-  float bw;
-  uint8_t tx_power_dbm;
-  uint8_t unused[3];
-  float rx_delay_base;
-  uint32_t ble_pin;
-};
+#define MAX_SIGN_DATA_LEN    (8*1024)   // 8K
 
 class MyMesh : public BaseChatMesh {
   FILESYSTEM* _fs;
@@ -207,6 +189,7 @@ class MyMesh : public BaseChatMesh {
   NodePrefs _prefs;
   uint32_t pending_login;
   uint32_t pending_status;
+  uint32_t pending_telemetry;
   BaseSerialInterface* _serial;
   ContactsIterator _iter;
   uint32_t _iter_filter_since;
@@ -216,8 +199,10 @@ class MyMesh : public BaseChatMesh {
   uint8_t app_target_ver;
   uint8_t* sign_data;
   uint32_t sign_data_len;
+  unsigned long dirty_contacts_expiry;
   uint8_t cmd_frame[MAX_FRAME_SIZE+1];
   uint8_t out_frame[MAX_FRAME_SIZE+1];
+  CayenneLPP telemetry;
 
   struct Frame {
     uint8_t len;
@@ -287,9 +272,9 @@ class MyMesh : public BaseChatMesh {
   }
 
   void saveContacts() {
-#if defined(NRF52_PLATFORM)
+#if defined(NRF52_PLATFORM) || defined(STM32_PLATFORM)
+    _fs->remove("/contacts3");
     File file = _fs->open("/contacts3", FILE_O_WRITE);
-    if (file) { file.seek(0); file.truncate(); }
 #elif defined(RP2040_PLATFORM)
     File file = _fs->open("/contacts3", "w");
 #else
@@ -352,9 +337,9 @@ class MyMesh : public BaseChatMesh {
   }
 
   void saveChannels() {
-  #if defined(NRF52_PLATFORM)
+  #if defined(NRF52_PLATFORM) || defined(STM32_PLATFORM)
+    _fs->remove("/channels2");
     File file = _fs->open("/channels2", FILE_O_WRITE);
-    if (file) { file.seek(0); file.truncate(); }
   #elif defined(RP2040_PLATFORM)
     File file = _fs->open("/channels2", "w");
   #else
@@ -409,9 +394,9 @@ class MyMesh : public BaseChatMesh {
     mesh::Utils::toHex(fname, key, key_len);
     sprintf(path, "/bl/%s", fname);
 
-  #if defined(NRF52_PLATFORM)
+  #if defined(NRF52_PLATFORM) || defined(STM32_PLATFORM)
+    _fs->remove(path);
     File f = _fs->open(path, FILE_O_WRITE);
-    if (f) { f.seek(0); f.truncate(); }
   #elif defined(RP2040_PLATFORM)
     File f = _fs->open(path, "w");
   #else
@@ -500,13 +485,13 @@ class MyMesh : public BaseChatMesh {
     return 0;  // queue is empty
   }
 
-  void soundBuzzer() {
-    // TODO
-  }
-
 protected:
   float getAirtimeBudgetFactor() const override {
     return _prefs.airtime_factor;
+  }
+
+  int getInterferenceThreshold() const override {
+    return 14;  // hard-coded for now
   }
 
   int calcRxDelay(float score, uint32_t air_time) const override {
@@ -540,10 +525,12 @@ protected:
         _serial->writeFrame(out_frame, 1 + PUB_KEY_SIZE);
       }
     } else {
-      soundBuzzer();
+    #ifdef DISPLAY_CLASS
+      ui_task.soundBuzzer(UIEventType::newContactMessage);
+    #endif
     }
 
-    saveContacts();
+    dirty_contacts_expiry = futureMillis(LAZY_CONTACTS_WRITE_DELAY);
   }
 
   void onContactPathUpdated(const ContactInfo& contact) override {
@@ -551,7 +538,7 @@ protected:
     memcpy(&out_frame[1], contact.id.pub_key, PUB_KEY_SIZE);
     _serial->writeFrame(out_frame, 1 + PUB_KEY_SIZE);   // NOTE: app may not be connected
 
-    saveContacts();
+    dirty_contacts_expiry = futureMillis(LAZY_CONTACTS_WRITE_DELAY);
   }
 
   bool processAck(const uint8_t *data) override {
@@ -601,9 +588,11 @@ protected:
       frame[0] = PUSH_CODE_MSG_WAITING;  // send push 'tickle'
       _serial->writeFrame(frame, 1);
     } else {
-      soundBuzzer();
+    #ifdef DISPLAY_CLASS
+      ui_task.soundBuzzer(UIEventType::contactMessage);
+    #endif
     }
-  #ifdef HAS_UI
+  #ifdef DISPLAY_CLASS
     ui_task.newMsg(path_len, from.name, text, offline_queue_len);
   #endif
   }
@@ -620,7 +609,8 @@ protected:
 
   void onSignedMessageRecv(const ContactInfo& from, mesh::Packet* pkt, uint32_t sender_timestamp, const uint8_t *sender_prefix, const char *text) override {
     markConnectionActive(from);
-    saveContacts();   // from.sync_since change needs to be persisted
+    // from.sync_since change needs to be persisted
+    dirty_contacts_expiry = futureMillis(LAZY_CONTACTS_WRITE_DELAY);
     queueMessage(from, TXT_TYPE_SIGNED_PLAIN, pkt, sender_timestamp, sender_prefix, 4, text);
   }
 
@@ -652,16 +642,57 @@ protected:
       frame[0] = PUSH_CODE_MSG_WAITING;  // send push 'tickle'
       _serial->writeFrame(frame, 1);
     } else {
-      soundBuzzer();
+    #ifdef DISPLAY_CLASS
+      ui_task.soundBuzzer(UIEventType::channelMessage);
+    #endif
     }
-  #ifdef HAS_UI
+  #ifdef DISPLAY_CLASS
     ui_task.newMsg(path_len, "Public", text, offline_queue_len);
   #endif
   }
 
+  uint8_t onContactRequest(const ContactInfo& contact, uint32_t sender_timestamp, const uint8_t* data, uint8_t len, uint8_t* reply) override {
+    if (data[0] == REQ_TYPE_GET_TELEMETRY_DATA) {
+      uint8_t permissions = 0;
+      uint8_t cp = contact.flags >> 1;   // LSB used as 'favourite' bit (so only use upper bits)
+
+      if (_prefs.telemetry_mode_base == TELEM_MODE_ALLOW_ALL) {
+        permissions = TELEM_PERM_BASE;
+      } else if (_prefs.telemetry_mode_base == TELEM_MODE_ALLOW_FLAGS) {
+        permissions = cp & TELEM_PERM_BASE;
+      }
+
+      if (_prefs.telemetry_mode_loc == TELEM_MODE_ALLOW_ALL) {
+        permissions |= TELEM_PERM_LOCATION;
+      } else if (_prefs.telemetry_mode_loc == TELEM_MODE_ALLOW_FLAGS) {
+        permissions |= cp & TELEM_PERM_LOCATION;
+      }
+
+      if (_prefs.telemetry_mode_env == TELEM_MODE_ALLOW_ALL) {
+        permissions |= TELEM_PERM_ENVIRONMENT;
+      } else if (_prefs.telemetry_mode_env == TELEM_MODE_ALLOW_FLAGS) {
+        permissions |= cp & TELEM_PERM_ENVIRONMENT;
+      }
+
+      if (permissions & TELEM_PERM_BASE) {   // only respond if base permission bit is set
+        telemetry.reset();
+        telemetry.addVoltage(TELEM_CHANNEL_SELF, (float)board.getBattMilliVolts() / 1000.0f);
+        // query other sensors -- target specific
+        sensors.querySensors(permissions, telemetry);
+
+        memcpy(reply, &sender_timestamp, 4);   // reflect sender_timestamp back in response packet (kind of like a 'tag')
+
+        uint8_t tlen = telemetry.getSize();
+        memcpy(&reply[4], telemetry.getBuffer(), tlen);
+        return 4 + tlen;
+      }
+    }
+    return 0;  // unknown
+  }
+
   void onContactResponse(const ContactInfo& contact, const uint8_t* data, uint8_t len) override {
-    uint32_t sender_timestamp;
-    memcpy(&sender_timestamp, data, 4);
+    uint32_t tag;
+    memcpy(&tag, data, 4);
 
     if (pending_login && memcmp(&pending_login, contact.id.pub_key, 4) == 0) { // check for login response
       // yes, is response to pending sendLogin()
@@ -671,6 +702,7 @@ protected:
       if (memcmp(&data[4], "OK", 2) == 0) {    // legacy Repeater login OK response
         out_frame[i++] = PUSH_CODE_LOGIN_SUCCESS;
         out_frame[i++] = 0;  // legacy: is_admin = false
+        memcpy(&out_frame[i], contact.id.pub_key, 6); i += 6;  // pub_key_prefix
       } else if (data[4] == RESP_SERVER_LOGIN_OK) {   // new login response
         uint16_t keep_alive_secs = ((uint16_t)data[5]) * 16;
         if (keep_alive_secs > 0) {
@@ -678,18 +710,31 @@ protected:
         }
         out_frame[i++] = PUSH_CODE_LOGIN_SUCCESS;
         out_frame[i++] = data[6];  // permissions (eg. is_admin)
+        memcpy(&out_frame[i], contact.id.pub_key, 6); i += 6;  // pub_key_prefix
+        memcpy(&out_frame[i], &tag, 4); i += 4;  // NEW: include server timestamp
       } else {
         out_frame[i++] = PUSH_CODE_LOGIN_FAIL;
         out_frame[i++] = 0;  // reserved
+        memcpy(&out_frame[i], contact.id.pub_key, 6); i += 6;  // pub_key_prefix
       }
-      memcpy(&out_frame[i], contact.id.pub_key, 6); i += 6;  // pub_key_prefix
       _serial->writeFrame(out_frame, i);
-    } else if (len > 4 && pending_status && memcmp(&pending_status, contact.id.pub_key, 4) == 0) { // check for status response
-      // yes, is response to pending sendStatusRequest()
+    } else if (len > 4 &&   // check for status response
+      pending_status && memcmp(&pending_status, contact.id.pub_key, 4) == 0   // legacy matching scheme
+      // FUTURE: tag == pending_status
+    ) {
       pending_status = 0;
 
       int i = 0;
       out_frame[i++] = PUSH_CODE_STATUS_RESPONSE;
+      out_frame[i++] = 0;  // reserved
+      memcpy(&out_frame[i], contact.id.pub_key, 6); i += 6;  // pub_key_prefix
+      memcpy(&out_frame[i], &data[4], len - 4); i += (len - 4);
+      _serial->writeFrame(out_frame, i);
+    } else if (len > 4 && tag == pending_telemetry) {  // check for telemetry response
+      pending_telemetry = 0;
+
+      int i = 0;
+      out_frame[i++] = PUSH_CODE_TELEMETRY_RESPONSE;
       out_frame[i++] = 0;  // reserved
       memcpy(&out_frame[i], contact.id.pub_key, 6); i += 6;  // pub_key_prefix
       memcpy(&out_frame[i], &data[4], len - 4); i += (len - 4);
@@ -749,15 +794,17 @@ protected:
 public:
 
   MyMesh(mesh::Radio& radio, mesh::RNG& rng, mesh::RTCClock& rtc, SimpleMeshTables& tables)
-     : BaseChatMesh(radio, *new ArduinoMillis(), rng, rtc, *new StaticPoolPacketManager(16), tables), _serial(NULL)
+     : BaseChatMesh(radio, *new ArduinoMillis(), rng, rtc, *new StaticPoolPacketManager(16), tables), _serial(NULL),
+       telemetry(MAX_PACKET_PAYLOAD - 4)
   {
     _iter_started = false;
     offline_queue_len = 0;
     app_target_ver = 0;
     _identity_store = NULL;
-    pending_login = pending_status = 0;
+    pending_login = pending_status = pending_telemetry = 0;
     next_ack_idx = 0;
     sign_data = NULL;
+    dirty_contacts_expiry = 0;
 
     // defaults
     memset(&_prefs, 0, sizeof(_prefs));
@@ -783,8 +830,8 @@ public:
       file.read((uint8_t *) &_prefs.airtime_factor, sizeof(float));  // 0
       file.read((uint8_t *) _prefs.node_name, sizeof(_prefs.node_name));  // 4
       file.read(pad, 4);   // 36
-      file.read((uint8_t *) &_prefs.node_lat, sizeof(_prefs.node_lat));  // 40
-      file.read((uint8_t *) &_prefs.node_lon, sizeof(_prefs.node_lon));  // 48
+      file.read((uint8_t *) &sensors.node_lat, sizeof(sensors.node_lat));  // 40
+      file.read((uint8_t *) &sensors.node_lon, sizeof(sensors.node_lon));  // 48
       file.read((uint8_t *) &_prefs.freq, sizeof(_prefs.freq));   // 56
       file.read((uint8_t *) &_prefs.sf, sizeof(_prefs.sf));  // 60
       file.read((uint8_t *) &_prefs.cr, sizeof(_prefs.cr));  // 61
@@ -792,7 +839,9 @@ public:
       file.read((uint8_t *) &_prefs.manual_add_contacts, sizeof(_prefs.manual_add_contacts));  // 63
       file.read((uint8_t *) &_prefs.bw, sizeof(_prefs.bw));  // 64
       file.read((uint8_t *) &_prefs.tx_power_dbm, sizeof(_prefs.tx_power_dbm));  // 68
-      file.read((uint8_t *) _prefs.unused, sizeof(_prefs.unused));  // 69
+      file.read((uint8_t *) &_prefs.telemetry_mode_base, sizeof(_prefs.telemetry_mode_base));  // 69
+      file.read((uint8_t *) &_prefs.telemetry_mode_loc, sizeof(_prefs.telemetry_mode_loc));  // 70
+      file.read((uint8_t *) &_prefs.telemetry_mode_env, sizeof(_prefs.telemetry_mode_env));  // 71
       file.read((uint8_t *) &_prefs.rx_delay_base, sizeof(_prefs.rx_delay_base));  // 72
       file.read(pad, 4);   // 76
       file.read((uint8_t *) &_prefs.ble_pin, sizeof(_prefs.ble_pin));  // 80
@@ -815,7 +864,7 @@ public:
 
     BaseChatMesh::begin();
 
-  #if defined(NRF52_PLATFORM)
+  #if defined(NRF52_PLATFORM) || defined(STM32_PLATFORM)
     _identity_store = new IdentityStore(fs, "");
   #elif defined(RP2040_PLATFORM)
     _identity_store = new IdentityStore(fs, "/identity");
@@ -825,6 +874,16 @@ public:
   #endif
 
     loadMainIdentity();
+
+    // use hex of first 4 bytes of identity public key as default node name
+    char pub_key_hex[10];
+    mesh::Utils::toHex(pub_key_hex, self_id.pub_key, 4);
+    strcpy(_prefs.node_name, pub_key_hex);
+
+    // if name is provided as a build flag, use that as default node name instead
+    #ifdef ADVERT_NAME
+    strcpy(_prefs.node_name, ADVERT_NAME);
+    #endif
 
     // load persisted prefs
     if (_fs->exists("/new_prefs")) {
@@ -837,7 +896,7 @@ public:
 
   #ifdef BLE_PIN_CODE
     if (_prefs.ble_pin == 0) {
-    #ifdef HAS_UI
+    #ifdef DISPLAY_CLASS
       if (has_display) {
         StdRNG  rng;
         _active_ble_pin = rng.nextInt(100000, 999999);  // random pin each session
@@ -866,6 +925,9 @@ public:
   }
 
   const char* getNodeName() { return _prefs.node_name; }
+  NodePrefs* getNodePrefs() { 
+    return &_prefs; 
+  }
   uint32_t getBLEPin() { return _active_ble_pin; }
 
   void startInterface(BaseSerialInterface& serial) {
@@ -874,9 +936,9 @@ public:
   }
 
   void savePrefs() {
-#if defined(NRF52_PLATFORM)
+#if defined(NRF52_PLATFORM) || defined(STM32_PLATFORM)
+    _fs->remove("/new_prefs");
     File file = _fs->open("/new_prefs", FILE_O_WRITE);
-    if (file) { file.seek(0); file.truncate(); }
 #elif defined(RP2040_PLATFORM)
     File file = _fs->open("/new_prefs", "w");
 #else
@@ -889,8 +951,8 @@ public:
       file.write((uint8_t *) &_prefs.airtime_factor, sizeof(float));  // 0
       file.write((uint8_t *) _prefs.node_name, sizeof(_prefs.node_name));  // 4
       file.write(pad, 4);   // 36
-      file.write((uint8_t *) &_prefs.node_lat, sizeof(_prefs.node_lat));  // 40
-      file.write((uint8_t *) &_prefs.node_lon, sizeof(_prefs.node_lon));  // 48
+      file.write((uint8_t *) &sensors.node_lat, sizeof(sensors.node_lat));  // 40
+      file.write((uint8_t *) &sensors.node_lon, sizeof(sensors.node_lon));  // 48
       file.write((uint8_t *) &_prefs.freq, sizeof(_prefs.freq));   // 56
       file.write((uint8_t *) &_prefs.sf, sizeof(_prefs.sf));  // 60
       file.write((uint8_t *) &_prefs.cr, sizeof(_prefs.cr));  // 61
@@ -898,7 +960,9 @@ public:
       file.write((uint8_t *) &_prefs.manual_add_contacts, sizeof(_prefs.manual_add_contacts));  // 63
       file.write((uint8_t *) &_prefs.bw, sizeof(_prefs.bw));  // 64
       file.write((uint8_t *) &_prefs.tx_power_dbm, sizeof(_prefs.tx_power_dbm));  // 68
-      file.write((uint8_t *) _prefs.unused, sizeof(_prefs.unused));  // 69
+      file.write((uint8_t *) &_prefs.telemetry_mode_base, sizeof(_prefs.telemetry_mode_base));  // 69
+      file.write((uint8_t *) &_prefs.telemetry_mode_loc, sizeof(_prefs.telemetry_mode_loc));  // 70
+      file.write((uint8_t *) &_prefs.telemetry_mode_env, sizeof(_prefs.telemetry_mode_env));  // 71
       file.write((uint8_t *) &_prefs.rx_delay_base, sizeof(_prefs.rx_delay_base));  // 72
       file.write(pad, 4);   // 76
       file.write((uint8_t *) &_prefs.ble_pin, sizeof(_prefs.ble_pin));  // 80
@@ -937,13 +1001,13 @@ public:
       memcpy(&out_frame[i], self_id.pub_key, PUB_KEY_SIZE); i += PUB_KEY_SIZE;
 
       int32_t lat, lon;
-      lat = (_prefs.node_lat * 1000000.0);
-      lon = (_prefs.node_lon * 1000000.0);
+      lat = (sensors.node_lat * 1000000.0);
+      lon = (sensors.node_lon * 1000000.0);
       memcpy(&out_frame[i], &lat, 4); i += 4;
       memcpy(&out_frame[i], &lon, 4); i += 4;
       out_frame[i++] = 0;  // reserved
       out_frame[i++] = 0;  // reserved
-      out_frame[i++] = 0;  // reserved
+      out_frame[i++] = (_prefs.telemetry_mode_env << 4) | (_prefs.telemetry_mode_loc << 2) | (_prefs.telemetry_mode_base);  // v5+
       out_frame[i++] = _prefs.manual_add_contacts;
 
       uint32_t freq = _prefs.freq * 1000;
@@ -1051,8 +1115,8 @@ public:
         memcpy(&alt, &cmd_frame[9], 4);  // for FUTURE support
       }
       if (lat <= 90*1E6 && lat >= -90*1E6 && lon <= 180*1E6 && lon >= -180*1E6) {
-        _prefs.node_lat = ((double)lat) / 1000000.0;
-        _prefs.node_lon = ((double)lon) / 1000000.0;
+        sensors.node_lat = ((double)lat) / 1000000.0;
+        sensors.node_lon = ((double)lon) / 1000000.0;
         savePrefs();
         writeOKFrame();
       } else {
@@ -1075,7 +1139,7 @@ public:
         writeErrFrame(ERR_CODE_ILLEGAL_ARG);
       }
     } else if (cmd_frame[0] == CMD_SEND_SELF_ADVERT) {
-      auto pkt = createSelfAdvert(_prefs.node_name, _prefs.node_lat, _prefs.node_lon);
+      auto pkt = createSelfAdvert(_prefs.node_name, sensors.node_lat, sensors.node_lon);
       if (pkt) {
         if (len >= 2 && cmd_frame[1] == 1) {   // optional param (1 = flood, 0 = zero hop)
           sendFlood(pkt);
@@ -1092,7 +1156,7 @@ public:
       if (recipient) {
         recipient->out_path_len = -1;
         //recipient->lastmod = ??   shouldn't be needed, app already has this version of contact
-        saveContacts();
+        dirty_contacts_expiry = futureMillis(LAZY_CONTACTS_WRITE_DELAY);
         writeOKFrame();
       } else {
         writeErrFrame(ERR_CODE_NOT_FOUND);  // unknown contact
@@ -1103,7 +1167,7 @@ public:
       if (recipient) {
         updateContactFromFrame(*recipient, cmd_frame, len);
         //recipient->lastmod = ??   shouldn't be needed, app already has this version of contact
-        saveContacts();
+        dirty_contacts_expiry = futureMillis(LAZY_CONTACTS_WRITE_DELAY);
         writeOKFrame();
       } else {
         ContactInfo contact;
@@ -1111,7 +1175,7 @@ public:
         contact.lastmod = getRTCClock()->getCurrentTime();
         contact.sync_since = 0;
         if (addContact(contact)) {
-          saveContacts();
+          dirty_contacts_expiry = futureMillis(LAZY_CONTACTS_WRITE_DELAY);
           writeOKFrame();
         } else {
           writeErrFrame(ERR_CODE_TABLE_FULL);
@@ -1121,7 +1185,7 @@ public:
       uint8_t* pub_key = &cmd_frame[1];
       ContactInfo* recipient = lookupContactByPubKey(pub_key, PUB_KEY_SIZE);
       if (recipient && removeContact(*recipient)) {
-        saveContacts();
+        dirty_contacts_expiry = futureMillis(LAZY_CONTACTS_WRITE_DELAY);
         writeOKFrame();
       } else {
         writeErrFrame(ERR_CODE_NOT_FOUND);  // not found, or unable to remove
@@ -1149,7 +1213,7 @@ public:
     } else if (cmd_frame[0] == CMD_EXPORT_CONTACT) {
       if (len < 1 + PUB_KEY_SIZE) {
         // export SELF
-        auto pkt = createSelfAdvert(_prefs.node_name, _prefs.node_lat, _prefs.node_lon);
+        auto pkt = createSelfAdvert(_prefs.node_name, sensors.node_lat, sensors.node_lon);
         if (pkt) {
           pkt->header |= ROUTE_TYPE_FLOOD;  // would normally be sent in this mode
 
@@ -1181,7 +1245,7 @@ public:
       int out_len;
       if ((out_len = getFromOfflineQueue(out_frame)) > 0) {
         _serial->writeFrame(out_frame, out_len);
-        #ifdef HAS_UI
+        #ifdef DISPLAY_CLASS
           ui_task.msgRead(offline_queue_len);
         #endif
       } else {
@@ -1232,9 +1296,17 @@ public:
       writeOKFrame();
     } else if (cmd_frame[0] == CMD_SET_OTHER_PARAMS) {
       _prefs.manual_add_contacts = cmd_frame[1];
+      if (len >= 3) {
+        _prefs.telemetry_mode_base = cmd_frame[2] & 0x03;       // v5+
+        _prefs.telemetry_mode_loc = (cmd_frame[2] >> 2) & 0x03;
+        _prefs.telemetry_mode_env = (cmd_frame[2] >> 4) & 0x03;
+      }
       savePrefs();
       writeOKFrame();
     } else if (cmd_frame[0] == CMD_REBOOT && memcmp(&cmd_frame[1], "reboot", 6) == 0) {
+      if (dirty_contacts_expiry) {  // is there are pending dirty contacts write needed?
+        saveContacts();
+      }
       board.reboot();
     } else if (cmd_frame[0] == CMD_GET_BATTERY_VOLTAGE) {
       uint8_t reply[3];
@@ -1290,7 +1362,7 @@ public:
         if (result == MSG_SEND_FAILED) {
           writeErrFrame(ERR_CODE_TABLE_FULL);
         } else {
-          pending_status = 0;
+          pending_telemetry = pending_status = 0;
           memcpy(&pending_login, recipient->id.pub_key, 4);  // match this to onContactResponse()
           out_frame[0] = RESP_CODE_SENT;
           out_frame[1] = (result == MSG_SEND_SENT_FLOOD) ? 1 : 0;
@@ -1305,16 +1377,37 @@ public:
       uint8_t* pub_key = &cmd_frame[1];
       ContactInfo* recipient = lookupContactByPubKey(pub_key, PUB_KEY_SIZE);
       if (recipient) {
-        uint32_t est_timeout;
-        int result = sendStatusRequest(*recipient, est_timeout);
+        uint32_t tag, est_timeout;
+        int result = sendRequest(*recipient, REQ_TYPE_GET_STATUS, tag, est_timeout);
         if (result == MSG_SEND_FAILED) {
           writeErrFrame(ERR_CODE_TABLE_FULL);
         } else {
-          pending_login = 0;
-          memcpy(&pending_status, recipient->id.pub_key, 4);  // match this to onContactResponse()
+          pending_telemetry = pending_login = 0;
+          // FUTURE:  pending_status = tag;  // match this in onContactResponse()
+          memcpy(&pending_status, recipient->id.pub_key, 4);  // legacy matching scheme
           out_frame[0] = RESP_CODE_SENT;
           out_frame[1] = (result == MSG_SEND_SENT_FLOOD) ? 1 : 0;
-          memcpy(&out_frame[2], &pending_status, 4);
+          memcpy(&out_frame[2], &tag, 4);
+          memcpy(&out_frame[6], &est_timeout, 4);
+          _serial->writeFrame(out_frame, 10);
+        }
+      } else {
+        writeErrFrame(ERR_CODE_NOT_FOUND);  // contact not found
+      }
+    } else if (cmd_frame[0] == CMD_SEND_TELEMETRY_REQ && len >= 4+PUB_KEY_SIZE) {
+      uint8_t* pub_key = &cmd_frame[4];
+      ContactInfo* recipient = lookupContactByPubKey(pub_key, PUB_KEY_SIZE);
+      if (recipient) {
+        uint32_t tag, est_timeout;
+        int result = sendRequest(*recipient, REQ_TYPE_GET_TELEMETRY_DATA, tag, est_timeout);
+        if (result == MSG_SEND_FAILED) {
+          writeErrFrame(ERR_CODE_TABLE_FULL);
+        } else {
+          pending_status = pending_login = 0;
+          pending_telemetry = tag;  // match this in onContactResponse()
+          out_frame[0] = RESP_CODE_SENT;
+          out_frame[1] = (result == MSG_SEND_SENT_FLOOD) ? 1 : 0;
+          memcpy(&out_frame[2], &tag, 4);
           memcpy(&out_frame[6], &est_timeout, 4);
           _serial->writeFrame(out_frame, 10);
         }
@@ -1412,9 +1505,45 @@ public:
         writeErrFrame(ERR_CODE_TABLE_FULL);
       }
     } else if (cmd_frame[0] == CMD_SET_DEVICE_PIN && len >= 5) {
-      memcpy(&_prefs.ble_pin, &cmd_frame[1], 4);
-      savePrefs();
-      writeOKFrame();
+
+      // get pin from command frame
+      uint32_t pin;
+      memcpy(&pin, &cmd_frame[1], 4);
+
+      // ensure pin is zero, or a valid 6 digit pin
+      if(pin == 0 || (pin >= 100000 && pin <= 999999)){
+        _prefs.ble_pin = pin;
+        savePrefs();
+        writeOKFrame();
+      } else {
+        writeErrFrame(ERR_CODE_ILLEGAL_ARG);
+      }
+      
+    } else if (cmd_frame[0] == CMD_GET_CUSTOM_VARS) {
+      out_frame[0] = RESP_CODE_CUSTOM_VARS;
+      char* dp = (char *) &out_frame[1];
+      for (int i = 0; i < sensors.getNumSettings() && dp - (char *) &out_frame[1] < 140; i++) {
+        if (i > 0) { *dp++ = ','; }
+        strcpy(dp, sensors.getSettingName(i)); dp = strchr(dp, 0);
+        *dp++ = ':';
+        strcpy(dp, sensors.getSettingValue(i)); dp = strchr(dp, 0);
+      }
+      _serial->writeFrame(out_frame, dp - (char *)out_frame);
+    } else if (cmd_frame[0] == CMD_SET_CUSTOM_VAR && len >= 4) {
+      cmd_frame[len] =  0;
+      char* sp = (char *) &cmd_frame[1];
+      char* np = strchr(sp, ':');  // look for separator char
+      if (np) {
+        *np++ = 0;   // modify 'cmd_frame', replace ':' with null
+        bool success = sensors.setSettingValue(sp, np);
+        if (success) {
+          writeOKFrame();
+        } else {
+          writeErrFrame(ERR_CODE_ILLEGAL_ARG);
+        }
+      } else {
+        writeErrFrame(ERR_CODE_ILLEGAL_ARG);
+      }
     } else {
       writeErrFrame(ERR_CODE_UNSUPPORTED_CMD);
       MESH_DEBUG_PRINTLN("ERROR: unknown command: %02X", cmd_frame[0]);
@@ -1448,7 +1577,13 @@ public:
       checkConnections();
     }
 
-  #ifdef HAS_UI
+    // is there are pending dirty contacts write needed?
+    if (dirty_contacts_expiry && millisHasNowPassed(dirty_contacts_expiry)) {
+      saveContacts();
+      dirty_contacts_expiry = 0;
+    }
+
+  #ifdef DISPLAY_CLASS
     ui_task.setHasConnection(_serial->isConnected());
     ui_task.loop();
   #endif
@@ -1499,6 +1634,9 @@ public:
     #include <helpers/ArduinoSerialInterface.h>
     ArduinoSerialInterface serial_interface;
   #endif
+#elif defined(STM32_PLATFORM)
+  #include <helpers/ArduinoSerialInterface.h>
+  ArduinoSerialInterface serial_interface;
 #else
   #error "need to define a serial interface"
 #endif
@@ -1516,26 +1654,24 @@ void setup() {
 
   board.begin();
 
-#ifdef HAS_UI
+#ifdef DISPLAY_CLASS
   DisplayDriver* disp = NULL;
- #ifdef DISPLAY_CLASS
   if (display.begin()) {
     disp = &display;
     disp->startFrame();
     disp->print("Please wait...");
     disp->endFrame();
   }
- #endif
 #endif
 
   if (!radio_init()) { halt(); }
 
   fast_rng.begin(radio_get_rng_seed());
 
-#if defined(NRF52_PLATFORM)
+#if defined(NRF52_PLATFORM) || defined(STM32_PLATFORM)
   InternalFS.begin();
   the_mesh.begin(InternalFS,
-    #ifdef HAS_UI
+    #ifdef DISPLAY_CLASS
         disp != NULL
     #else
         false
@@ -1553,7 +1689,7 @@ void setup() {
 #elif defined(RP2040_PLATFORM)
   LittleFS.begin();
   the_mesh.begin(LittleFS,
-    #ifdef HAS_UI
+    #ifdef DISPLAY_CLASS
         disp != NULL
     #else
         false
@@ -1578,7 +1714,7 @@ void setup() {
 #elif defined(ESP32)
   SPIFFS.begin(true);
   the_mesh.begin(SPIFFS,
-    #ifdef HAS_UI
+    #ifdef DISPLAY_CLASS
         disp != NULL
     #else
         false
@@ -1604,11 +1740,14 @@ void setup() {
   #error "need to define filesystem"
 #endif
 
-#ifdef HAS_UI
-  ui_task.begin(disp, the_mesh.getNodeName(), FIRMWARE_BUILD_DATE, FIRMWARE_VERSION, the_mesh.getBLEPin());
+  sensors.begin();
+
+#ifdef DISPLAY_CLASS
+  ui_task.begin(disp, the_mesh.getNodePrefs(), FIRMWARE_BUILD_DATE, FIRMWARE_VERSION, the_mesh.getBLEPin());
 #endif
 }
 
 void loop() {
   the_mesh.loop();
+  sensors.loop();
 }

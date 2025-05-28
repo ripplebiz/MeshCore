@@ -7,25 +7,17 @@
 
 // LoRa radio module pins for Seeed Xiao-nrf52
 #ifdef SX1262_XIAO_S3_VARIANT
+  #undef P_LORA_DIO_1
+  #undef P_LORA_BUSY
+  #undef P_LORA_RESET
+  #undef P_LORA_NSS
   #define  P_LORA_DIO_1       D0
   #define  P_LORA_BUSY        D1
   #define  P_LORA_RESET       D2
   #define  P_LORA_NSS         D3
-  #define  LORA_TX_BOOST_PIN  D4
-#else
-  #define  P_LORA_DIO_1       D1
-  #define  P_LORA_BUSY        D3
-  #define  P_LORA_RESET       D2
-  #define  P_LORA_NSS         D4
-  #define  LORA_TX_BOOST_PIN  D5
 #endif
-#define  P_LORA_SCLK        PIN_SPI_SCK
-#define  P_LORA_MISO        PIN_SPI_MISO
-#define  P_LORA_MOSI        PIN_SPI_MOSI
 //#define  SX126X_POWER_EN  37
 
-#define SX126X_DIO2_AS_RF_SWITCH  true
-#define SX126X_DIO3_TCXO_VOLTAGE   1.8
 
 
 class XiaoNrf52Board : public mesh::MainBoard {

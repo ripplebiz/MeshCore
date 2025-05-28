@@ -7,6 +7,7 @@ ESP32Board board;
 ESPNOWRadio radio_driver;
 
 ESP32RTCClock rtc_clock;
+SensorManager sensors;
 
 bool radio_init() {
   rtc_clock.begin();

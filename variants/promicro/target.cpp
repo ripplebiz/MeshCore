@@ -2,6 +2,9 @@
 #include "target.h"
 #include <helpers/ArduinoHelpers.h>
 
+#if ENV_INCLUDE_GPS
+#endif
+
 PromicroBoard board;
 
 RADIO_CLASS radio = new Module(P_LORA_NSS, P_LORA_DIO_1, P_LORA_RESET, P_LORA_BUSY, SPI);
@@ -10,6 +13,17 @@ WRAPPER_CLASS radio_driver(radio, board);
 
 VolatileRTCClock fallback_clock;
 AutoDiscoverRTCClock rtc_clock(fallback_clock);
+#if ENV_INCLUDE_GPS
+  #include <helpers/sensors/MicroNMEALocationProvider.h>
+  MicroNMEALocationProvider nmea = MicroNMEALocationProvider(Serial1);
+  EnvironmentSensorManager sensors = EnvironmentSensorManager(nmea);
+#else
+  EnvironmentSensorManager sensors;
+#endif
+
+#ifdef DISPLAY_CLASS
+  DISPLAY_CLASS display;
+#endif
 
 #ifndef LORA_CR
   #define LORA_CR      5
@@ -73,3 +87,4 @@ mesh::LocalIdentity radio_new_identity() {
   RadioNoiseListener rng(radio);
   return mesh::LocalIdentity(&rng);  // create new random identity
 }
+

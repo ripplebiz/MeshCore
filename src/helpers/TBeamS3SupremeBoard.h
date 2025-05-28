@@ -15,19 +15,19 @@
 #define  P_LORA_MISO    13  //SX1262 MISO pin
 #define  P_LORA_MOSI    11  //SX1262 MOSI pin
 
-#define PIN_BOARD_SDA 17  //SDA for OLED, BME280, and QMC6310U (0x1C)
-#define PIN_BOARD_SCL 18  //SCL for OLED, BME280, and QMC6310U (0x1C)
+//#define PIN_BOARD_SDA 17  //SDA for OLED, BME280, and QMC6310U (0x1C)
+//#define PIN_BOARD_SCL 18  //SCL for OLED, BME280, and QMC6310U (0x1C)
 
 #define PIN_BOARD_SDA1 42  //SDA for PMU and PFC8563 (RTC)
 #define PIN_BOARD_SCL1 41  //SCL for PMU and PFC8563 (RTC)
 #define PIN_PMU_IRQ 40     //IRQ pin for PMU
 
-#define PIN_USER_BTN 0
+//#define PIN_USER_BTN 0
 
 #define P_BOARD_SPI_MOSI 35  //SPI for SD Card and QMI8653 (IMU)
 #define P_BOARD_SPI_MISO 37  //SPI for SD Card and QMI8653 (IMU)
 #define P_BOARD_SPI_SCK  36  //SPI for SD Card and QMI8653 (IMU)
-#define P_BPARD_SPI_CS   47  //SPI for SD Card and QMI8653 (IMU)
+#define P_BPARD_SPI_CS   47  //Pin for SD Card CS
 #define P_BOARD_IMU_CS   34  //Pin for QMI8653 (IMU) CS
 
 #define P_BOARD_IMU_INT  33  //IMU Int pin
@@ -36,7 +36,8 @@
 #define P_GPS_RX    9   //GPS RX pin
 #define P_GPS_TX    8   //GPS TX pin
 #define P_GPS_WAKE  7   //GPS Wakeup pin
-#define P_GPS_1PPS  6   //GPS 1PPS pin
+//#define P_GPS_1PPS  6   //GPS 1PPS pin - repurposed for lora tx led
+#define GPS_BAUD_RATE 9600
 
 //I2C Wire addresses
 #define I2C_BME280_ADD    0x76  //BME280 sensor I2C address on Wire
@@ -47,16 +48,22 @@
 #define I2C_RTC_ADD       0x51  //RTC I2C address on Wire1
 #define I2C_PMU_ADD       0x34  //AXP2101 I2C address on Wire1
 
-
+#define PMU_WIRE_PORT               Wire1
+#define XPOWERS_CHIP_AXP2101
 
 class TBeamS3SupremeBoard : public ESP32Board {
-
+  XPowersAXP2101 PMU;
 public:
+#ifdef MESH_DEBUG
+  void printPMU();
+#endif
+  bool power_init();
+
   void begin() {
-    
-    bool power_init();
-    
+
     ESP32Board::begin();
+
+    power_init();
 
     esp_reset_reason_t reason = esp_reset_reason();
     if (reason == ESP_RST_DEEPSLEEP) {
@@ -68,6 +75,7 @@ public:
       rtc_gpio_hold_dis((gpio_num_t)P_LORA_NSS);
       rtc_gpio_deinit((gpio_num_t)P_LORA_DIO_1);
     }
+    power_init();
   }
 
   void enterDeepSleep(uint32_t secs, int pin_wake_btn = -1) {
@@ -94,12 +102,14 @@ public:
   }
 
   uint16_t getBattMilliVolts() override {
-
-    return 0;
+    return PMU.getBattVoltage();
   }
 
-  uint16_t getBattPercent();
-
+  uint16_t getBattPercent() {
+    //Read the PMU fuel guage for battery %
+    uint16_t battPercent = PMU.getBatteryPercent();
+    return battPercent;
+  }
   const char* getManufacturerName() const override {
     return "LilyGo T-Beam S3 Supreme SX1262";
   }

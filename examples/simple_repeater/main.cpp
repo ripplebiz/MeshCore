@@ -1,7 +1,7 @@
 #include <Arduino.h>   // needed for PlatformIO
 #include <Mesh.h>
 
-#if defined(NRF52_PLATFORM)
+#if defined(NRF52_PLATFORM) || defined(STM32_PLATFORM)
   #include <InternalFileSystem.h>
 #elif defined(RP2040_PLATFORM)
   #include <LittleFS.h>
@@ -22,11 +22,11 @@
 /* ------------------------------ Config -------------------------------- */
 
 #ifndef FIRMWARE_BUILD_DATE
-  #define FIRMWARE_BUILD_DATE   "21 Apr 2025"
+  #define FIRMWARE_BUILD_DATE   "24 May 2025"
 #endif
 
 #ifndef FIRMWARE_VERSION
-  #define FIRMWARE_VERSION   "v1.5.1"
+  #define FIRMWARE_VERSION   "v1.6.2"
 #endif
 
 #ifndef LORA_FREQ
@@ -60,10 +60,6 @@
 #endif
 
 #ifdef DISPLAY_CLASS
-  #include <helpers/ui/SSD1306Display.h>
-
-  static DISPLAY_CLASS  display;
-
   #include "UITask.h"
   static UITask ui_task(display);
 #endif
@@ -74,14 +70,16 @@
 
 /* ------------------------------ Code -------------------------------- */
 
-#define CMD_GET_STATUS      0x01
+#define REQ_TYPE_GET_STATUS          0x01   // same as _GET_STATS
+#define REQ_TYPE_KEEP_ALIVE          0x02
+#define REQ_TYPE_GET_TELEMETRY_DATA  0x03
 
 #define RESP_SERVER_LOGIN_OK      0   // response to ANON_REQ
 
 struct RepeaterStats {
   uint16_t batt_milli_volts;
   uint16_t curr_tx_queue_len;
-  uint16_t curr_free_queue_len;
+  int16_t  noise_floor;
   int16_t  last_rssi;
   uint32_t n_packets_recv;
   uint32_t n_packets_sent;
@@ -89,7 +87,7 @@ struct RepeaterStats {
   uint32_t total_up_time_secs;
   uint32_t n_sent_flood, n_sent_direct;
   uint32_t n_recv_flood, n_recv_direct;
-  uint16_t n_full_events;
+  uint16_t err_events;                // was 'n_full_events'
   int16_t  last_snr;   // x 4
   uint16_t n_direct_dups, n_flood_dups;
 };
@@ -103,7 +101,16 @@ struct ClientInfo {
   uint8_t out_path[MAX_PATH_SIZE];
 };
 
-#define MAX_CLIENTS   4
+#ifndef MAX_CLIENTS
+  #define MAX_CLIENTS           32
+#endif
+
+struct NeighbourInfo {
+  mesh::Identity id;
+  uint32_t advert_timestamp;
+  uint32_t heard_timestamp;
+  int8_t snr; // multiplied by 4, user should divide to get float value
+};
 
 // NOTE: need to space the ACK and the reply text apart (in CLI)
 #define CLI_REPLY_DELAY_MILLIS  1500
@@ -116,6 +123,10 @@ class MyMesh : public mesh::Mesh, public CommonCLICallbacks {
   CommonCLI _cli;
   uint8_t reply_data[MAX_PACKET_PAYLOAD];
   ClientInfo known_clients[MAX_CLIENTS];
+#if MAX_NEIGHBOURS
+  NeighbourInfo neighbours[MAX_NEIGHBOURS];
+#endif
+  CayenneLPP telemetry;
 
   ClientInfo* putClient(const mesh::Identity& id) {
     uint32_t min_time = 0xFFFFFFFF;
@@ -135,16 +146,44 @@ class MyMesh : public mesh::Mesh, public CommonCLICallbacks {
     return oldest;
   }
 
-  int handleRequest(ClientInfo* sender, uint8_t* payload, size_t payload_len) {
-    uint32_t now = getRTCClock()->getCurrentTimeUnique();
-    memcpy(reply_data, &now, 4);   // response packets always prefixed with timestamp
+  void putNeighbour(const mesh::Identity& id, uint32_t timestamp, float snr) {
+  #if MAX_NEIGHBOURS    // check if neighbours enabled    
+    // find existing neighbour, else use least recently updated
+    uint32_t oldest_timestamp = 0xFFFFFFFF;
+    NeighbourInfo* neighbour = &neighbours[0];
+    for (int i = 0; i < MAX_NEIGHBOURS; i++) {
+      // if neighbour already known, we should update it
+      if (id.matches(neighbours[i].id)) {
+        neighbour = &neighbours[i];
+        break;
+      }
+
+      // otherwise we should update the least recently updated neighbour
+      if (neighbours[i].heard_timestamp < oldest_timestamp) {
+        neighbour = &neighbours[i];
+        oldest_timestamp = neighbour->heard_timestamp;
+      }
+    }
+
+    // update neighbour info
+    neighbour->id = id;
+    neighbour->advert_timestamp = timestamp;
+    neighbour->heard_timestamp = getRTCClock()->getCurrentTime();
+    neighbour->snr = (int8_t) (snr * 4);
+  #endif
+  }
+
+  int handleRequest(ClientInfo* sender, uint32_t sender_timestamp, uint8_t* payload, size_t payload_len) {
+   // uint32_t now = getRTCClock()->getCurrentTimeUnique();
+   // memcpy(reply_data, &now, 4);   // response packets always prefixed with timestamp
+    memcpy(reply_data, &sender_timestamp, 4);   // reflect sender_timestamp back in response packet (kind of like a 'tag')
 
     switch (payload[0]) {
-      case CMD_GET_STATUS: {   // guests can also access this now
+      case REQ_TYPE_GET_STATUS: {   // guests can also access this now
         RepeaterStats stats;
         stats.batt_milli_volts = board.getBattMilliVolts();
-        stats.curr_tx_queue_len = _mgr->getOutboundCount();
-        stats.curr_free_queue_len = _mgr->getFreeCount();
+        stats.curr_tx_queue_len = _mgr->getOutboundCount(0xFFFFFFFF);
+        stats.noise_floor = (int16_t)_radio->getNoiseFloor();
         stats.last_rssi = (int16_t) radio_driver.getLastRSSI();
         stats.n_packets_recv = radio_driver.getPacketsRecv();
         stats.n_packets_sent = radio_driver.getPacketsSent();
@@ -154,7 +193,7 @@ class MyMesh : public mesh::Mesh, public CommonCLICallbacks {
         stats.n_sent_direct = getNumSentDirect();
         stats.n_recv_flood = getNumRecvFlood();
         stats.n_recv_direct = getNumRecvDirect();
-        stats.n_full_events = getNumFullEvents();
+        stats.err_events = _err_flags;
         stats.last_snr = (int16_t)(radio_driver.getLastSNR() * 4);
         stats.n_direct_dups = ((SimpleMeshTables *)getTables())->getNumDirectDups();
         stats.n_flood_dups = ((SimpleMeshTables *)getTables())->getNumFloodDups();
@@ -163,9 +202,18 @@ class MyMesh : public mesh::Mesh, public CommonCLICallbacks {
 
         return 4 + sizeof(stats);  //  reply_len
       }
+      case REQ_TYPE_GET_TELEMETRY_DATA: {
+        telemetry.reset();
+        telemetry.addVoltage(TELEM_CHANNEL_SELF, (float)board.getBattMilliVolts() / 1000.0f);
+        // query other sensors -- target specific
+        sensors.querySensors(sender->is_admin ? 0xFF : 0x00, telemetry);
+
+        uint8_t tlen = telemetry.getSize();
+        memcpy(&reply_data[4], telemetry.getBuffer(), tlen);
+        return 4 + tlen;  // reply_len
+      }
     }
-    // unknown command
-    return 0;  // reply_len
+    return 0;  // unknown command
   }
 
   mesh::Packet* createSelfAdvert() {
@@ -180,7 +228,7 @@ class MyMesh : public mesh::Mesh, public CommonCLICallbacks {
   }
 
   File openAppend(const char* fname) {
-  #if defined(NRF52_PLATFORM)
+  #if defined(NRF52_PLATFORM) || defined(STM32_PLATFORM)
     return _fs->open(fname, FILE_O_WRITE);
   #elif defined(RP2040_PLATFORM)
     return _fs->open(fname, "a");
@@ -279,6 +327,9 @@ protected:
     uint32_t t = (_radio->getEstAirtimeFor(packet->path_len + packet->payload_len + 2) * _prefs.direct_tx_delay_factor);
     return getRNG()->nextInt(0, 6)*t;
   }
+  int getInterferenceThreshold() const override {
+    return _prefs.interference_threshold;
+  }
 
   void onAnonDataRecv(mesh::Packet* packet, uint8_t type, const mesh::Identity& sender, uint8_t* data, size_t len) override {
     if (type == PAYLOAD_TYPE_ANON_REQ) {  // received an initial request by a possible admin client (unknown at this stage)
@@ -361,6 +412,18 @@ protected:
     }
   }
 
+  void onAdvertRecv(mesh::Packet* packet, const mesh::Identity& id, uint32_t timestamp, const uint8_t* app_data, size_t app_data_len) {
+    mesh::Mesh::onAdvertRecv(packet, id, timestamp, app_data, app_data_len);  // chain to super impl
+
+    // if this a zero hop advert, add it to neighbours
+    if (packet->path_len == 0) {
+      AdvertDataParser parser(app_data, app_data_len);
+      if (parser.isValid() && parser.getType() == ADV_TYPE_REPEATER) {   // just keep neigbouring Repeaters
+        putNeighbour(id, timestamp, packet->getSNR());
+      }
+    }
+  }
+
   void onPeerDataRecv(mesh::Packet* packet, uint8_t type, int sender_idx, const uint8_t* secret, uint8_t* data, size_t len) override {
     int i = matching_peer_indexes[sender_idx];
     if (i < 0 || i >= MAX_CLIENTS) {  // get from our known_clients table (sender SHOULD already be known in this context)
@@ -373,7 +436,7 @@ protected:
       memcpy(&timestamp, data, 4);
 
       if (timestamp > client->last_timestamp) {  // prevent replay attacks
-        int reply_len = handleRequest(client, &data[4], len - 4);
+        int reply_len = handleRequest(client, timestamp, &data[4], len - 4);
         if (reply_len == 0) return;  // invalid command
 
         client->last_timestamp = timestamp;
@@ -427,12 +490,14 @@ protected:
         }
 
         uint8_t temp[166];
+        const char *command = (const char *) &data[5];
+        char *reply = (char *) &temp[5];
         if (is_retry) {
-          temp[0] = 0;
+          *reply = 0;
         } else {
-          _cli.handleCommand(sender_timestamp, (const char *) &data[5], (char *) &temp[5]);
+          _cli.handleCommand(sender_timestamp, command, reply);
         }
-        int text_len = strlen((char *) &temp[5]);
+        int text_len = strlen(reply);
         if (text_len > 0) {
           uint32_t timestamp = getRTCClock()->getCurrentTimeUnique();
           if (timestamp == sender_timestamp) {
@@ -476,11 +541,15 @@ protected:
 public:
   MyMesh(mesh::MainBoard& board, mesh::Radio& radio, mesh::MillisecondClock& ms, mesh::RNG& rng, mesh::RTCClock& rtc, mesh::MeshTables& tables)
      : mesh::Mesh(radio, ms, rng, rtc, *new StaticPoolPacketManager(32), tables),
-      _cli(board, this, &_prefs, this)
+      _cli(board, rtc, &_prefs, this), telemetry(MAX_PACKET_PAYLOAD - 4)
   {
     memset(known_clients, 0, sizeof(known_clients));
     next_local_advert = next_flood_advert = 0;
     _logging = false;
+
+  #if MAX_NEIGHBOURS
+    memset(neighbours, 0, sizeof(neighbours));
+  #endif
 
     // defaults
     memset(&_prefs, 0, sizeof(_prefs));
@@ -499,6 +568,7 @@ public:
     _prefs.advert_interval = 1;  // default to 2 minutes for NEW installs
     _prefs.flood_advert_interval = 3;   // 3 hours
     _prefs.flood_max = 64;
+    _prefs.interference_threshold = 14;  // DB
   }
 
   CommonCLI* getCLI() { return &_cli; }
@@ -520,13 +590,16 @@ public:
   const char* getBuildDate() override { return FIRMWARE_BUILD_DATE; }
   const char* getRole() override { return FIRMWARE_ROLE; }
   const char* getNodeName() { return _prefs.node_name; }
+  NodePrefs* getNodePrefs() { 
+    return &_prefs; 
+  }
 
   void savePrefs() override {
     _cli.savePrefs(_fs);
   }
 
   bool formatFileSystem() override {
-#if defined(NRF52_PLATFORM)
+#if defined(NRF52_PLATFORM) || defined(STM32_PLATFORM)
     return InternalFS.format();
 #elif defined(RP2040_PLATFORM)
     return LittleFS.format();
@@ -588,6 +661,41 @@ public:
     radio_set_tx_power(power_dbm);
   }
 
+  void formatNeighborsReply(char *reply) override {
+    char *dp = reply;
+
+#if MAX_NEIGHBOURS
+    for (int i = 0; i < MAX_NEIGHBOURS && dp - reply < 134; i++) {
+      NeighbourInfo* neighbour = &neighbours[i];
+      if (neighbour->heard_timestamp == 0) continue;    // skip empty slots
+
+      // add new line if not first item
+      if (i > 0) *dp++ = '\n';
+
+      char hex[10];
+      // get 4 bytes of neighbour id as hex
+      mesh::Utils::toHex(hex, neighbour->id.pub_key, 4);
+
+      // add next neighbour
+      uint32_t secs_ago = getRTCClock()->getCurrentTime() - neighbour->heard_timestamp;
+      sprintf(dp, "%s:%d:%d", hex, secs_ago, neighbour->snr);
+      while (*dp) dp++;   // find end of string
+    }
+#endif
+    if (dp == reply) {   // no neighbours, need empty response
+      strcpy(dp, "-none-"); dp += 6;
+    }
+    *dp = 0;  // null terminator
+  }
+
+  const uint8_t* getSelfIdPubKey() override { return self_id.pub_key; }
+
+  void clearStats() override {
+    radio_driver.resetStats();
+    resetStats();
+    ((SimpleMeshTables *)getTables())->resetStats();
+  }
+
   void loop() {
     mesh::Mesh::loop();
 
@@ -627,7 +735,7 @@ void setup() {
   board.begin();
 
 #ifdef DISPLAY_CLASS
-  if(display.begin()){
+  if (display.begin()) {
     display.startFrame();
     display.print("Please wait...");
     display.endFrame();
@@ -639,7 +747,7 @@ void setup() {
   fast_rng.begin(radio_get_rng_seed());
 
   FILESYSTEM* fs;
-#if defined(NRF52_PLATFORM)
+#if defined(NRF52_PLATFORM) || defined(STM32_PLATFORM)
   InternalFS.begin();
   fs = &InternalFS;
   IdentityStore store(InternalFS, "");
@@ -670,10 +778,12 @@ void setup() {
 
   command[0] = 0;
 
+  sensors.begin();
+
   the_mesh.begin(fs);
 
 #ifdef DISPLAY_CLASS
-  ui_task.begin(the_mesh.getNodeName(), FIRMWARE_BUILD_DATE, FIRMWARE_VERSION);
+  ui_task.begin(the_mesh.getNodePrefs(), FIRMWARE_BUILD_DATE, FIRMWARE_VERSION);
 #endif
 
   // send out initial Advertisement to the mesh
@@ -706,4 +816,5 @@ void loop() {
   }
 
   the_mesh.loop();
+  sensors.loop();
 }

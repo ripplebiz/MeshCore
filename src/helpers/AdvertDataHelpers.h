@@ -11,19 +11,24 @@
 //FUTURE: 4..15
 
 #define ADV_LATLON_MASK       0x10
-#define ADV_BATTERY_MASK      0x20
-#define ADV_TEMPERATURE_MASK  0x40
+#define ADV_FEAT1_MASK        0x20   // FUTURE
+#define ADV_FEAT2_MASK        0x40   // FUTURE
 #define ADV_NAME_MASK         0x80
 
 class AdvertDataBuilder {
   uint8_t _type;
   const char* _name;
   int32_t _lat, _lon;
+  uint16_t _extra1 = 0;
+  uint16_t _extra2 = 0;
 public:
   AdvertDataBuilder(uint8_t adv_type) : _type(adv_type), _name(NULL), _lat(0), _lon(0) { }
   AdvertDataBuilder(uint8_t adv_type, const char* name) : _type(adv_type), _name(name), _lat(0), _lon(0)  { }
   AdvertDataBuilder(uint8_t adv_type, const char* name, double lat, double lon) : 
       _type(adv_type), _name(name), _lat(lat * 1E6), _lon(lon * 1E6)  { }
+
+  void setFeat1(uint16_t extra) { _extra1 = extra; }
+  void setFeat2(uint16_t extra) { _extra2 = extra; }
 
   /**
    * \brief  encode the given advertisement data.
@@ -38,11 +43,15 @@ class AdvertDataParser {
   bool _valid;
   char _name[MAX_ADVERT_DATA_SIZE];
   int32_t _lat, _lon;
+  uint16_t _extra1;
+  uint16_t _extra2;
 public:
   AdvertDataParser(const uint8_t app_data[], uint8_t app_data_len);
 
   bool isValid() const { return _valid; }
   uint8_t getType() const { return _flags & 0x0F; }
+  uint16_t getFeat1() const { return _extra1; }
+  uint16_t getFeat2() const { return _extra2; }
 
   bool hasName() const { return _name[0] != 0; }
   const char* getName() const { return _name; }

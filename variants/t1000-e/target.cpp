@@ -9,7 +9,7 @@ RADIO_CLASS radio = new Module(P_LORA_NSS, P_LORA_DIO_1, P_LORA_RESET, P_LORA_BU
 WRAPPER_CLASS radio_driver(radio, board);
 
 VolatileRTCClock rtc_clock;
-MicroNMEALocationProvider nmea = MicroNMEALocationProvider(Serial1);
+MicroNMEALocationProvider nmea = MicroNMEALocationProvider(Serial1, &rtc_clock);
 T1000SensorManager sensors = T1000SensorManager(nmea);
 
 #ifdef DISPLAY_CLASS
@@ -179,14 +179,26 @@ void T1000SensorManager::loop() {
   }
 }
 
-int T1000SensorManager::getNumSettings() const { return 1; }  // just one supported: "gps" (power switch)
+int T1000SensorManager::getNumSettings() const { return 2; }  // just one supported: "gps" (power switch)
 
 const char* T1000SensorManager::getSettingName(int i) const {
-  return i == 0 ? "gps" : NULL;
+  switch (i) {
+    case 0:
+      return "gps";
+      break;
+    case 1:
+      return "sync";
+      break;
+    default:
+      return NULL;
+      break;
+  }
 }
 const char* T1000SensorManager::getSettingValue(int i) const {
   if (i == 0) {
     return gps_active ? "1" : "0";
+  } else if (i == 1) {
+    return _nmea->waitingTimeSync() ? "1" : "0";
   }
   return NULL;
 }
@@ -197,6 +209,9 @@ bool T1000SensorManager::setSettingValue(const char* name, const char* value) {
     } else {
       start_gps();
     }
+    return true;
+  } else if (strcmp(name, "sync") == 0) {
+    _nmea->syncTime(); // whatever the value ...
     return true;
   }
   return false;  // not supported

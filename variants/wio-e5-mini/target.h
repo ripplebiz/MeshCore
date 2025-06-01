@@ -8,6 +8,9 @@
 #include <helpers/ArduinoHelpers.h>
 #include <helpers/SensorManager.h>
 
+#include <BME280I2C.h>
+#include <Wire.h>
+
 class WIOE5Board : public STM32Board {
 public:
     const char* getManufacturerName() const override {
@@ -21,10 +24,20 @@ public:
     }
 };
 
+class WIOE5SensorManager : public SensorManager {
+    BME280I2C* _bme;
+    bool has_bme = false;   
+
+public:
+    WIOE5SensorManager(BME280I2C& bme) : _bme(&bme) {}
+    bool begin() override;
+    bool querySensors(uint8_t requester_permissions, CayenneLPP& telemetry) override;
+};
+
 extern WIOE5Board board;
 extern WRAPPER_CLASS radio_driver;
 extern VolatileRTCClock rtc_clock;
-extern SensorManager sensors;
+extern WIOE5SensorManager sensors;
 
 bool radio_init();
 uint32_t radio_get_rng_seed();

@@ -18,20 +18,15 @@ static const Module::RfSwitchMode_t rfswitch_table[] = {
 };
 
 VolatileRTCClock rtc_clock;
-SensorManager sensors;
+BME280I2C bme;   
+WIOE5SensorManager sensors(bme);
 
 #ifndef LORA_CR
   #define LORA_CR      5
 #endif
 
 bool radio_init() {
-//  rtc_clock.begin(Wire);
-  
-// #ifdef SX126X_DIO3_TCXO_VOLTAGE
-//   float tcxo = SX126X_DIO3_TCXO_VOLTAGE;
-// #else
-//   float tcxo = 1.6f;
-// #endif
+  Wire.begin();
 
   radio.setRfSwitchTable(rfswitch_pins, rfswitch_table);
 
@@ -70,4 +65,27 @@ void radio_set_tx_power(uint8_t dbm) {
 mesh::LocalIdentity radio_new_identity() {
   RadioNoiseListener rng(radio);
   return mesh::LocalIdentity(&rng);  // create new random identity
+}
+
+bool WIOE5SensorManager::querySensors(uint8_t requester_permissions, CayenneLPP& telemetry) { 
+  if (!has_bme) return false;
+
+  float temp(NAN), hum(NAN), pres(NAN);
+
+  BME280::TempUnit tempUnit(BME280::TempUnit_Celsius);
+  BME280::PresUnit presUnit(BME280::PresUnit_bar);
+
+  _bme->read(pres, temp, hum, tempUnit, presUnit);
+
+  telemetry.addTemperature(TELEM_CHANNEL_SELF, temp);
+  telemetry.addRelativeHumidity(TELEM_CHANNEL_SELF, hum);
+  telemetry.addBarometricPressure(TELEM_CHANNEL_SELF, pres);
+
+  return true; 
+}
+
+bool WIOE5SensorManager::begin() {
+  has_bme = _bme->begin();
+
+  return has_bme;
 }

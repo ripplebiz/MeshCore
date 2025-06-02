@@ -1,3 +1,4 @@
+#ifdef ENABLE_ESPNOW
 #pragma once
 
 #include <Mesh.h>
@@ -36,4 +37,5 @@ public:
 #else
   #define ESPNOW_DEBUG_PRINT(...) {}
   #define ESPNOW_DEBUG_PRINTLN(...) {}
+#endif
 #endif

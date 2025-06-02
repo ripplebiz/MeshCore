@@ -47,23 +47,6 @@ extern TbeamSupSensorManager sensors;
   extern DISPLAY_CLASS display;
 #endif
 
-enum {
-  POWERMANAGE_ONLINE  = _BV(0),
-  DISPLAY_ONLINE      = _BV(1),
-  RADIO_ONLINE        = _BV(2),
-  GPS_ONLINE          = _BV(3),
-  PSRAM_ONLINE        = _BV(4),
-  SDCARD_ONLINE       = _BV(5),
-  AXDL345_ONLINE      = _BV(6),
-  BME280_ONLINE       = _BV(7),
-  BMP280_ONLINE       = _BV(8),
-  BME680_ONLINE       = _BV(9),
-  QMC6310_ONLINE      = _BV(10),
-  QMI8658_ONLINE      = _BV(11),
-  PCF8563_ONLINE      = _BV(12),
-  OSC32768_ONLINE      = _BV(13),
-};
-
 bool radio_init();
 uint32_t radio_get_rng_seed();
 void radio_set_params(float freq, float bw, uint8_t sf, uint8_t cr);

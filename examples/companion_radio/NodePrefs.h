@@ -1,6 +1,4 @@
-#ifndef NODE_PREFS_H
-#define NODE_PREFS_H
-
+#pragma once
 #include <cstdint> // For uint8_t, uint32_t
 
 #define TELEM_MODE_DENY            0
@@ -23,5 +21,3 @@ struct NodePrefs {  // persisted to file
   float rx_delay_base;
   uint32_t ble_pin;
 };
-
-#endif // NODE_PREFS_H

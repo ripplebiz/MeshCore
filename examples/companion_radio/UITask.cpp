@@ -2,6 +2,7 @@
 #include <Arduino.h>
 #include <helpers/TxtDataHelpers.h>
 #include "NodePrefs.h"
+#include "MyMesh.h"
 
 #define AUTO_OFF_MILLIS     15000   // 15 seconds
 #define BOOT_SCREEN_MILLIS   4000   // 4 seconds
@@ -33,26 +34,25 @@ static const uint8_t meshcore_logo [] PROGMEM = {
     0xe3, 0xe3, 0x8f, 0xff, 0x1f, 0xfc, 0x3c, 0x0e, 0x1f, 0xf8, 0xff, 0xf8, 0x70, 0x3c, 0x7f, 0xf8, 
 };
 
-void UITask::begin(DisplayDriver* display, NodePrefs* node_prefs, const char* build_date, const char* firmware_version, uint32_t pin_code) {
+void UITask::begin(DisplayDriver* display, NodePrefs* node_prefs) {
   _display = display;
   _auto_off = millis() + AUTO_OFF_MILLIS;
   clearMsgPreview();
   _node_prefs = node_prefs;
-  _pin_code = pin_code;
   if (_display != NULL) {
     _display->turnOn();
   }
 
   // strip off dash and commit hash by changing dash to null terminator
   // e.g: v1.2.3-abcdef -> v1.2.3
-  char *version = strdup(firmware_version);
+  char *version = strdup(FIRMWARE_VERSION);
   char *dash = strchr(version, '-');
-  if(dash){
+  if (dash) {
     *dash = 0;
   }
 
   // v1.2.3 (1 Jan 2025)
-  sprintf(_version_info, "%s (%s)", version, build_date);
+  sprintf(_version_info, "%s (%s)", version, FIRMWARE_BUILD_DATE);
 
 #ifdef PIN_BUZZER
   buzzer.begin();
@@ -215,11 +215,11 @@ void UITask::renderCurrScreen() {
     _display->print(tmp);
 
     // BT pin
-    if (!_connected && _pin_code != 0) {
+    if (!_connected && the_mesh.getBLEPin() != 0) {
       _display->setColor(DisplayDriver::RED);
       _display->setTextSize(2);
       _display->setCursor(0, 43);
-      sprintf(tmp, "Pin:%d", _pin_code);
+      sprintf(tmp, "Pin:%d", the_mesh.getBLEPin());
       _display->print(tmp);
       _display->setColor(DisplayDriver::GREEN);
     } else {
@@ -340,8 +340,13 @@ void UITask::handleButtonShortPress() {
 }
 
 void UITask::handleButtonDoublePress() {
-  MESH_DEBUG_PRINTLN("UITask: double press triggered");
-  // Not implemented. TODO: possibly send an advert here?
+  MESH_DEBUG_PRINTLN("UITask: double press triggered, sending advert");
+  // ADVERT
+  if (the_mesh.advert()) {
+    MESH_DEBUG_PRINTLN("Advert sent!");
+  } else {
+    MESH_DEBUG_PRINTLN("Advert failed!");
+  }
 }
 
 void UITask::handleButtonTriplePress() {

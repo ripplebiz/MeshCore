@@ -173,8 +173,8 @@ bool TBeamS3SupremeBoard::power_init()
       XPOWERS_AXP2101_BAT_CHG_DONE_IRQ | XPOWERS_AXP2101_BAT_CHG_START_IRQ // Charging interrupts
   );
 #ifdef MESH_DEBUG
-  scanDevices(&Wire); 
-  scanDevices(&Wire1);
+  scanI2CDevices(&Wire); 
+  scanI2CDevices(&Wire1);
   printPMU();
 #endif
 

@@ -79,21 +79,12 @@ uint8_t ESP32Board::scanI2CDevices(TwoWire *w)
                 _deviceOnline |= QMC6310_ONLINE;
                 break;
             default:
-                MESH_DEBUG_PRINTLN("\tI2C device found at address 0x");
-                if (addr < 16) {
-                    MESH_DEBUG_PRINT("0");
-                }
-                MESH_DEBUG_PRINT(addr, HEX);
-                MESH_DEBUG_PRINTLN(" !");
+                MESH_DEBUG_PRINTLN("\tI2C device found at address 0x%02x!", addr);
                 break;
             }
 
         } else if (err == 4) {
-            MESH_DEBUG_PRINT("Unknown error at address 0x");
-            if (addr < 16) {
-                MESH_DEBUG_PRINTLN("0");
-            }
-            MESH_DEBUG_PRINTLN(addr, HEX);
+            MESH_DEBUG_PRINTLN("Unknown error at address 0x%02x!", addr);
         }
     }
     if (nDevices == 0)

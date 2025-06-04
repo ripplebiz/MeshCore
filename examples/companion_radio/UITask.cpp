@@ -3,7 +3,7 @@
 #include <helpers/TxtDataHelpers.h>
 #include "NodePrefs.h"
 
-#define AUTO_OFF_MILLIS     15000   // 15 seconds
+#define AUTO_OFF_MILLIS     120000   // 2 minutes
 #define BOOT_SCREEN_MILLIS   4000   // 4 seconds
 
 #ifdef PIN_STATUS_LED

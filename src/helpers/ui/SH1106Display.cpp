@@ -11,7 +11,16 @@ bool SH1106Display::i2c_probe(TwoWire &wire, uint8_t addr)
 
 bool SH1106Display::begin()
 {
-  return display.begin(DISPLAY_ADDRESS, true) && i2c_probe(Wire, DISPLAY_ADDRESS);
+  if (!display.begin(DISPLAY_ADDRESS, true) || !i2c_probe(Wire, DISPLAY_ADDRESS)) {
+    return false;
+  }
+  
+  // Ensure display is on and configured
+  display.oled_command(SH110X_DISPLAYON);
+  display.setContrast(0x7F); // Set to max contrast
+  _isOn = true;
+  
+  return true;
 }
 
 void SH1106Display::turnOn()

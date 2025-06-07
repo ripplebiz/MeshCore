@@ -1,5 +1,25 @@
 #include "SerialBLEInterface.h"
 
+SerialBLEInterface* SerialBLEInterface::_instance = nullptr;
+
+static void connect_callback(uint16_t conn_handle) {
+  (void)conn_handle;
+  MESH_DEBUG_PRINTLN("BLE client connected");
+  // Update connection state
+  if (Bluefruit.connected()) {
+    SerialBLEInterface::getInstance()->deviceConnected = true;
+  }
+}
+
+static void disconnect_callback(uint16_t conn_handle, uint8_t reason) {
+  (void)conn_handle;
+  (void)reason;
+
+  MESH_DEBUG_PRINTLN("BLE client disconnected");
+  // Update connection state
+  SerialBLEInterface::getInstance()->deviceConnected = false;
+}
+
 void SerialBLEInterface::begin(const char* device_name, uint32_t pin_code) {
   char charpin[20];
   sprintf(charpin, "%d", pin_code);
@@ -12,6 +32,10 @@ void SerialBLEInterface::begin(const char* device_name, uint32_t pin_code) {
 
   Bluefruit.Security.setMITM(true);
   Bluefruit.Security.setPIN(charpin);
+
+  // Register callbacks
+  Bluefruit.Periph.setConnectCallback(connect_callback);
+  Bluefruit.Periph.setDisconnectCallback(disconnect_callback);
 
   // To be consistent OTA DFU should be added first if it exists
   //bledfu.begin();

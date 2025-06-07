@@ -1,6 +1,9 @@
 #include <Arduino.h>
 #include "target.h"
 #include <helpers/sensors/MicroNMEALocationProvider.h>
+#ifdef DISPLAY_CLASS
+  #include <helpers/ui/SH1106Display.h>
+#endif
 
 TBeamS3SupremeBoard board;
 
@@ -23,6 +26,10 @@ ESP32RTCClock fallback_clock;
 AutoDiscoverRTCClock rtc_clock(fallback_clock);
 MicroNMEALocationProvider nmea = MicroNMEALocationProvider(Serial1);
 TbeamSupSensorManager sensors = TbeamSupSensorManager(nmea);
+
+#ifdef DISPLAY_CLASS
+  DISPLAY_CLASS display;
+#endif
 
 static void setPMUIntFlag(){
   pmuIntFlag = true;

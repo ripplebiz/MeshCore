@@ -23,6 +23,8 @@ class SerialBLEInterface : public BaseSerialInterface {
   void clearBuffers() { send_queue_len = 0; }
   void startAdv();
 
+  static SerialBLEInterface* _instance;
+
 public:
   SerialBLEInterface() {
     deviceConnected = false;
@@ -31,6 +33,11 @@ public:
     _isEnabled = false;
     _last_write = 0;
     send_queue_len = 0;
+    _instance = this;
+  }
+
+  static SerialBLEInterface* getInstance() {
+    return _instance;
   }
 
   void begin(const char* device_name, uint32_t pin_code);
@@ -45,6 +52,9 @@ public:
   bool isWriteBusy() const override;
   size_t writeFrame(const uint8_t src[], size_t len) override;
   size_t checkRecvFrame(uint8_t dest[]) override;
+
+  friend void connect_callback(uint16_t conn_handle);
+  friend void disconnect_callback(uint16_t conn_handle, uint8_t reason);
 };
 
 #if BLE_DEBUG_LOGGING && ARDUINO

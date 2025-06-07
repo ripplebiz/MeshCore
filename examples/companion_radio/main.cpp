@@ -18,6 +18,10 @@
 #include <RTClib.h>
 #include <target.h>
 
+#ifdef DISPLAY_CLASS
+  #include <helpers/ui/SH1106Display.h>
+#endif
+
 /* ---------------------------------- CONFIGURATION ------------------------------------- */
 
 #ifndef LORA_FREQ

@@ -126,11 +126,14 @@ InternalFileSystem::InternalFileSystem(void)
 
 bool InternalFileSystem::begin(void)
 {
+  volatile bool format_fs;
   #ifdef FORMAT_FS
-  this->format();
+  format_fs = true;
+  #else
+  format_fs = false; // you can always use debugger to force formatting ;)
   #endif
   // failed to mount, erase all sector then format and mount again
-  if ( !Adafruit_LittleFS::begin() )
+  if ( format_fs || !Adafruit_LittleFS::begin() )
   {
     // lfs format
     this->format();

@@ -24,6 +24,7 @@ struct NodePrefs {  // persisted to file
     uint8_t reserved2;
     float bw;
     uint8_t flood_max;
+    uint8_t interference_threshold;
 };
 
 class CommonCLICallbacks {

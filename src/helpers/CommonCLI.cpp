@@ -56,6 +56,7 @@ void CommonCLI::loadPrefsInt(FILESYSTEM* fs, const char* filename) {
     file.read(pad, 4);   // 120
     file.read((uint8_t *) &_prefs->flood_max, sizeof(_prefs->flood_max));   // 124
     file.read((uint8_t *) &_prefs->flood_advert_interval, sizeof(_prefs->flood_advert_interval));  // 125
+    file.read((uint8_t *) &_prefs->interference_threshold, sizeof(_prefs->interference_threshold));  // 126
 
     // sanitise bad pref values
     _prefs->rx_delay_base = constrain(_prefs->rx_delay_base, 0, 20.0f);
@@ -109,6 +110,7 @@ void CommonCLI::savePrefs(FILESYSTEM* fs) {
     file.write(pad, 4);   // 120
     file.write((uint8_t *) &_prefs->flood_max, sizeof(_prefs->flood_max));   // 124
     file.write((uint8_t *) &_prefs->flood_advert_interval, sizeof(_prefs->flood_advert_interval));  // 125
+    file.write((uint8_t *) &_prefs->interference_threshold, sizeof(_prefs->interference_threshold));  // 126
 
     file.close();
   }
@@ -176,6 +178,8 @@ void CommonCLI::handleCommand(uint32_t sender_timestamp, const char* command, ch
       const char* config = &command[4];
       if (memcmp(config, "af", 2) == 0) {
         sprintf(reply, "> %s", StrHelper::ftoa(_prefs->airtime_factor));
+      } else if (memcmp(config, "int.thresh", 10) == 0) {
+        sprintf(reply, "> %d", (uint32_t) _prefs->interference_threshold);
       } else if (memcmp(config, "allow.read.only", 15) == 0) {
         sprintf(reply, "> %s", _prefs->allow_read_only ? "on" : "off");
       } else if (memcmp(config, "flood.advert.interval", 21) == 0) {
@@ -221,6 +225,10 @@ void CommonCLI::handleCommand(uint32_t sender_timestamp, const char* command, ch
       const char* config = &command[4];
       if (memcmp(config, "af ", 3) == 0) {
         _prefs->airtime_factor = atof(&config[3]);
+        savePrefs();
+        strcpy(reply, "OK");
+      } else if (memcmp(config, "int.thresh ", 11) == 0) {
+        _prefs->interference_threshold = atoi(&config[11]);
         savePrefs();
         strcpy(reply, "OK");
       } else if (memcmp(config, "allow.read.only ", 16) == 0) {

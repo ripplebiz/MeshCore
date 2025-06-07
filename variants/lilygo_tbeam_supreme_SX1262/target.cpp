@@ -336,7 +336,7 @@ bool TbeamSupSensorManager::begin() {
 }
 
 bool TbeamSupSensorManager::querySensors(uint8_t requester_permissions, CayenneLPP& telemetry) {
-  if (requester_permissions & TELEM_PERM_LOCATION) {   // does requester have permission?
+  if (requester_permissions & TELEM_PERM_LOCATION && gps_active) {   // does requester have permission?
     telemetry.addGPS(TELEM_CHANNEL_SELF, node_lat, node_lon, node_altitude);
   }
   if (requester_permissions & TELEM_PERM_ENVIRONMENT && bme_active) {   // does requester have permission?

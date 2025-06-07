@@ -7,19 +7,7 @@
 
 #define MAX_TEXT_LEN    (10*CIPHER_BLOCK_SIZE)  // must be LESS than (MAX_PACKET_PAYLOAD - 4 - CIPHER_MAC_SIZE - 1)
 
-struct ContactInfo {
-  mesh::Identity id;
-  char name[32];
-  uint8_t type;   // on of ADV_TYPE_*
-  uint8_t flags;
-  int8_t out_path_len;
-  uint8_t out_path[MAX_PATH_SIZE];
-  uint32_t last_advert_timestamp;   // by THEIR clock
-  uint8_t shared_secret[PUB_KEY_SIZE];
-  uint32_t lastmod;  // by OUR clock
-  int32_t gps_lat, gps_lon;    // 6 dec places
-  uint32_t sync_since;
-};
+#include "ContactInfo.h"
 
 #define MAX_SEARCH_RESULTS   8
 
@@ -61,10 +49,7 @@ struct ConnectionInfo {
   uint32_t expected_ack;
 };
 
-struct ChannelDetails {
-  mesh::GroupChannel channel;
-  char name[32];
-};
+#include "ChannelDetails.h"
 
 /**
  *  \brief  abstract Mesh class for common 'chat' client
@@ -158,6 +143,7 @@ public:
   bool  removeContact(ContactInfo& contact);
   bool  addContact(const ContactInfo& contact);
   int getNumContacts() const { return num_contacts; }
+  bool getContactByIdx(uint32_t idx, ContactInfo& contact);
   ContactsIterator startContactsIterator();
   ChannelDetails* addChannel(const char* name, const char* psk_base64);
   bool getChannel(int idx, ChannelDetails& dest);

@@ -7,6 +7,9 @@
 
 // Defined using AXP2102
 #define XPOWERS_CHIP_AXP2101
+#define PIN_BOARD_SDA1 42  //SDA for PMU and PFC8563 (RTC)
+#define PIN_BOARD_SCL1 41  //SCL for PMU and PFC8563 (RTC)
+#define PIN_PMU_IRQ 40     //IRQ pin for PMU
 
 // LoRa radio module pins for TBeam
 #define  P_LORA_DIO_0   26
@@ -28,15 +31,13 @@
 #include <driver/rtc_io.h>
 
 class TBeamBoard : public ESP32Board {
-  XPowersAXP2101 power;
-
+  XPowersLibInterface *PMU = NULL;
 public:
+  bool power_init();
+  void printPMU();
+
   void begin() {
     ESP32Board::begin();
-
-    power.setALDO2Voltage(3300);
-    power.enableALDO2();
-
     pinMode(38, INPUT_PULLUP);
 
     esp_reset_reason_t reason = esp_reset_reason();
@@ -49,6 +50,7 @@ public:
       rtc_gpio_hold_dis((gpio_num_t)P_LORA_NSS);
       rtc_gpio_deinit((gpio_num_t)P_LORA_DIO_1);
     }
+    power_init();
   }
 
   void enterDeepSleep(uint32_t secs, int pin_wake_btn = -1) {
@@ -75,7 +77,8 @@ public:
   }
 
   uint16_t getBattMilliVolts() override {
-    return power.getBattVoltage();
+    if(PMU) return PMU->getBattVoltage();
+    else return 0;
   }
 
   const char* getManufacturerName() const override {

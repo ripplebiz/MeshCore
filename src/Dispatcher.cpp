@@ -10,6 +10,10 @@ namespace mesh {
 
 #define MAX_RX_DELAY_MILLIS   32000  // 32 seconds
 
+#ifndef NOISE_FLOOR_CALIB_INTERVAL
+  #define NOISE_FLOOR_CALIB_INTERVAL   2000     // 2 seconds
+#endif
+
 void Dispatcher::begin() {
   n_sent_flood = n_sent_direct = 0;
   n_recv_flood = n_recv_direct = 0;
@@ -36,6 +40,12 @@ uint32_t Dispatcher::getCADFailMaxDuration() const {
 }
 
 void Dispatcher::loop() {
+  if (millisHasNowPassed(next_floor_calib_time)) {
+    _radio->triggerNoiseFloorCalibrate(getInterferenceThreshold());
+    next_floor_calib_time = futureMillis(NOISE_FLOOR_CALIB_INTERVAL);
+  }
+  _radio->loop();
+
   // check for radio 'stuck' in mode other than Rx
   bool is_recv = _radio->isInRecvMode();
   if (is_recv != prev_isrecv_mode) {

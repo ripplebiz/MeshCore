@@ -65,7 +65,8 @@ author: https://github.com/LitBomb<!-- omit from toc -->
   - [6.4. Q: I can't connect via Bluetooth, what is the Bluetooth pairing code?](#64-q-i-cant-connect-via-bluetooth-what-is-the-bluetooth-pairing-code)
   - [6.5. Q: My Heltec V3 keeps disconnecting from my smartphone.  It can't hold a solid Bluetooth connection.](#65-q-my-heltec-v3-keeps-disconnecting-from-my-smartphone--it-cant-hold-a-solid-bluetooth-connection)
 - [7. Other Questions:](#7-other-questions)
-  - [7.1. Q: How to  Update repeater and room server firmware over the air?](#71-q-how-to--update-repeater-and-room-server-firmware-over-the-air)
+  - [7.2 Q: How to update ESP32-based devices over the air?](#72-q-how-to-update-esp32-based-devices-over-the-air)
+  - [7.1 Q: How to update nRF (RAK, T114, Seed XIAO) repeater and room server firmware over the air using the new simpler DFU app?](#71-q-how-to-update-nrf-rak-t114-seed-xiao-repeater-and-room-server-firmware-over-the-air-using-the-new-simpler-dfu-app)
 
 ## 1. Introduction
 
@@ -534,74 +535,35 @@ You can get the epoch time on <https://www.epochconverter.com/> and use it to se
 
 ---
 ## 7. Other Questions:
-### 7.1. Q: How to  Update repeater and room server firmware over the air?
 
-**A:** Only nRF-based RAK4631 and Heltec T114 OTA firmware update are verified using nRF smartphone app.  Lilygo T-Echo doesn't work currently.
-You can update repeater and room server firmware with a Bluetooth connection between your smartphone and your LoRa radio using the nRF app.
+### 7.2 Q: How to update ESP32-based devices over the air?
 
-1. Download the ZIP file for the specific node from the web flasher to your smartphone
-2. On the phone client, log on to the repeater as administrator (default password is `password`) to issue the `start ota`command to the repeater or room server to get the device into OTA DFU mode
-   
-![image](https://github.com/user-attachments/assets/889bb81b-7214-4a1c-955a-396b5a05d8ad)
-
-1. `start ota` can be initiated from USB serial console on the web flasher page or a T-Deck
-4. On the smartphone, download and run the nRF app and scan for Bluetooth devices
-5. Connect to the repeater/room server node you want to update
-	1. nRF app is available on both Android and iOS
-
-**Android continues after the iOS section:**
-
-**iOS continues here:**
-5. Once connected successfully, a `DFU` icon ![Pasted image 20250309173039](https://github.com/user-attachments/assets/af7a9f78-8739-4946-b734-02bade9c8e71)
- appears in the top right corner of the app
- ![Pasted image 20250309171919](https://github.com/user-attachments/assets/08007ec8-4924-49c1-989f-ca2611e78793)
-
-6. Scroll down to change the `PRN(s)` number:
-
-![Pasted image 20250309190158](https://github.com/user-attachments/assets/11f69cdd-12f3-4696-a6fc-14a78c85fe32)
-
-- For the T114, change the number of packets `(PRN(s)` to 8
-- For RAK, it can be 10, but it also works on 8.
-
-7. Click the `DFU` icon ![Pasted image 20250309173039](https://github.com/user-attachments/assets/af7a9f78-8739-4946-b734-02bade9c8e71), select the type of file to upload (choose ZIP), then select the ZIP file that was downloaded earlier  from the web flasher
-8. The upload process will start now. If everything goes well, the node resets and is flashed successfully.
-![Pasted image 20250309190342](https://github.com/user-attachments/assets/a60e25d0-33b8-46cf-af90-20a7d8ac2adb)
+**A:** For ESP32-based devices (e.g. Heltec V3):
+1. On flasher.meshcore.co.uk, download the **non-merged** version of the firmware for your ESP32 device (e.g. `Heltec_v3_repeater-v1.6.2-4449fd3.bin`, no `"merged"` in the file name)
+2. From the MeshCore app, login remotely to the repeater you want to update with admin priviledge
+4. Go to the Command Line tab, type `start ota` and hit enter.
+5. you should see `OK` to confirm the repeater device is now in OTA mode
+6. The command `start ota` on an ESP32-based device starts a wifi hotspot named `MeshCore OTA`
+7. From your phone or computer connect to the 'MeshCore OTA' hotspot 
+8. From a browser, go to http://192.168.4.1/update and upload the non-merged bin from the flasher
 
 
+### 7.1 Q: How to update nRF (RAK, T114, Seed XIAO) repeater and room server firmware over the air using the new simpler DFU app?
 
-**Android steps continues below:**
-1. on the top left corner of the nRF Connect app on Android, tap the 3-bar hamburger menu, then `Settings`, then `nRF5 DFU Options`
+**A:** The steps below work on both Android and iOS as nRF has made both apps' user interface the same on both platforms:
 
-![Android nRF Hamberger](https://github.com/user-attachments/assets/ea6dfeef-9367-4830-bd70-1441d517c706)
-
-![Android nRF Settings](https://github.com/user-attachments/assets/c63726bf-cecd-4987-be68-afb6358c7190)
-
-![Android nRF DFU Options](https://github.com/user-attachments/assets/b20e872f-5122-41d9-90df-0215cff5fbc9)
-
-2. Change `Number of packets` to `10` for RAK, `8` for Heltec T114
-
-![Android nRF Number of Packets](https://github.com/user-attachments/assets/c092adaf-4cb3-460b-b7ef-8d7f450d602b)
-
-3. Go back to the main screen
-4. Your LoRa device should already ben in DFU mode from previous steps
-5. tap `SCANNER` and then `SCAN` to find the device you want to update, tap `CONNECT`
-
-![Android nRF Scanner Scan Connect](https://github.com/user-attachments/assets/37218717-f167-48b6-a6ca-93d132ef77ca)
-
-6. On the top left corner of the nRF Connect app, tap the `DFU` icon next to the three dots
-
-![Android nRF DFU](https://github.com/user-attachments/assets/1ec3b818-bf0c-461f-8fdf-37c41a63cafa)
-
-7. Choose `Distribution packet (ZIP)` and then `OK`
-
-![Android nRF Distribution Packet (ZIP)](https://github.com/user-attachments/assets/e65f5616-9793-44f5-95c0-a3eb15aa7152)
-
-8. Choose the firmware file in ZIP formate that you downloaded earlier from the MeshCore web flasher, update will start as soon as you tap the file
-
-![Android nRF FW Updating](https://github.com/user-attachments/assets/0814d123-85ce-4c87-90a7-e1a25dc71900)
-
-9. When the update process is done, the device will disconnect from nRF app and the LoRa device is updated
+1. Download nRF's DFU app from iOS App Store or Android's Play Store, you can find the app by searching for `nrf dfu`, the app's full name is `nRF Device Firmware Update`
+2. On flasher.meshcore.co.uk, download the **ZIP** version of the firmware for your nRF device (e.g. RAK or Heltec T114 or Seeed Studio's Xiao)
+3. From the MeshCore app, login remotely to the repeater you want to update with admin priviledge
+4. Go to the Command Line tab, type `start ota` and hit enter.
+5. you should see `OK` to confirm the repeater device is now in OTA mode
+6. Run the DFU app,tab `Settings` on the top right corner
+7. Enable `Packets receipt notifications` and change `Number of Packets` to 10 for RAK, 8 for T114.  8 also works for RAK.  
+8. Select the firmware zip file you downloaded
+9. Select the device you want to update. If the device you want to updat is not on the list, try enabling`OTA` on the device again
+10. Tab the `Upload` to begin OTA update
+11. If it fails, try turning off and on Bluetooth on your phone.  If that doesn't work, try rebooting your phone.  
+12. Wait for the update to complete.  It can take a few minutes.
 
 
 ---
-    

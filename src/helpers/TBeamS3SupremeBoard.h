@@ -75,6 +75,7 @@ public:
       rtc_gpio_hold_dis((gpio_num_t)P_LORA_NSS);
       rtc_gpio_deinit((gpio_num_t)P_LORA_DIO_1);
     }
+    power_init();
   }
 
   void enterDeepSleep(uint32_t secs, int pin_wake_btn = -1) {

@@ -11,6 +11,7 @@ void genericBuzzer::begin() {
 
     quiet(false);
     pinMode(PIN_BUZZER, OUTPUT);
+    digitalWrite(PIN_BUZZER, LOW); // need to pull low by default to avoid extreme power draw
     startup();
 }
 

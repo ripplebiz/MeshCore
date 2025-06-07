@@ -2,6 +2,7 @@
 #include <Arduino.h>
 #include <helpers/TxtDataHelpers.h>
 #include "NodePrefs.h"
+#include "MyMesh.h"
 
 #define AUTO_OFF_MILLIS     15000   // 15 seconds
 #define BOOT_SCREEN_MILLIS   4000   // 4 seconds
@@ -33,30 +34,48 @@ static const uint8_t meshcore_logo [] PROGMEM = {
     0xe3, 0xe3, 0x8f, 0xff, 0x1f, 0xfc, 0x3c, 0x0e, 0x1f, 0xf8, 0xff, 0xf8, 0x70, 0x3c, 0x7f, 0xf8, 
 };
 
-void UITask::begin(DisplayDriver* display, NodePrefs* node_prefs, const char* build_date, const char* firmware_version, uint32_t pin_code) {
+void UITask::begin(DisplayDriver* display, NodePrefs* node_prefs) {
   _display = display;
   _auto_off = millis() + AUTO_OFF_MILLIS;
   clearMsgPreview();
   _node_prefs = node_prefs;
-  _pin_code = pin_code;
   if (_display != NULL) {
     _display->turnOn();
   }
 
   // strip off dash and commit hash by changing dash to null terminator
   // e.g: v1.2.3-abcdef -> v1.2.3
-  char *version = strdup(firmware_version);
+  char *version = strdup(FIRMWARE_VERSION);
   char *dash = strchr(version, '-');
-  if(dash){
+  if (dash) {
     *dash = 0;
   }
 
   // v1.2.3 (1 Jan 2025)
-  sprintf(_version_info, "%s (%s)", version, build_date);
+  sprintf(_version_info, "%s (%s)", version, FIRMWARE_BUILD_DATE);
 
 #ifdef PIN_BUZZER
   buzzer.begin();
 #endif
+
+  // Initialize button with appropriate configuration
+#if defined(PIN_USER_BTN) || defined(PIN_USER_BTN_ANA)
+  #ifdef PIN_USER_BTN
+    _userButton = new Button(PIN_USER_BTN, USER_BTN_PRESSED);
+  #else
+    _userButton = new Button(PIN_USER_BTN_ANA, USER_BTN_PRESSED, true, 20);
+  #endif
+  
+  _userButton->begin();
+  
+  // Set up button callbacks
+  _userButton->onShortPress([this]() { handleButtonShortPress(); });
+  _userButton->onDoublePress([this]() { handleButtonDoublePress(); });
+  _userButton->onTriplePress([this]() { handleButtonTriplePress(); });
+  _userButton->onLongPress([this]() { handleButtonLongPress(); });
+  _userButton->onAnyPress([this]() { handleButtonAnyPress(); });
+#endif
+  ui_started_at = millis();
 }
 
 void UITask::soundBuzzer(UIEventType bet) {
@@ -68,6 +87,9 @@ switch(bet){
     break;
   case UIEventType::channelMessage:
     buzzer.play("kerplop:d=16,o=6,b=120:32g#,32c#");
+    break;
+  case UIEventType::ack:
+    buzzer.play("ack:d=32,o=8,b=120:c");
     break;
   case UIEventType::roomMessage:
   case UIEventType::newContactMessage:
@@ -140,7 +162,16 @@ void UITask::renderCurrScreen() {
   if (_display == NULL) return;  // assert() ??
 
   char tmp[80];
-  if (_origin[0] && _msg[0]) { // message preview
+  if (_alert[0]) {
+    uint16_t textWidth = _display->getTextWidth(_alert);
+    _display->setCursor((_display->width() - textWidth) / 2, 22);
+    _display->setTextSize(1.4);
+    _display->setColor(DisplayDriver::GREEN);
+    _display->print(_alert);
+    _alert[0] = 0;
+    _need_refresh = true;
+    return;
+  } else if (_origin[0] && _msg[0]) { // message preview
     // render message preview
     _display->setCursor(0, 0);
     _display->setTextSize(1);
@@ -194,11 +225,11 @@ void UITask::renderCurrScreen() {
     _display->print(tmp);
 
     // BT pin
-    if (!_connected && _pin_code != 0) {
+    if (!_connected && the_mesh.getBLEPin() != 0) {
       _display->setColor(DisplayDriver::RED);
       _display->setTextSize(2);
       _display->setCursor(0, 43);
-      sprintf(tmp, "Pin:%d", _pin_code);
+      sprintf(tmp, "Pin:%d", the_mesh.getBLEPin());
       _display->print(tmp);
       _display->setColor(DisplayDriver::GREEN);
     } else {
@@ -233,53 +264,36 @@ void UITask::userLedHandler() {
 #endif
 }
 
-void UITask::buttonHandler() {
-  #if defined(PIN_USER_BTN) || defined(PIN_USER_BTN_ANA)
-    static int prev_btn_state = !USER_BTN_PRESSED;
-    static int prev_btn_state_ana = !USER_BTN_PRESSED;
-    static unsigned long btn_state_change_time = 0;
-    static unsigned long next_read = 0;
-    int cur_time = millis();
-    if (cur_time >= next_read) {
-      int btn_state = 0;
-      int btn_state_ana = 0;
-      #ifdef PIN_USER_BTN
-      btn_state = digitalRead(PIN_USER_BTN);
-      #endif
-      #ifdef PIN_USER_BTN_ANA
-      btn_state_ana = (analogRead(PIN_USER_BTN_ANA) < 20); // analogRead returns a value hopefully below 20 when button is pressed. 
-      #endif
-      if (btn_state != prev_btn_state || btn_state_ana != prev_btn_state_ana) { // check for either digital or analogue button change of state
-        if (btn_state == USER_BTN_PRESSED || btn_state_ana == USER_BTN_PRESSED) {  // pressed?
-          if (_display != NULL) {
-            if (_display->isOn()) {
-              clearMsgPreview();
-            } else {
-              _display->turnOn();
-              _need_refresh = true;
-            }
-            _auto_off = cur_time + AUTO_OFF_MILLIS;   // extend auto-off timer
-          }
-        } else { // unpressed ? check pressed time ...
-          if ((cur_time - btn_state_change_time) > 5000) {
-          #ifdef PIN_STATUS_LED
-            digitalWrite(PIN_STATUS_LED, LOW);
-            delay(10);
-          #endif
-            _board->powerOff();
-          }
-        }
-        btn_state_change_time = millis();
-        prev_btn_state = btn_state;
-        prev_btn_state_ana = btn_state_ana;
-      }
-      next_read = millis() + 100;  // 10 reads per second
-    }
-  #endif
-  }
+/* 
+  hardware-agnostic pre-shutdown activity should be done here 
+*/
+void UITask::shutdown(bool restart){
+
+  #ifdef PIN_BUZZER
+  /* note: we have a choice here -
+     we can do a blocking buzzer.loop() with non-deterministic consequences
+     or we can set a flag and delay the shutdown for a couple of seconds
+     while a non-blocking buzzer.loop() plays out in UITask::loop()
+  */
+  buzzer.shutdown();
+  uint32_t buzzer_timer = millis(); // fail-safe shutdown
+  while (buzzer.isPlaying() && (millis() - 2500) < buzzer_timer)
+    buzzer.loop();
+
+  #endif // PIN_BUZZER
+
+  if (restart)
+    _board->reboot();
+  else
+    _board->powerOff();
+}
 
 void UITask::loop() {
-  buttonHandler();
+  #if defined(PIN_USER_BTN) || defined(PIN_USER_BTN_ANA)
+    if (_userButton) {
+      _userButton->update();
+    }
+  #endif
   userLedHandler();
 
 #ifdef PIN_BUZZER
@@ -302,5 +316,74 @@ void UITask::loop() {
     if (millis() > _auto_off) {
       _display->turnOff();
     }
+  }
+}
+
+void UITask::handleButtonAnyPress() {
+  MESH_DEBUG_PRINTLN("UITask: any press triggered");
+  // called on any button press before other events, to wake up the display quickly
+  // do not refresh the display here, as it may block the button handler
+  if (_display != NULL) {
+    _displayWasOn = _display->isOn();  // Track display state before any action
+    if (!_displayWasOn) {
+      _display->turnOn();
+    }
+    _auto_off = millis() + AUTO_OFF_MILLIS;   // extend auto-off timer
+  }
+}
+
+void UITask::handleButtonShortPress() {
+  MESH_DEBUG_PRINTLN("UITask: short press triggered");
+  if (_display != NULL) {
+    // Only clear message preview if display was already on before button press
+    if (_displayWasOn) {
+      // If display was on and showing message preview, clear it
+      if (_origin[0] && _msg[0]) {
+        clearMsgPreview();
+      } else {
+        // Otherwise, refresh the display
+        _need_refresh = true;
+      }
+    }
+    // Note: Display turn-on and auto-off timer extension are handled by handleButtonAnyPress
+  }
+}
+
+void UITask::handleButtonDoublePress() {
+  MESH_DEBUG_PRINTLN("UITask: double press triggered, sending advert");
+  // ADVERT
+  #ifdef PIN_BUZZER
+      soundBuzzer(UIEventType::ack);
+  #endif
+  if (the_mesh.advert()) {
+    MESH_DEBUG_PRINTLN("Advert sent!");
+    sprintf(_alert, "Advert sent!");
+  } else {
+    MESH_DEBUG_PRINTLN("Advert failed!");
+    sprintf(_alert, "Advert failed..");
+  }
+  _need_refresh = true;
+}
+
+void UITask::handleButtonTriplePress() {
+  MESH_DEBUG_PRINTLN("UITask: triple press triggered");
+  // Toggle buzzer quiet mode
+  #ifdef PIN_BUZZER
+    if (buzzer.isQuiet()) {
+      buzzer.quiet(false);
+      soundBuzzer(UIEventType::ack);
+    } else {
+      soundBuzzer(UIEventType::ack);
+      buzzer.quiet(true);
+    }
+  #endif
+}
+
+void UITask::handleButtonLongPress() {
+  MESH_DEBUG_PRINTLN("UITask: long press triggered");
+  if (millis() - ui_started_at < 8000) {   // long press in first 8 seconds since startup -> CLI/rescue
+    the_mesh.enterCLIRescue();
+  } else {
+    shutdown();
   }
 }

@@ -29,6 +29,6 @@ void initVariant() {
   digitalWrite(PIN_TXCO, HIGH);
 
   // shutdown gps
-  pinMode(PIN_GPS_STANDBY, OUTPUT);
-  digitalWrite(PIN_GPS_STANDBY, LOW);
+  pinMode(GPS_EN, OUTPUT);
+  digitalWrite(GPS_EN, LOW);
 }

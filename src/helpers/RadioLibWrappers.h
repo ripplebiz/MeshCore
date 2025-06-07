@@ -8,10 +8,14 @@ protected:
   PhysicalLayer* _radio;
   mesh::MainBoard* _board;
   uint32_t n_recv, n_sent;
+  int16_t _noise_floor, _threshold;
+  uint16_t _num_floor_samples;
+  int32_t _floor_sample_sum;
 
   void idle();
   void startRecv();
   float packetScoreInt(float snr, int sf, int packet_len);
+  virtual bool isReceivingPacket() =0;
 
 public:
   RadioLibWrapper(PhysicalLayer& radio, mesh::MainBoard& board) : _radio(&radio), _board(&board) { n_recv = n_sent = 0; }
@@ -23,6 +27,20 @@ public:
   bool isSendComplete() override;
   void onSendFinished() override;
   bool isInRecvMode() const override;
+  bool isChannelActive();
+
+  bool isReceiving() override { 
+    if (isReceivingPacket()) return true;
+
+    return isChannelActive();
+  }
+
+  virtual float getCurrentRSSI() =0;
+
+  int getNoiseFloor() const override { return _noise_floor; }
+  void triggerNoiseFloorCalibrate(int threshold) override;
+
+  void loop() override;
 
   uint32_t getPacketsRecv() const { return n_recv; }
   uint32_t getPacketsSent() const { return n_sent; }

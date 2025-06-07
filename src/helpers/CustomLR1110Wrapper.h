@@ -6,18 +6,13 @@
 class CustomLR1110Wrapper : public RadioLibWrapper {
 public:
   CustomLR1110Wrapper(CustomLR1110& radio, mesh::MainBoard& board) : RadioLibWrapper(radio, board) { }
-  bool isReceiving() override { 
-    if (((CustomLR1110 *)_radio)->isReceiving()) return true;
-
-    idle();  // put sx126x into standby
-    // do some basic CAD (blocks for ~12780 micros (on SF 10)!)
-    bool activity = (((CustomLR1110 *)_radio)->scanChannel() == RADIOLIB_LORA_DETECTED);
-    if (activity) {
-      startRecv();
-    } else {
-      idle();
-    }
-    return activity;
+  bool isReceivingPacket() override { 
+    return ((CustomLR1110 *)_radio)->isReceiving();
+  }
+  float getCurrentRSSI() override {
+    float rssi = -110;
+    ((CustomLR1110 *)_radio)->getRssiInst(&rssi);
+    return rssi;
   }
 
   void onSendFinished() override {

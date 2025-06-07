@@ -142,7 +142,7 @@ DispatcherAction Mesh::onRecvPacket(Packet* pkt) {
                   if (pkt->isRouteFlood()) {
                     // send a reciprocal return path to sender, but send DIRECTLY!
                     mesh::Packet* rpath = createPathReturn(&src_hash, secret, pkt->path, pkt->path_len, 0, NULL, 0);
-                    if (rpath) sendDirect(rpath, path, path_len);
+                    if (rpath) sendDirect(rpath, path, path_len, 500);
                   }
                 }
               } else {
@@ -518,7 +518,11 @@ void Mesh::sendDirect(Packet* packet, const uint8_t* path, uint8_t path_len, uin
     pri = 5;   // maybe make this configurable
   } else {
     memcpy(packet->path, path, packet->path_len = path_len);
-    pri = 0;
+    if (packet->getPayloadType() == PAYLOAD_TYPE_PATH) {
+      pri = 1;   // slightly less priority
+    } else {
+      pri = 0;
+    }
   }
   _tables->hasSeen(packet); // mark this packet as already sent in case it is rebroadcast back to us
   sendPacket(packet, pri, delay_millis);

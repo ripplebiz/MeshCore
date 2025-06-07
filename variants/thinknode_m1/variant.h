@@ -40,8 +40,8 @@
 ////////////////////////////////////////////////////////////////////////////////
 // UART pin definition
 
-#define PIN_SERIAL1_RX          (41) // GPS TX
-#define PIN_SERIAL1_TX          (40) // GPS RX
+#define PIN_SERIAL1_RX          PIN_GPS_TX
+#define PIN_SERIAL1_TX          PIN_GPS_RX
 ////////////////////////////////////////////////////////////////////////////////
 // I2C pin definition
 
@@ -125,9 +125,10 @@ extern const int SCK;
 ////////////////////////////////////////////////////////////////////////////////
 // GPS
 
-#define PIN_GPS_RX              (41)
-#define PIN_GPS_TX              (40)
-#define PIN_GPS_WAKEUP          (34)
+#define PIN_GPS_RX              (40)
+#define PIN_GPS_TX              (41)
+#define GPS_EN                  (34)
 #define PIN_GPS_RESET           (37)
 #define PIN_GPS_PPS             (36)
 #define PIN_GPS_STANDBY         (34)
+#define PIN_GPS_SWITCH          (33)

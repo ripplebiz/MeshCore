@@ -1,6 +1,14 @@
 #include <helpers/BaseChatMesh.h>
 #include <Utils.h>
 
+#ifndef SERVER_RESPONSE_DELAY
+  #define SERVER_RESPONSE_DELAY   300
+#endif
+
+#ifndef TXT_ACK_DELAY
+  #define TXT_ACK_DELAY     200
+#endif
+
 mesh::Packet* BaseChatMesh::createSelfAdvert(const char* name, double lat, double lon) {
   uint8_t app_data[MAX_ADVERT_DATA_SIZE];
   uint8_t app_data_len;
@@ -131,14 +139,14 @@ void BaseChatMesh::onPeerDataRecv(mesh::Packet* packet, uint8_t type, int sender
         // let this sender know path TO here, so they can use sendDirect(), and ALSO encode the ACK
         mesh::Packet* path = createPathReturn(from.id, secret, packet->path, packet->path_len,
                                                 PAYLOAD_TYPE_ACK, (uint8_t *) &ack_hash, 4);
-        if (path) sendFlood(path);
+        if (path) sendFlood(path, TXT_ACK_DELAY);
       } else {
         mesh::Packet* ack = createAck(ack_hash);
         if (ack) {
           if (from.out_path_len < 0) {
-            sendFlood(ack);
+            sendFlood(ack, TXT_ACK_DELAY);
           } else {
-            sendDirect(ack, from.out_path, from.out_path_len);
+            sendDirect(ack, from.out_path, from.out_path_len, TXT_ACK_DELAY);
           }
         }
       }
@@ -164,14 +172,14 @@ void BaseChatMesh::onPeerDataRecv(mesh::Packet* packet, uint8_t type, int sender
         // let this sender know path TO here, so they can use sendDirect(), and ALSO encode the ACK
         mesh::Packet* path = createPathReturn(from.id, secret, packet->path, packet->path_len,
                                                 PAYLOAD_TYPE_ACK, (uint8_t *) &ack_hash, 4);
-        if (path) sendFlood(path);
+        if (path) sendFlood(path, TXT_ACK_DELAY);
       } else {
         mesh::Packet* ack = createAck(ack_hash);
         if (ack) {
           if (from.out_path_len < 0) {
-            sendFlood(ack);
+            sendFlood(ack, TXT_ACK_DELAY);
           } else {
-            sendDirect(ack, from.out_path, from.out_path_len);
+            sendDirect(ack, from.out_path, from.out_path_len, TXT_ACK_DELAY);
           }
         }
       }
@@ -187,14 +195,14 @@ void BaseChatMesh::onPeerDataRecv(mesh::Packet* packet, uint8_t type, int sender
         // let this sender know path TO here, so they can use sendDirect(), and ALSO encode the response
         mesh::Packet* path = createPathReturn(from.id, secret, packet->path, packet->path_len,
                                               PAYLOAD_TYPE_RESPONSE, temp_buf, reply_len);
-        if (path) sendFlood(path);
+        if (path) sendFlood(path, SERVER_RESPONSE_DELAY);
       } else {
         mesh::Packet* reply = createDatagram(PAYLOAD_TYPE_RESPONSE, from.id, secret, temp_buf, reply_len);
         if (reply) {
           if (from.out_path_len >= 0) {  // we have an out_path, so send DIRECT
-            sendDirect(reply, from.out_path, from.out_path_len);
+            sendDirect(reply, from.out_path, from.out_path_len, SERVER_RESPONSE_DELAY);
           } else {
-            sendFlood(reply);
+            sendFlood(reply, SERVER_RESPONSE_DELAY);
           }
         }
       }
@@ -690,6 +698,13 @@ int BaseChatMesh::findChannelIdx(const mesh::GroupChannel& ch) {
   return -1;  // not found
 }
 #endif
+
+bool BaseChatMesh::getContactByIdx(uint32_t idx, ContactInfo& contact) {
+  if (idx >= num_contacts) return false;
+
+  contact = contacts[idx];
+  return true;
+}
 
 ContactsIterator BaseChatMesh::startContactsIterator() {
   return ContactsIterator();

@@ -56,6 +56,15 @@ public:
   */
   virtual void onSendFinished() = 0;
 
+  /**
+   * \brief  do any processing needed on each loop cycle
+   */
+  virtual void loop() { }
+
+  virtual int getNoiseFloor() const { return 0; }
+
+  virtual void triggerNoiseFloorCalibrate(int threshold) { }
+
   virtual bool isInRecvMode() const = 0;
 
   /**
@@ -107,6 +116,7 @@ class Dispatcher {
   unsigned long next_tx_time;
   unsigned long cad_busy_start;
   unsigned long radio_nonrx_start;
+  unsigned long next_floor_calib_time;
   bool  prev_isrecv_mode;
   uint32_t n_sent_flood, n_sent_direct;
   uint32_t n_recv_flood, n_recv_direct;
@@ -124,6 +134,7 @@ protected:
   {
     outbound = NULL; total_air_time = 0; next_tx_time = 0;
     cad_busy_start = 0;
+    next_floor_calib_time = 0;
     _err_flags = 0;
     radio_nonrx_start = 0;
     prev_isrecv_mode = true;
@@ -142,6 +153,7 @@ protected:
   virtual int calcRxDelay(float score, uint32_t air_time) const;
   virtual uint32_t getCADFailRetryDelay() const;
   virtual uint32_t getCADFailMaxDuration() const;
+  virtual int getInterferenceThreshold() const { return 0; }    // disabled by default
 
 public:
   void begin();

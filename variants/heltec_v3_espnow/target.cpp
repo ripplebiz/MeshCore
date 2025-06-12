@@ -6,7 +6,8 @@ HeltecV3Board board;
 
 ESPNOWRadio radio_driver;
 
-ESP32RTCClock rtc_clock;
+ESP32RTCClock fallback_clock;
+AutoDiscoverRTCClock rtc_clock(fallback_clock);
 EnvironmentSensorManager sensors;
 
 #ifdef DISPLAY_CLASS
@@ -14,7 +15,8 @@ EnvironmentSensorManager sensors;
 #endif
 
 bool radio_init() {
-  rtc_clock.begin();
+  fallback_clock.begin();
+  rtc_clock.begin(Wire);
 
   radio_driver.init();
 

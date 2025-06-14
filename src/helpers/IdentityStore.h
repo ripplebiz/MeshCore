@@ -2,19 +2,23 @@
 
 #if defined(ESP32) || defined(RP2040_PLATFORM)
   #include <FS.h>
-  #define FILESYSTEM  fs::FS
+  using FILESYSTEM = fs::FS;
 #elif defined(NRF52_PLATFORM) || defined(STM32_PLATFORM)
   #include <Adafruit_LittleFS.h>
-  #define FILESYSTEM  Adafruit_LittleFS
-
   using namespace Adafruit_LittleFS_Namespace;
+  using FILESYSTEM = Adafruit_LittleFS;
+#elif defined(PLATFORM_NATIVE)
+  #include "NativeFS.h"
+  using FILESYSTEM = NativeFS;
 #endif
 
 #include <Identity.h>
 
 class IdentityStore {
+private:
   FILESYSTEM* _fs;
   const char* _dir;
+
 public:
   IdentityStore(FILESYSTEM& fs, const char* dir): _fs(&fs), _dir(dir) { }
 

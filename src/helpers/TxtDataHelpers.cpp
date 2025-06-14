@@ -95,7 +95,8 @@ static void _ftoa(float f, char *p, int *status)
     *p++ = '0';
   else 
   {
-    ltoa(int_part, p, 10);
+    std::string int_str = std::to_string(int_part);
+    strcpy(p, int_str.c_str());
     while (*p)
       p++;
   }

@@ -19,6 +19,14 @@
 #include <RTClib.h>
 #include <target.h>
 
+#if defined(PLATFORM_NATIVE)
+#include "../../src/helpers/NativeFS.h"
+#define PLATFORM_FILE NativeFS::File
+NativeFS nativeFS;
+IdentityStore store(nativeFS, "");
+#define PLATFORM_FILE NativeFS::File
+#endif
+
 /* ------------------------------ Config -------------------------------- */
 
 #ifndef FIRMWARE_BUILD_DATE
@@ -234,7 +242,7 @@ class MyMesh : public mesh::Mesh, public CommonCLICallbacks {
    return createAdvert(self_id, app_data, app_data_len);
   }
 
-  File openAppend(const char* fname) {
+  PLATFORM_FILE openAppend(const char* fname) {
   #if defined(NRF52_PLATFORM) || defined(STM32_PLATFORM)
     return _fs->open(fname, FILE_O_WRITE);
   #elif defined(RP2040_PLATFORM)
@@ -274,7 +282,7 @@ protected:
 
   void logRx(mesh::Packet* pkt, int len, float score) override {
     if (_logging) {
-      File f = openAppend(PACKET_LOG_FILE);
+      PLATFORM_FILE f = openAppend(PACKET_LOG_FILE);
       if (f) {
         f.print(getLogDateTime());
         f.printf(": RX, len=%d (type=%d, route=%s, payload_len=%d) SNR=%d RSSI=%d score=%d",
@@ -293,7 +301,7 @@ protected:
   }
   void logTx(mesh::Packet* pkt, int len) override {
     if (_logging) {
-      File f = openAppend(PACKET_LOG_FILE);
+      PLATFORM_FILE f = openAppend(PACKET_LOG_FILE);
       if (f) {
         f.print(getLogDateTime());
         f.printf(": TX, len=%d (type=%d, route=%s, payload_len=%d)",
@@ -311,7 +319,7 @@ protected:
   }
   void logTxFail(mesh::Packet* pkt, int len) override {
     if (_logging) {
-      File f = openAppend(PACKET_LOG_FILE);
+      PLATFORM_FILE f = openAppend(PACKET_LOG_FILE);
       if (f) {
         f.print(getLogDateTime());
         f.printf(": TX FAIL!, len=%d (type=%d, route=%s, payload_len=%d)\n",
@@ -612,6 +620,8 @@ public:
     return LittleFS.format();
 #elif defined(ESP32)
     return SPIFFS.format();
+#elif defined(PLATFORM_NATIVE)
+    return true;  // No need to format on native platform
 #else
     #error "need to implement file system erase"
     return false;
@@ -645,14 +655,18 @@ public:
   void setLoggingOn(bool enable) override { _logging = enable; }
 
   void eraseLogFile() override {
-    _fs->remove(PACKET_LOG_FILE);
+#if defined(PLATFORM_NATIVE)
+    nativeFS.remove(PACKET_LOG_FILE);
+#else
+    // platform-specific erase
+#endif
   }
 
   void dumpLogFile() override {
 #if defined(RP2040_PLATFORM)
-    File f = _fs->open(PACKET_LOG_FILE, "r");
+    PLATFORM_FILE f = _fs->open(PACKET_LOG_FILE, "r");
 #else
-    File f = _fs->open(PACKET_LOG_FILE);
+    PLATFORM_FILE f = _fs->open(PACKET_LOG_FILE);
 #endif
     if (f) {
       while (f.available()) {
@@ -766,6 +780,11 @@ void setup() {
   LittleFS.begin();
   fs = &LittleFS;
   IdentityStore store(LittleFS, "/identity");
+  store.begin();
+#elif defined(PLATFORM_NATIVE)
+  nativeFS.begin();
+  fs = &nativeFS;
+  IdentityStore store(nativeFS, "/tmp/meshcore");
   store.begin();
 #else
   #error "need to define filesystem"

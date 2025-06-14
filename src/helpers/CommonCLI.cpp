@@ -2,6 +2,10 @@
 #include "CommonCLI.h"
 #include "TxtDataHelpers.h"
 #include <RTClib.h>
+#if defined(PLATFORM_NATIVE)
+#include "NativeFS.h"
+#define File NativeFS::File
+#endif
 
 // Believe it or not, this std C function is busted on some platforms!
 static uint32_t _atoi(const char* sp) {

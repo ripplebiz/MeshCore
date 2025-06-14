@@ -12,8 +12,21 @@ NativeBoard board;
 
 WRAPPER_CLASS radio_driver(radio, board);
 
+#ifdef PLATFORM_NATIVE
+#include <MeshCore.h>
+class NativeRTCClock : public mesh::RTCClock {
+public:
+  void begin() {}
+  uint32_t getCurrentTime() override { return 0; }
+  void setCurrentTime(uint32_t) override {}
+};
+NativeRTCClock fallback_clock;
+AutoDiscoverRTCClock rtc_clock(fallback_clock);
+#else
 ESP32RTCClock fallback_clock;
 AutoDiscoverRTCClock rtc_clock(fallback_clock);
+#endif
+
 EnvironmentSensorManager sensors;
 
 #ifdef DISPLAY_CLASS
@@ -24,9 +37,21 @@ EnvironmentSensorManager sensors;
   #define LORA_CR      5
 #endif
 
+#ifndef LORA_FREQ
+#define LORA_FREQ 915.0
+#endif
+#ifndef LORA_BW
+#define LORA_BW 250
+#endif
+#ifndef LORA_SF
+#define LORA_SF 10
+#endif
+
 bool radio_init() {
   fallback_clock.begin();
-  rtc_clock.begin(Wire);
+#ifndef PLATFORM_NATIVE
+  rtc_clock.begin();
+#endif
   
 #ifdef SX126X_DIO3_TCXO_VOLTAGE
   float tcxo = SX126X_DIO3_TCXO_VOLTAGE;
@@ -35,7 +60,9 @@ bool radio_init() {
 #endif
 
 #if defined(P_LORA_SCLK)
+  #if !defined(__linux__)
   spi.begin(P_LORA_SCLK, P_LORA_MISO, P_LORA_MOSI);
+  #endif
 #endif
   int status = radio.begin(LORA_FREQ, LORA_BW, LORA_SF, LORA_CR, RADIOLIB_SX126X_SYNC_WORD_PRIVATE, LORA_TX_POWER, 8, tcxo);
   if (status != RADIOLIB_ERR_NONE) {

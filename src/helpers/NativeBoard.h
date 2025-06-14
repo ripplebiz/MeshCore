@@ -23,8 +23,6 @@
 #define  PIN_ADC_CTRL_INACTIVE  HIGH
 //#define  PIN_LED_BUILTIN 35
 
-#include <driver/rtc_io.h>
-
 class NativeBoard : public mesh::MainBoard {
 private:
   bool adc_active_state;
@@ -41,67 +39,35 @@ public:
     pinMode(PIN_ADC_CTRL, INPUT);
     adc_active_state = !digitalRead(PIN_ADC_CTRL);
     
-    pinMode(PIN_ADC_CTRL, OUTPUT);x
+    pinMode(PIN_ADC_CTRL, OUTPUT);
     digitalWrite(PIN_ADC_CTRL, !adc_active_state); // Initially inactive
 
     periph_power.begin();
-
-    esp_reset_reason_t reason = esp_reset_reason();
-    if (reason == ESP_RST_DEEPSLEEP) {
-      long wakeup_source = esp_sleep_get_ext1_wakeup_status();
-      if (wakeup_source & (1 << P_LORA_DIO_1)) {  // received a LoRa packet (while in deep sleep)
-        startup_reason = BD_STARTUP_RX_PACKET;
-      }
-
-      rtc_gpio_hold_dis((gpio_num_t)P_LORA_NSS);
-      rtc_gpio_deinit((gpio_num_t)P_LORA_DIO_1);
-    }
   }
 
   void enterDeepSleep(uint32_t secs, int pin_wake_btn = -1) {
-    esp_sleep_pd_config(ESP_PD_DOMAIN_RTC_PERIPH, ESP_PD_OPTION_ON);
-
-    // Make sure the DIO1 and NSS GPIOs are hold on required levels during deep sleep 
-    rtc_gpio_set_direction((gpio_num_t)P_LORA_DIO_1, RTC_GPIO_MODE_INPUT_ONLY);
-    rtc_gpio_pulldown_en((gpio_num_t)P_LORA_DIO_1);
-
-    rtc_gpio_hold_en((gpio_num_t)P_LORA_NSS);
-
-    if (pin_wake_btn < 0) {
-      esp_sleep_enable_ext1_wakeup( (1L << P_LORA_DIO_1), ESP_EXT1_WAKEUP_ANY_HIGH);  // wake up on: recv LoRa packet
-    } else {
-      esp_sleep_enable_ext1_wakeup( (1L << P_LORA_DIO_1) | (1L << pin_wake_btn), ESP_EXT1_WAKEUP_ANY_HIGH);  // wake up on: recv LoRa packet OR wake btn
-    }
-
-    if (secs > 0) {
-      esp_sleep_enable_timer_wakeup(secs * 1000000);
-    }
-
-    // Finally set ESP32 into sleep
-    esp_deep_sleep_start();   // CPU halts here and never returns!
+    // Not implemented for native Linux
   }
 
   void powerOff() override {
-    // TODO: re-enable this when there is a definite wake-up source pin:
-    //  enterDeepSleep(0);
+    // Not implemented for native Linux
   }
 
   uint16_t getBattMilliVolts() override {
-    analogReadResolution(10);
-    digitalWrite(PIN_ADC_CTRL, adc_active_state);
-
-    uint32_t raw = 0;
-    for (int i = 0; i < 8; i++) {
-      raw += analogRead(PIN_VBAT_READ);
-    }
-    raw = raw / 8;
-
-    digitalWrite(PIN_ADC_CTRL, !adc_active_state);
-
-    return (5.2 * (3.3 / 1024.0) * raw) * 1000;
+    // Simulate battery voltage for native Linux
+    return 3700; // Return 3.7V as a default value
   }
 
   const char* getManufacturerName() const override {
     return "Native";
+  }
+
+  void reboot() override {
+    // Not implemented for native Linux
+  }
+
+  uint8_t getStartupReason() const override {
+    // Not implemented for native Linux
+    return 0;
   }
 };

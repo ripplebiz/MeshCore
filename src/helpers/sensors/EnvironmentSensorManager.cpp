@@ -1,3 +1,7 @@
+#ifndef ENV_INCLUDE_AHTX0
+#define ENV_INCLUDE_AHTX0 0
+#endif
+
 #include "EnvironmentSensorManager.h"
 
 #if ENV_INCLUDE_AHTX0

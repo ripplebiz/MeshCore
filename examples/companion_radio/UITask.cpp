@@ -132,7 +132,7 @@ void UITask::newMsg(uint8_t path_len, const char* from_name, const char* text, i
   }
 }
 
-void UITask::renderBatteryIndicator(uint16_t batteryPercentage) {
+void UITask::renderBatteryIndicator(int batteryPercentage) {
   if (batteryPercentage < 0) batteryPercentage = 0; // Clamp to 0%
   if (batteryPercentage > 100) batteryPercentage = 100; // Clamp to 100%
 

@@ -1,6 +1,7 @@
 #pragma once
 
 #include <stdint.h>
+#include "helpers/Battery.h"
 
 #define MAX_HASH_SIZE        8
 #define PUB_KEY_SIZE        32
@@ -33,30 +34,14 @@ namespace mesh {
 #define  BD_STARTUP_NORMAL     0  // getStartupReason() codes
 #define  BD_STARTUP_RX_PACKET  1
 
-#define BATT_LIPO     0
-#define BATT_LIFEPO   1
-
 class MainBoard {
 public:
   virtual uint16_t getBattMilliVolts() = 0;
-  uint8_t getBattPercent() {
-    uint32_t mv = getBattMilliVolts();
-    // Convert millivolts to percentage
-    int minMilliVolts;
-    int maxMilliVolts;
-    switch (getBattType()) {
-    case BATT_LIPO:
-      minMilliVolts = 3000;
-      maxMilliVolts = 4200;
-      break;
-    case BATT_LIFEPO:
-      minMilliVolts = 2500;
-      maxMilliVolts = 3400;
-      break;
-    }
-    return ((mv - minMilliVolts) * 100) / (maxMilliVolts - minMilliVolts);
+  uint16_t getBattPercent() {
+    uint16_t mv = getBattMilliVolts();
+    return Battery::percent(getBattType(), mv);
   }
-  uint8_t getBattType() { return BATT_LIPO; };
+  uint8_t getBattType() { return Battery::BATT_LIPO; };
   virtual const char* getManufacturerName() const = 0;
   virtual void onBeforeTransmit() { }
   virtual void onAfterTransmit() { }

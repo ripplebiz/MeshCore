@@ -1,3 +1,4 @@
+#ifdef ENABLE_ESPNOW
 #include "ESPNOWRadio.h"
 #include <esp_now.h>
 #include <WiFi.h>
@@ -111,3 +112,4 @@ int ESPNOWRadio::recvRaw(uint8_t* bytes, int sz) {
 uint32_t ESPNOWRadio::getEstAirtimeFor(int len_bytes) {
   return 4;  // Fast AF
 }
+#endif

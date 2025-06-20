@@ -68,7 +68,8 @@ public:
     }
     raw = raw / 8;
 
-    return (1.883 * (2 / 1024.0) * raw) * 1000;
+    // raw * voltage divider ratio * (VREF/ADC resolution) then to mv * 1000
+    return raw * 1.454 * ( 3 / 1024 ) * 1000;
   }
 
   const char* getManufacturerName() const override {

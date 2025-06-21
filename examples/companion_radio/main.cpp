@@ -186,7 +186,7 @@ void setup() {
   sensors.begin();
 
 #ifdef DISPLAY_CLASS
-  ui_task.begin(disp, &sensors, the_mesh.getNodePrefs());  // still want to pass this in as dependency, as prefs might be moved
+  ui_task.begin(disp, &sensors, the_mesh.getSerialInterface(), the_mesh.getNodePrefs());  // still want to pass this in as dependency, as prefs might be moved
 #endif
 }
 

@@ -68,7 +68,7 @@ bool NanoG2Ultra::startOTAUpdate(const char *id, char reply[])
   // Set max power. Accepted values are: -40, -30, -20, -16, -12, -8, -4, 0, 4
   Bluefruit.setTxPower(4);
   // Set the BLE device name
-  Bluefruit.setName("TECHO_OTA");
+  Bluefruit.setName("NANO_G2_OTA");
 
   Bluefruit.Periph.setConnectCallback(connect_callback);
   Bluefruit.Periph.setDisconnectCallback(disconnect_callback);

@@ -1,6 +1,5 @@
 #pragma once
 
-#define RADIOLIB_STATIC_ONLY 1
 #include <RadioLib.h>
 #include <helpers/RadioLibWrappers.h>
 #include "HT-CT62Board.h"

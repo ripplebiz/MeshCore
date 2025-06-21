@@ -1,5 +1,4 @@
 
-#define RADIOLIB_STATIC_ONLY 1
 #include "RadioLibWrappers.h"
 
 #define STATE_IDLE       0

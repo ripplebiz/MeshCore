@@ -10,10 +10,6 @@ TBeamS3SupremeBoard board;
 
 bool pmuIntFlag;
 
-#ifndef LORA_CR
-  #define LORA_CR      5
-#endif
-
 #if defined(P_LORA_SCLK)
   static SPIClass spi;
   RADIO_CLASS radio = new Module(P_LORA_NSS, P_LORA_DIO_1, P_LORA_RESET, P_LORA_BUSY, spi);
@@ -261,32 +257,9 @@ static bool readStringUntil(Stream& s, char dest[], size_t max_len, char term, u
 
 bool radio_init() {
   fallback_clock.begin();
-
   rtc_clock.begin(Wire1);
-
-  // #ifdef MESH_DEBUG
-  // printBMEValues();
-  // #endif
-  
-#ifdef SX126X_DIO3_TCXO_VOLTAGE
-  float tcxo = SX126X_DIO3_TCXO_VOLTAGE;
-#else
-  float tcxo = 1.6f;
+  return radio.std_init(&spi);
 #endif
-
-#if defined(P_LORA_SCLK)
-  spi.begin(P_LORA_SCLK, P_LORA_MISO, P_LORA_MOSI);
-#endif
-  int status = radio.begin(LORA_FREQ, LORA_BW, LORA_SF, LORA_CR, RADIOLIB_SX126X_SYNC_WORD_PRIVATE, LORA_TX_POWER, 8, tcxo);
-  if (status != RADIOLIB_ERR_NONE) {
-    Serial.print("ERROR: radio init failed: ");
-    Serial.println(status);
-    return false;  // fail
-  }
-
-  radio.setCRC(1);
-  
-  return true;  // success
 }
 
 uint32_t radio_get_rng_seed() {

@@ -32,7 +32,21 @@ bool ST7789Display::begin() {
 }
 
 void ST7789Display::turnOn() {
-  ST7789Display::begin();
+  if (!_isOn) {
+    // Restore power to the display but keep backlight off
+    digitalWrite(PIN_TFT_VDD_CTL, LOW);
+    digitalWrite(PIN_TFT_RST, HIGH);
+    
+    // Re-initialize the display
+    display.init();
+    display.displayOn();
+    delay(20);
+
+    // Now turn on the backlight
+    digitalWrite(PIN_TFT_LEDA_CTL, LOW);
+    
+    _isOn = true;
+  }
 }
 
 void ST7789Display::turnOff() {

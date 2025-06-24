@@ -144,7 +144,6 @@ void CommonCLI::handleCommand(uint32_t sender_timestamp, const char* command, ch
       uint32_t curr = getRTCClock()->getCurrentTime();
       if (sender_timestamp > curr) {
         if (bootTime == 0) {
-          MESH_DEBUG_PRINTLN("clock sync: setting boot time...");
           _callbacks->setBootTime(sender_timestamp - (millis()/1000));
         } 
         getRTCClock()->setCurrentTime(sender_timestamp + 1);
@@ -167,7 +166,6 @@ void CommonCLI::handleCommand(uint32_t sender_timestamp, const char* command, ch
       uint32_t curr = getRTCClock()->getCurrentTime();
       if (secs > curr) {
         if (bootTime == 0) {
-          MESH_DEBUG_PRINTLN("clock set time: setting boot time...");
           _callbacks->setBootTime(sender_timestamp - (millis()/1000));
         } 
         getRTCClock()->setCurrentTime(secs);

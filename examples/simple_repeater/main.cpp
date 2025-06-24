@@ -656,7 +656,7 @@ public:
   void setLoggingOn(bool enable) override { _logging = enable; }
 
   void setBootTime(uint32_t boot_time) {
-    _cli.bootTime = boot_time;   // set the boot time for CLI
+    _cli.bootTime = boot_time;
   }
   
   void eraseLogFile() override {

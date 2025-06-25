@@ -44,7 +44,7 @@ public:
   virtual void setTxPower(uint8_t power_dbm) = 0;
   virtual void formatNeighborsReply(char *reply) = 0;
   virtual const uint8_t* getSelfIdPubKey() = 0;
-  virtual void clearStats() = 0;  
+  virtual void clearStats() = 0;
   virtual void setBootTime(uint32_t bootTime) = 0;
 };
 

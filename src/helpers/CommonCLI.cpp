@@ -143,6 +143,9 @@ void CommonCLI::handleCommand(uint32_t sender_timestamp, const char* command, ch
     } else if (memcmp(command, "clock sync", 10) == 0) {
       uint32_t curr = getRTCClock()->getCurrentTime();
       if (sender_timestamp > curr) {
+        if (bootTime == 0) {
+          _callbacks->setBootTime(sender_timestamp - (millis()/1000));
+        } 
         getRTCClock()->setCurrentTime(sender_timestamp + 1);
         uint32_t now = getRTCClock()->getCurrentTime();
         DateTime dt = DateTime(now);
@@ -162,6 +165,9 @@ void CommonCLI::handleCommand(uint32_t sender_timestamp, const char* command, ch
       uint32_t secs = _atoi(&command[5]);
       uint32_t curr = getRTCClock()->getCurrentTime();
       if (secs > curr) {
+        if (bootTime == 0) {
+          _callbacks->setBootTime(sender_timestamp - (millis()/1000));
+        } 
         getRTCClock()->setCurrentTime(secs);
         uint32_t now = getRTCClock()->getCurrentTime();
         DateTime dt = DateTime(now);

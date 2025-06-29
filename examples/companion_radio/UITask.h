@@ -2,6 +2,7 @@
 
 #include <MeshCore.h>
 #include <helpers/ui/DisplayDriver.h>
+#include <helpers/SensorManager.h>
 #include <stddef.h>
 
 #ifdef PIN_BUZZER
@@ -24,6 +25,7 @@
 class UITask {
   DisplayDriver* _display;
   mesh::MainBoard* _board;
+  SensorManager* _sensors;
 #ifdef PIN_BUZZER
   genericBuzzer buzzer;
 #endif
@@ -40,8 +42,11 @@ class UITask {
   unsigned long ui_started_at;
 
   // Button handlers
-#if defined(PIN_USER_BTN) || defined(PIN_USER_BTN_ANA)
+#ifdef PIN_USER_BTN
   Button* _userButton = nullptr;
+#endif
+#ifdef PIN_USER_BTN_ANA
+  Button* _userButtonAnalog = nullptr;
 #endif
 
   void renderCurrScreen();
@@ -53,17 +58,18 @@ class UITask {
   void handleButtonShortPress();
   void handleButtonDoublePress();
   void handleButtonTriplePress();
+  void handleButtonQuadruplePress();
   void handleButtonLongPress();
 
  
 public:
 
-  UITask(mesh::MainBoard* board) : _board(board), _display(NULL) {
+  UITask(mesh::MainBoard* board) : _board(board), _display(NULL), _sensors(NULL) {
       _next_refresh = 0;
       ui_started_at = 0;
       _connected = false;
   }
-  void begin(DisplayDriver* display, NodePrefs* node_prefs);
+  void begin(DisplayDriver* display, SensorManager* sensors, NodePrefs* node_prefs);
 
   void setHasConnection(bool connected) { _connected = connected; }
   bool hasDisplay() const { return _display != NULL; }

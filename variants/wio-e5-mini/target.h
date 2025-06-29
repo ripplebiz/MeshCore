@@ -7,20 +7,38 @@
 #include <helpers/CustomSTM32WLxWrapper.h>
 #include <helpers/ArduinoHelpers.h>
 #include <helpers/SensorManager.h>
+#ifdef DISPLAY_CLASS
+  #include "NullDisplayDriver.h"
+#endif
 
 #include <BME280I2C.h>
 #include <Wire.h>
 
+#ifdef DISPLAY_CLASS
+  extern NullDisplayDriver display;
+#endif
+
 class WIOE5Board : public STM32Board {
 public:
+    void begin() override {
+        STM32Board::begin();
+
+        pinMode(LED_RED, OUTPUT);
+        digitalWrite(LED_RED, HIGH);
+        pinMode(USER_BTN, INPUT_PULLUP);
+    }
+
     const char* getManufacturerName() const override {
         return "Seeed Wio E5 mini";
     }
 
     uint16_t getBattMilliVolts() override {
         analogReadResolution(12);
-        uint32_t raw = analogRead(PIN_A3);            
-        return raw;
+        uint32_t raw = 0;
+        for (int i=0; i<8;i++) {
+            raw += analogRead(PIN_A3);
+        }            
+        return ((double)raw) * 1.73 * 5 * 1000 / 8 / 4096;
     }
 };
 

@@ -5,7 +5,7 @@
 #include "MyMesh.h"
 
 #define AUTO_OFF_MILLIS     15000   // 15 seconds
-#define BOOT_SCREEN_MILLIS   4000   // 4 seconds
+#define BOOT_SCREEN_MILLIS   3000   // 3 seconds
 
 #ifdef PIN_STATUS_LED
 #define LED_ON_MILLIS     20
@@ -34,8 +34,9 @@ static const uint8_t meshcore_logo [] PROGMEM = {
     0xe3, 0xe3, 0x8f, 0xff, 0x1f, 0xfc, 0x3c, 0x0e, 0x1f, 0xf8, 0xff, 0xf8, 0x70, 0x3c, 0x7f, 0xf8, 
 };
 
-void UITask::begin(DisplayDriver* display, NodePrefs* node_prefs) {
+void UITask::begin(DisplayDriver* display, SensorManager* sensors, NodePrefs* node_prefs) {
   _display = display;
+  _sensors = sensors;
   _auto_off = millis() + AUTO_OFF_MILLIS;
   clearMsgPreview();
   _node_prefs = node_prefs;
@@ -58,22 +59,32 @@ void UITask::begin(DisplayDriver* display, NodePrefs* node_prefs) {
   buzzer.begin();
 #endif
 
-  // Initialize button with appropriate configuration
-#if defined(PIN_USER_BTN) || defined(PIN_USER_BTN_ANA)
-  #ifdef PIN_USER_BTN
-    _userButton = new Button(PIN_USER_BTN, USER_BTN_PRESSED);
-  #else
-    _userButton = new Button(PIN_USER_BTN_ANA, USER_BTN_PRESSED, true, 20);
-  #endif
-  
+  // Initialize digital button if available
+#ifdef PIN_USER_BTN
+  _userButton = new Button(PIN_USER_BTN, USER_BTN_PRESSED);
   _userButton->begin();
   
-  // Set up button callbacks
+  // Set up digital button callbacks
   _userButton->onShortPress([this]() { handleButtonShortPress(); });
   _userButton->onDoublePress([this]() { handleButtonDoublePress(); });
   _userButton->onTriplePress([this]() { handleButtonTriplePress(); });
+  _userButton->onQuadruplePress([this]() { handleButtonQuadruplePress(); });
   _userButton->onLongPress([this]() { handleButtonLongPress(); });
   _userButton->onAnyPress([this]() { handleButtonAnyPress(); });
+#endif
+
+  // Initialize analog button if available
+#ifdef PIN_USER_BTN_ANA
+  _userButtonAnalog = new Button(PIN_USER_BTN_ANA, USER_BTN_PRESSED, true, 20);
+  _userButtonAnalog->begin();
+  
+  // Set up analog button callbacks
+  _userButtonAnalog->onShortPress([this]() { handleButtonShortPress(); });
+  _userButtonAnalog->onDoublePress([this]() { handleButtonDoublePress(); });
+  _userButtonAnalog->onTriplePress([this]() { handleButtonTriplePress(); });
+  _userButtonAnalog->onQuadruplePress([this]() { handleButtonQuadruplePress(); });
+  _userButtonAnalog->onLongPress([this]() { handleButtonLongPress(); });
+  _userButtonAnalog->onAnyPress([this]() { handleButtonAnyPress(); });
 #endif
   ui_started_at = millis();
 }
@@ -163,9 +174,9 @@ void UITask::renderCurrScreen() {
 
   char tmp[80];
   if (_alert[0]) {
+    _display->setTextSize(1.4);
     uint16_t textWidth = _display->getTextWidth(_alert);
     _display->setCursor((_display->width() - textWidth) / 2, 22);
-    _display->setTextSize(1.4);
     _display->setColor(DisplayDriver::GREEN);
     _display->print(_alert);
     _alert[0] = 0;
@@ -191,7 +202,7 @@ void UITask::renderCurrScreen() {
     sprintf(tmp, "%d", _msgcount);
     _display->print(tmp);
     _display->setColor(DisplayDriver::YELLOW); // last color will be kept on T114
-  } else if (millis() < BOOT_SCREEN_MILLIS) { // boot screen
+  } else if ((millis() - ui_started_at) < BOOT_SCREEN_MILLIS) { // boot screen
     // meshcore logo
     _display->setColor(DisplayDriver::BLUE);
     int logoWidth = 128;
@@ -289,9 +300,14 @@ void UITask::shutdown(bool restart){
 }
 
 void UITask::loop() {
-  #if defined(PIN_USER_BTN) || defined(PIN_USER_BTN_ANA)
+  #ifdef PIN_USER_BTN
     if (_userButton) {
       _userButton->update();
+    }
+  #endif
+  #ifdef PIN_USER_BTN_ANA
+    if (_userButtonAnalog) {
+      _userButtonAnalog->update();
     }
   #endif
   userLedHandler();
@@ -302,7 +318,7 @@ void UITask::loop() {
 
   if (_display != NULL && _display->isOn()) {
     static bool _firstBoot = true;
-    if(_firstBoot && millis() >= BOOT_SCREEN_MILLIS) {
+    if(_firstBoot && (millis() - ui_started_at) >= BOOT_SCREEN_MILLIS) {
       _need_refresh = true;
       _firstBoot = false;
     }
@@ -344,6 +360,8 @@ void UITask::handleButtonShortPress() {
         // Otherwise, refresh the display
         _need_refresh = true;
       }
+    } else {
+      _need_refresh = true; // display just turned on, so we need to refresh
     }
     // Note: Display turn-on and auto-off timer extension are handled by handleButtonAnyPress
   }
@@ -372,11 +390,32 @@ void UITask::handleButtonTriplePress() {
     if (buzzer.isQuiet()) {
       buzzer.quiet(false);
       soundBuzzer(UIEventType::ack);
+      sprintf(_alert, "Buzzer: ON");
     } else {
-      soundBuzzer(UIEventType::ack);
       buzzer.quiet(true);
+      sprintf(_alert, "Buzzer: OFF");
     }
+    _need_refresh = true;
   #endif
+}
+
+void UITask::handleButtonQuadruplePress() {
+  MESH_DEBUG_PRINTLN("UITask: quad press triggered");
+  if (_sensors != NULL) {
+    // toggle GPS onn/off
+    int num = _sensors->getNumSettings();
+    for (int i = 0; i < num; i++) {
+      if (strcmp(_sensors->getSettingName(i), "gps") == 0) {
+        if (strcmp(_sensors->getSettingValue(i), "1") == 0) {
+          _sensors->setSettingValue("gps", "0");
+        } else {
+          _sensors->setSettingValue("gps", "1");
+        }
+        break;
+      }
+    }
+  }
+  _need_refresh = true;
 }
 
 void UITask::handleButtonLongPress() {

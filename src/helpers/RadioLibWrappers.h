@@ -39,6 +39,7 @@ public:
 
   int getNoiseFloor() const override { return _noise_floor; }
   void triggerNoiseFloorCalibrate(int threshold) override;
+  void resetAGC() override;
 
   void loop() override;
 

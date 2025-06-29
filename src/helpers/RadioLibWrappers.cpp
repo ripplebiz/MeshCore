@@ -9,6 +9,7 @@
 #define STATE_INT_READY 16
 
 #define NUM_NOISE_FLOOR_SAMPLES  64
+#define SAMPLING_THRESHOLD  14
 
 static volatile uint8_t state = STATE_IDLE;
 
@@ -46,17 +47,26 @@ void RadioLibWrapper::idle() {
 
 void RadioLibWrapper::triggerNoiseFloorCalibrate(int threshold) {
   _threshold = threshold;
-  if (threshold > 0 && _num_floor_samples >= NUM_NOISE_FLOOR_SAMPLES) {  // ignore trigger if currently sampling
+  if (_num_floor_samples >= NUM_NOISE_FLOOR_SAMPLES) {  // ignore trigger if currently sampling
     _num_floor_samples = 0;
     _floor_sample_sum = 0;
   }
+}
+
+void RadioLibWrapper::resetAGC() {
+  // make sure we're not mid-receive of packet!
+  if ((state & STATE_INT_READY) != 0 || isReceivingPacket()) return;
+
+  // NOTE: according to higher powers, just issuing RadioLib's startReceive() will reset the AGC.
+  //      revisit this if a better impl is discovered.
+  state = STATE_IDLE;   // trigger a startReceive()
 }
 
 void RadioLibWrapper::loop() {
   if (state == STATE_RX && _num_floor_samples < NUM_NOISE_FLOOR_SAMPLES) {
     if (!isReceivingPacket()) {
       int rssi = getCurrentRSSI();
-      if (rssi < _noise_floor + _threshold) {  // only consider samples below current floor+THRESHOLD
+      if (rssi < _noise_floor + SAMPLING_THRESHOLD) {  // only consider samples below current floor + sampling THRESHOLD
         _num_floor_samples++;
         _floor_sample_sum += rssi;
       }

@@ -3,18 +3,18 @@
 #define RADIOLIB_STATIC_ONLY 1
 #include <RadioLib.h>
 #include <helpers/RadioLibWrappers.h>
-#include <helpers/TBeamBoardSX1262.h>
+#include <helpers/esp32/TBeamBoard.h>
 #include <helpers/CustomSX1262Wrapper.h>
 #include <helpers/AutoDiscoverRTCClock.h>
-#include <helpers/SensorManager.h>
+#include <helpers/sensors/EnvironmentSensorManager.h>
 #ifdef DISPLAY_CLASS
   #include <helpers/ui/SSD1306Display.h>
 #endif
 
-extern TBeamBoardSX1262 board;
+extern TBeamBoard board;
 extern WRAPPER_CLASS radio_driver;
 extern AutoDiscoverRTCClock rtc_clock;
-extern SensorManager sensors;
+extern EnvironmentSensorManager sensors;
 
 #ifdef DISPLAY_CLASS
   extern DISPLAY_CLASS display;

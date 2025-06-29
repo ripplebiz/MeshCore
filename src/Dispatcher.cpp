@@ -87,6 +87,14 @@ void Dispatcher::loop() {
     } else {
       return;  // can't do any more radio activity until send is complete or timed out
     }
+
+    // going back into receive mode now...
+    next_agc_reset_time = futureMillis(getAGCResetInterval());
+  }
+
+  if (getAGCResetInterval() > 0 && millisHasNowPassed(next_agc_reset_time)) {
+    _radio->resetAGC();
+    next_agc_reset_time = futureMillis(getAGCResetInterval());
   }
 
   // check inbound (delayed) queue

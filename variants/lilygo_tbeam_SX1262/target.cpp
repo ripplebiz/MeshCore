@@ -1,7 +1,7 @@
 #include <Arduino.h>
 #include "target.h"
 
-TBeamBoardSX1262 board;
+TBeamBoard board;
 
 #if defined(P_LORA_SCLK)
   static SPIClass spi;
@@ -14,39 +14,23 @@ WRAPPER_CLASS radio_driver(radio, board);
 
 ESP32RTCClock fallback_clock;
 AutoDiscoverRTCClock rtc_clock(fallback_clock);
-SensorManager sensors;
+
+#if ENV_INCLUDE_GPS
+  #include <helpers/sensors/MicroNMEALocationProvider.h>
+  MicroNMEALocationProvider nmea = MicroNMEALocationProvider(Serial1);
+  EnvironmentSensorManager sensors = EnvironmentSensorManager(nmea);
+#else
+  EnvironmentSensorManager sensors;
+#endif
 
 #ifdef DISPLAY_CLASS
   DISPLAY_CLASS display;
 #endif
 
-#ifndef LORA_CR
-  #define LORA_CR      5
-#endif
-
 bool radio_init() {
   fallback_clock.begin();
   rtc_clock.begin(Wire);
-  
-#ifdef SX126X_DIO3_TCXO_VOLTAGE
-  float tcxo = SX126X_DIO3_TCXO_VOLTAGE;
-#else
-  float tcxo = 1.6f;
-#endif
-
-#if defined(P_LORA_SCLK)
-  spi.begin(P_LORA_SCLK, P_LORA_MISO, P_LORA_MOSI);
-#endif
-  int status = radio.begin(LORA_FREQ, LORA_BW, LORA_SF, LORA_CR, RADIOLIB_SX126X_SYNC_WORD_PRIVATE, LORA_TX_POWER, 8, tcxo);
-  if (status != RADIOLIB_ERR_NONE) {
-    Serial.print("ERROR: radio init failed: ");
-    Serial.println(status);
-    return false;  // fail
-  }
-
-  radio.setCRC(1);
-  
-  return true;  // success
+  return radio.std_init(&spi);
 }
 
 uint32_t radio_get_rng_seed() {

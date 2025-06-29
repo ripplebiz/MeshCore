@@ -40,7 +40,58 @@ void DataStore::begin() {
   #include <SPIFFS.h>
 #elif defined(RP2040_PLATFORM)
   #include <LittleFS.h>
+#elif defined(NRF52_PLATFORM) || defined(STM32_PLATFORM)
+  #include <InternalFileSystem.h>
 #endif
+
+#if defined(NRF52_PLATFORM) || defined(STM32_PLATFORM)
+int _countLfsBlock(void *p, lfs_block_t block){
+  lfs_size_t *size = (lfs_size_t*) p;
+  *size += 1;
+  return 0;
+}
+
+lfs_ssize_t _getLfsUsedBlockCount() {
+  lfs_size_t size = 0;
+  lfs_traverse(InternalFS._getFS(), _countLfsBlock, &size);
+  return size;
+}
+#endif
+
+uint32_t DataStore::getStorageUsedKb() const {
+#if defined(ESP32)
+  return SPIFFS.usedBytes() / 1024;
+#elif defined(RP2040_PLATFORM)
+  FSInfo info;
+  info.usedBytes = 0;
+  _fs->info(info);
+  return info.usedBytes / 1024;
+#elif defined(NRF52_PLATFORM) || defined(STM32_PLATFORM)
+  const lfs_config* config = InternalFS._getFS()->cfg;
+  int usedBlockCount = _getLfsUsedBlockCount();
+  int usedBytes = config->block_size * usedBlockCount;
+  return usedBytes / 1024;
+#else
+  return 0;
+#endif
+}
+
+uint32_t DataStore::getStorageTotalKb() const {
+#if defined(ESP32)
+  return SPIFFS.totalBytes() / 1024;
+#elif defined(RP2040_PLATFORM)
+  FSInfo info;
+  info.totalBytes = 0;
+  _fs->info(info);
+  return info.totalBytes / 1024;
+#elif defined(NRF52_PLATFORM) || defined(STM32_PLATFORM)
+  const lfs_config* config = InternalFS._getFS()->cfg;
+  int totalBytes = config->block_size * config->block_count;
+  return totalBytes / 1024;
+#else
+  return 0;
+#endif
+}
 
 File DataStore::openRead(const char* filename) {
 #if defined(NRF52_PLATFORM) || defined(STM32_PLATFORM)
@@ -111,7 +162,8 @@ void DataStore::loadPrefsInt(const char *filename, NodePrefs& _prefs, double& no
     file.read((uint8_t *)&_prefs.telemetry_mode_loc, sizeof(_prefs.telemetry_mode_loc));   // 70
     file.read((uint8_t *)&_prefs.telemetry_mode_env, sizeof(_prefs.telemetry_mode_env));   // 71
     file.read((uint8_t *)&_prefs.rx_delay_base, sizeof(_prefs.rx_delay_base));             // 72
-    file.read(pad, 4);                                                                     // 76
+    file.read((uint8_t *)&_prefs.advert_loc_policy, sizeof(_prefs.advert_loc_policy));     // 76
+    file.read(pad, 3);                                                                     // 77
     file.read((uint8_t *)&_prefs.ble_pin, sizeof(_prefs.ble_pin));                         // 80
 
     file.close();
@@ -140,7 +192,8 @@ void DataStore::savePrefs(const NodePrefs& _prefs, double node_lat, double node_
     file.write((uint8_t *)&_prefs.telemetry_mode_loc, sizeof(_prefs.telemetry_mode_loc));   // 70
     file.write((uint8_t *)&_prefs.telemetry_mode_env, sizeof(_prefs.telemetry_mode_env));   // 71
     file.write((uint8_t *)&_prefs.rx_delay_base, sizeof(_prefs.rx_delay_base));             // 72
-    file.write(pad, 4);                                                                     // 76
+    file.write((uint8_t *)&_prefs.advert_loc_policy, sizeof(_prefs.advert_loc_policy));     // 76
+    file.write(pad, 3);                                                                     // 77
     file.write((uint8_t *)&_prefs.ble_pin, sizeof(_prefs.ble_pin));                         // 80
 
     file.close();

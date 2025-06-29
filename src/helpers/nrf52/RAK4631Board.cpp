@@ -84,7 +84,7 @@ bool RAK4631Board::startOTAUpdate(const char* id, char reply[]) {
   memset(mac_addr, 0, sizeof(mac_addr));
   Bluefruit.getAddr(mac_addr);
   sprintf(reply, "OK - mac: %02X:%02X:%02X:%02X:%02X:%02X", 
-      mac_addr[0], mac_addr[1], mac_addr[2], mac_addr[3], mac_addr[4], mac_addr[5]);
+      mac_addr[5], mac_addr[4], mac_addr[3], mac_addr[2], mac_addr[1], mac_addr[0]);
 
   return true;
 }

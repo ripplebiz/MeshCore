@@ -22,11 +22,11 @@
 /* ------------------------------ Config -------------------------------- */
 
 #ifndef FIRMWARE_BUILD_DATE
-  #define FIRMWARE_BUILD_DATE   "7 Jun 2025"
+  #define FIRMWARE_BUILD_DATE   "29 Jun 2025"
 #endif
 
 #ifndef FIRMWARE_VERSION
-  #define FIRMWARE_VERSION   "v1.7.0"
+  #define FIRMWARE_VERSION   "v1.7.1"
 #endif
 
 #ifndef LORA_FREQ
@@ -123,7 +123,9 @@ struct PostInfo {
 #define PUSH_TIMEOUT_BASE          4000
 #define PUSH_ACK_TIMEOUT_FACTOR    2000
 
-#define CLIENT_KEEP_ALIVE_SECS   128
+#define POST_SYNC_DELAY_SECS       6
+
+#define CLIENT_KEEP_ALIVE_SECS     0     // Now Disabled (was 128)
 
 #define REQ_TYPE_GET_STATUS          0x01   // same as _GET_STATS
 #define REQ_TYPE_KEEP_ALIVE          0x02
@@ -419,6 +421,9 @@ protected:
   }
   int getInterferenceThreshold() const override {
     return _prefs.interference_threshold;
+  }
+  int getAGCResetInterval() const override {
+    return ((int)_prefs.agc_reset_interval) * 4000;   // milliseconds
   }
 
   bool allowPacketForward(const mesh::Packet* packet) override {
@@ -725,7 +730,7 @@ public:
     _prefs.advert_interval = 1;  // default to 2 minutes for NEW installs
     _prefs.flood_advert_interval = 3;   // 3 hours
     _prefs.flood_max = 64;
-    _prefs.interference_threshold = 14;  // DB
+    _prefs.interference_threshold = 0;  // disabled 
   #ifdef ROOM_PASSWORD
     StrHelper::strncpy(_prefs.guest_password, ROOM_PASSWORD, sizeof(_prefs.guest_password));
   #endif
@@ -858,13 +863,15 @@ public:
       bool did_push = false;
       if (client->pending_ack == 0 && client->last_activity != 0 && client->push_failures < 3) {  // not already waiting for ACK, AND not evicted, AND retries not max
         MESH_DEBUG_PRINTLN("loop - checking for client %02X", (uint32_t) client->id.pub_key[0]);
+        uint32_t now = getRTCClock()->getCurrentTime();
         for (int k = 0, idx = next_post_idx; k < MAX_UNSYNCED_POSTS; k++) {
-          if (posts[idx].post_timestamp > client->sync_since   // is new post for this Client?
-            && !posts[idx].author.matches(client->id)) {    // don't push posts to the author
+          auto p = &posts[idx];
+          if (now >= p->post_timestamp + POST_SYNC_DELAY_SECS && p->post_timestamp > client->sync_since   // is new post for this Client?
+            && !p->author.matches(client->id)) {    // don't push posts to the author
             // push this post to Client, then wait for ACK
-            pushPostToClient(client, posts[idx]);
+            pushPostToClient(client, *p);
             did_push = true;
-            MESH_DEBUG_PRINTLN("loop - pushed to client %02X: %s", (uint32_t) client->id.pub_key[0], posts[idx].text);
+            MESH_DEBUG_PRINTLN("loop - pushed to client %02X: %s", (uint32_t) client->id.pub_key[0], p->text);
             break;
           }
           idx = (idx + 1) % MAX_UNSYNCED_POSTS;   // wrap to start of cyclic queue

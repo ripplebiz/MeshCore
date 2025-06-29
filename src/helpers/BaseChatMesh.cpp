@@ -9,6 +9,17 @@
   #define TXT_ACK_DELAY     200
 #endif
 
+mesh::Packet* BaseChatMesh::createSelfAdvert(const char* name) {
+  uint8_t app_data[MAX_ADVERT_DATA_SIZE];
+  uint8_t app_data_len;
+  {
+    AdvertDataBuilder builder(ADV_TYPE_CHAT, name);
+    app_data_len = builder.encodeTo(app_data);
+  }
+
+  return createAdvert(self_id, app_data, app_data_len);
+}
+
 mesh::Packet* BaseChatMesh::createSelfAdvert(const char* name, double lat, double lon) {
   uint8_t app_data[MAX_ADVERT_DATA_SIZE];
   uint8_t app_data_len;
@@ -58,7 +69,7 @@ void BaseChatMesh::onAdvertRecv(mesh::Packet* packet, const mesh::Identity& id, 
       }
       ci.last_advert_timestamp = timestamp;
       ci.lastmod = getRTCClock()->getCurrentTime();
-      onDiscoveredContact(ci, true);       // let UI know
+      onDiscoveredContact(ci, true, packet->path_len, packet->path);       // let UI know
       return;
     }
 
@@ -89,7 +100,7 @@ void BaseChatMesh::onAdvertRecv(mesh::Packet* packet, const mesh::Identity& id, 
   from->last_advert_timestamp = timestamp;
   from->lastmod = getRTCClock()->getCurrentTime();
 
-  onDiscoveredContact(*from, is_new);       // let UI know
+  onDiscoveredContact(*from, is_new, packet->path_len, packet->path);       // let UI know
 }
 
 int BaseChatMesh::searchPeersByHash(const uint8_t* hash) {

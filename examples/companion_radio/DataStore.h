@@ -39,4 +39,6 @@ public:
   bool putBlobByKey(const uint8_t key[], int key_len, const uint8_t src_buf[], uint8_t len);
   File openRead(const char* filename);
   bool removeFile(const char* filename);
+  uint32_t getStorageUsedKb() const;
+  uint32_t getStorageTotalKb() const;
 };

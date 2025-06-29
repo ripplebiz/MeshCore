@@ -5,12 +5,13 @@
 #include <helpers/RadioLibWrappers.h>
 #include <helpers/nrf52/XiaoNrf52Board.h>
 #include <helpers/CustomSX1262Wrapper.h>
+#include <helpers/AutoDiscoverRTCClock.h>
 #include <helpers/ArduinoHelpers.h>
 #include <helpers/sensors/EnvironmentSensorManager.h>
 
 extern XiaoNrf52Board board;
 extern WRAPPER_CLASS radio_driver;
-extern VolatileRTCClock rtc_clock;
+extern AutoDiscoverRTCClock rtc_clock;
 extern EnvironmentSensorManager sensors;
 
 bool radio_init();

@@ -24,12 +24,21 @@ SensorManager sensors;
   #define LORA_CR      5
 #endif
 
+#ifndef STM32WL_TCXO_VOLTAGE
+  // TCXO set to 0 for RAK3172
+  #define STM32WL_TCXO_VOLTAGE 0
+#endif
+
+#ifndef LORA_TX_POWER
+  #define LORA_TX_POWER 22
+#endif
+
 bool radio_init() {
 //  rtc_clock.begin(Wire);
 
   radio.setRfSwitchTable(rfswitch_pins, rfswitch_table);
 
-  int status = radio.begin(LORA_FREQ, LORA_BW, LORA_SF, LORA_CR, RADIOLIB_SX126X_SYNC_WORD_PRIVATE, LORA_TX_POWER, 8, 0, 0); // TCXO set to 0 for RAK3172
+  int status = radio.begin(LORA_FREQ, LORA_BW, LORA_SF, LORA_CR, RADIOLIB_SX126X_SYNC_WORD_PRIVATE, LORA_TX_POWER, 8, STM32WL_TCXO_VOLTAGE, 0); 
 
   if (status != RADIOLIB_ERR_NONE) {
     Serial.print("ERROR: radio init failed: ");

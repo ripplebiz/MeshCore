@@ -3,7 +3,7 @@
   uint8_t AdvertDataBuilder::encodeTo(uint8_t app_data[]) {
     app_data[0] = _type;
     int i = 1;
-    if (!(_lat == 0 && _lon == 0)) {
+    if (_has_loc) {
       app_data[0] |= ADV_LATLON_MASK;
       memcpy(&app_data[i], &_lat, 4); i += 4;
       memcpy(&app_data[i], &_lon, 4); i += 4;

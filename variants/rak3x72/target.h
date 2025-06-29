@@ -18,8 +18,12 @@ public:
     }
 
     uint16_t getBattMilliVolts() override {
-        uint32_t raw = analogRead(PIN_VBAT_READ);            
-        return (ADC_MULTIPLIER * raw) / 1024;
+        analogReadResolution(12);
+        uint32_t raw = 0;
+        for (int i=0; i<8;i++) {
+            raw += analogRead(PIN_VBAT_READ);
+        }            
+        return ((double)raw) * ADC_MULTIPLIER / 8 / 4096;
     }
 };
 

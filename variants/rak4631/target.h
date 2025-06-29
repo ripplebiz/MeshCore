@@ -20,7 +20,7 @@
 class RAK4631SensorManager: public SensorManager {
   #if ENV_INCLUDE_GPS
     bool gps_active = false;
-    bool gps_present = false;
+    bool gps_detected = false;
     LocationProvider * _nmea;
     SFE_UBLOX_GNSS ublox_GNSS;
     uint32_t disStandbyPin = 0;
@@ -32,20 +32,26 @@ class RAK4631SensorManager: public SensorManager {
     bool gpsIsAwake(uint32_t ioPin);
   #endif
 
+  #if ENV_INCLUDE_BME680
+    bool bme680_active = false;
+    bool bme680_present = false;
+    #define SAMPLING_RATE		BSEC_SAMPLE_RATE_ULP
+  #endif
+
   public:
   #if ENV_INCLUDE_GPS
     RAK4631SensorManager(LocationProvider &nmea): _nmea(&nmea) { }
-
-    bool querySensors(uint8_t requester_permissions, CayenneLPP& telemetry) override;
-    void loop() override;
-    int getNumSettings() const override;
-    const char* getSettingName(int i) const override;
-    const char* getSettingValue(int i) const override;
-    bool setSettingValue(const char* name, const char* value) override;
   #else
     RAK4631SensorManager() { }
   #endif
-    bool begin() override;
+
+  void loop() override;
+  bool querySensors(uint8_t requester_permissions, CayenneLPP& telemetry) override;
+  int getNumSettings() const override;
+  const char* getSettingName(int i) const override;
+  const char* getSettingValue(int i) const override;
+  bool setSettingValue(const char* name, const char* value) override;
+  bool begin() override;
 };
 
 extern RAK4631Board board;

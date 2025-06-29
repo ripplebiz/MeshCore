@@ -99,7 +99,7 @@ public:
 
     digitalWrite(PIN_ADC_CTRL, !adc_active_state);
 
-    return (5.2 * (3.3 / 1024.0) * raw) * 1000;
+    return (5.42 * (3.3 / 1024.0) * raw) * 1000;
   }
 
   const char* getManufacturerName() const override {

@@ -11,20 +11,22 @@ Note: see the [payloads doc](./payloads.md) for more information about the conte
 
 ## Header Breakdown
 
+bit 0 means the lowest bit (1s place)
+
 | Bits  | Mask   | Field           | Description                                   |
 |-------|--------|-----------------|-----------------------------------------------|
 | 0-1   | `0x03` | Route Type      | Flood, Direct, Reserved - see below.          |
-| 2-5   | `0x0F` | Payload Type    | Request, Response, ACK, etc. - see below.     |
-| 6-7   | `0x03` | Payload Version | Versioning of the payload format - see below. |
+| 2-5   | `0x3C` | Payload Type    | Request, Response, ACK, etc. - see below.     |
+| 6-7   | `0xC0` | Payload Version | Versioning of the payload format - see below. |
 
 ## Route Type Values
 
-| Value  | Name                   | Description                          |
-|--------|------------------------|--------------------------------------|
-| `0x00` | `ROUTE_TYPE_RESERVED1` | Reserved for future use.             |
-| `0x01` | `ROUTE_TYPE_FLOOD`     | Flood routing mode (builds up path). |
-| `0x02` | `ROUTE_TYPE_DIRECT`    | Direct route (path is supplied).     |
-| `0x03` | `ROUTE_TYPE_RESERVED2` | Reserved for future use.             |
+| Value  | Name                          | Description                          |
+|--------|-------------------------------|--------------------------------------|
+| `0x00` | `ROUTE_TYPE_TRANSPORT_FLOOD`  | Flood routing mode + transport codes |
+| `0x01` | `ROUTE_TYPE_FLOOD`            | Flood routing mode (builds up path). |
+| `0x02` | `ROUTE_TYPE_DIRECT`           | Direct route (path is supplied).     |
+| `0x03` | `ROUTE_TYPE_TRANSPORT_DIRECT` | direct route + transport codes       |
 
 ## Payload Type Values
 
@@ -39,6 +41,7 @@ Note: see the [payloads doc](./payloads.md) for more information about the conte
 | `0x06` | `PAYLOAD_TYPE_GRP_DATA`   | Group datagram (unverified).                  |
 | `0x07` | `PAYLOAD_TYPE_ANON_REQ`   | Anonymous request.                            |
 | `0x08` | `PAYLOAD_TYPE_PATH`       | Returned path.                                |
+| `0x09` | `PAYLOAD_TYPE_TRACE`      | trace a path, collecting SNI for each hop.    |
 | `0x0F` | `PAYLOAD_TYPE_RAW_CUSTOM` | Custom packet (raw bytes, custom encryption). |
 
 ## Payload Version Values

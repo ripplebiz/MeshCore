@@ -16,6 +16,7 @@ public:
         SHORT_PRESS,
         DOUBLE_PRESS,
         TRIPLE_PRESS,
+        QUADRUPLE_PRESS,
         LONG_PRESS,
         ANY_PRESS
     };
@@ -32,6 +33,7 @@ public:
     void onShortPress(EventCallback callback) { _onShortPress = callback; }
     void onDoublePress(EventCallback callback) { _onDoublePress = callback; }
     void onTriplePress(EventCallback callback) { _onTriplePress = callback; }
+    void onQuadruplePress(EventCallback callback) { _onQuadruplePress = callback; }
     void onLongPress(EventCallback callback) { _onLongPress = callback; }
     void onAnyPress(EventCallback callback) { _onAnyPress = callback; }
     
@@ -68,6 +70,7 @@ private:
     EventCallback _onShortPress = nullptr;
     EventCallback _onDoublePress = nullptr;
     EventCallback _onTriplePress = nullptr;
+    EventCallback _onQuadruplePress = nullptr;
     EventCallback _onLongPress = nullptr;
     EventCallback _onAnyPress = nullptr;
     

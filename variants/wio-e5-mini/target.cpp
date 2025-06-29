@@ -20,6 +20,10 @@ static const Module::RfSwitchMode_t rfswitch_table[] = {
 VolatileRTCClock rtc_clock;
 WIOE5SensorManager sensors;
 
+#ifdef DISPLAY_CLASS
+  NullDisplayDriver display;
+#endif
+
 #ifndef LORA_CR
   #define LORA_CR      5
 #endif

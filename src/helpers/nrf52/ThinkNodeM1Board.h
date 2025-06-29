@@ -39,6 +39,15 @@ public:
     return startup_reason;
   }
 
+  #if defined(P_LORA_TX_LED)
+  void onBeforeTransmit() override {
+    digitalWrite(P_LORA_TX_LED, HIGH);   // turn TX LED on
+  }
+  void onAfterTransmit() override {
+    digitalWrite(P_LORA_TX_LED, LOW);   // turn TX LED off
+  }
+  #endif
+
   const char* getManufacturerName() const override {
     return "Elecrow ThinkNode-M1";
   }

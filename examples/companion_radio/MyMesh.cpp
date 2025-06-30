@@ -613,10 +613,10 @@ void MyMesh::begin(bool has_display) {
   _prefs.cr = constrain(_prefs.cr, 5, 8);
   _prefs.tx_power_dbm = constrain(_prefs.tx_power_dbm, 1, MAX_LORA_TX_POWER);
 
-#ifdef BLE_PIN_CODE
+#ifdef BLE_PIN_CODE // 123456 by default
   if (_prefs.ble_pin == 0) {
 #ifdef DISPLAY_CLASS
-    if (has_display) {
+    if (has_display && BLE_PIN_CODE == 123456) {
       StdRNG rng;
       _active_ble_pin = rng.nextInt(100000, 999999); // random pin each session
     } else {

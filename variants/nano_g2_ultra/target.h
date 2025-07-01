@@ -1,5 +1,6 @@
 #pragma once
 
+#define RADIOLIB_STATIC_ONLY 1
 #include <RadioLib.h>
 #include "nano-g2.h"
 #include <helpers/RadioLibWrappers.h>

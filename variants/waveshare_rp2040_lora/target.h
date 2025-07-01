@@ -1,5 +1,7 @@
 #pragma once
 
+#define RADIOLIB_STATIC_ONLY 1
+
 #include <RadioLib.h>
 #include <helpers/AutoDiscoverRTCClock.h>
 #include <helpers/CustomSX1262Wrapper.h>

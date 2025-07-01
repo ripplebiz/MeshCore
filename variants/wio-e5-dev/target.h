@@ -1,5 +1,6 @@
 #pragma once
 
+#define RADIOLIB_STATIC_ONLY 1
 #include <RadioLib.h>
 #include <helpers/RadioLibWrappers.h>
 #include <helpers/stm32/STM32Board.h>

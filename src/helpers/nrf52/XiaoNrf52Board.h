@@ -11,10 +11,12 @@
   #undef P_LORA_BUSY
   #undef P_LORA_RESET
   #undef P_LORA_NSS
+  #undef SX126X_RXEN
   #define  P_LORA_DIO_1       D0
   #define  P_LORA_BUSY        D1
   #define  P_LORA_RESET       D2
   #define  P_LORA_NSS         D3
+  #define  SX126X_RXEN        D4
 #endif
 //#define  SX126X_POWER_EN  37
 

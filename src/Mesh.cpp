@@ -162,7 +162,7 @@ DispatcherAction Mesh::onRecvPacket(Packet* pkt) {
       }
       break;
     }
-    case PAYLOAD_TYPE_ANON_REQ: {
+    case PAYLOAD_TYPE_ID_REQ: {
       int i = 0;
       uint8_t dest_hash = pkt->payload[i++];
       uint8_t* sender_pub_key = &pkt->payload[i]; i += PUB_KEY_SIZE;
@@ -181,7 +181,7 @@ DispatcherAction Mesh::onRecvPacket(Packet* pkt) {
           uint8_t data[MAX_PACKET_PAYLOAD];
           int len = Utils::MACThenDecrypt(secret, data, macAndData, pkt->payload_len - i);
           if (len > 0) {  // success!
-            onAnonDataRecv(pkt, pkt->getPayloadType(), sender, data, len);
+            onIdDataRecv(pkt, pkt->getPayloadType(), sender, data, len);
             pkt->markDoNotRetransmit();
           }
         }
@@ -387,8 +387,8 @@ Packet* Mesh::createDatagram(uint8_t type, const Identity& dest, const uint8_t* 
   return packet;
 }
 
-Packet* Mesh::createAnonDatagram(uint8_t type, const LocalIdentity& sender, const Identity& dest, const uint8_t* secret, const uint8_t* data, size_t data_len) {
-  if (type == PAYLOAD_TYPE_ANON_REQ) {
+Packet* Mesh::createIdDatagram(uint8_t type, const LocalIdentity& sender, const Identity& dest, const uint8_t* secret, const uint8_t* data, size_t data_len) {
+  if (type == PAYLOAD_TYPE_ID_REQ) {
     if (data_len + 1 + PUB_KEY_SIZE + CIPHER_BLOCK_SIZE-1 > MAX_PACKET_PAYLOAD) return NULL;
   } else {
     return NULL;  // invalid type
@@ -396,13 +396,13 @@ Packet* Mesh::createAnonDatagram(uint8_t type, const LocalIdentity& sender, cons
 
   Packet* packet = obtainNewPacket();
   if (packet == NULL) {
-    MESH_DEBUG_PRINTLN("%s Mesh::createAnonDatagram(): error, packet pool empty", getLogDateTime());
+    MESH_DEBUG_PRINTLN("%s Mesh::createIdDatagram(): error, packet pool empty", getLogDateTime());
     return NULL;
   }
   packet->header = (type << PH_TYPE_SHIFT);  // ROUTE_TYPE_* set later
 
   int len = 0;
-  if (type == PAYLOAD_TYPE_ANON_REQ) {
+  if (type == PAYLOAD_TYPE_ID_REQ) {
     len += dest.copyHashTo(&packet->payload[len]);  // dest hash
     memcpy(&packet->payload[len], sender.pub_key, PUB_KEY_SIZE); len += PUB_KEY_SIZE;  // sender pub_key
   } else {

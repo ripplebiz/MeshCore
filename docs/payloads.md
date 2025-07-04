@@ -5,9 +5,9 @@ Inside of each [meshcore packet](./packet_structure.md) is a payload, identified
 * Acknowledgment.
 * Returned path.
 * Request (destination/source hashes + MAC).
-* Response to REQ or ANON_REQ.
+* Response to REQ or ID_REQ.
 * Plain text message.
-* Anonymous request.
+* Identified request.
 * Group text message (unverified).
 * Group datagram (unverified).
 * Custom packet (raw bytes, custom encryption).
@@ -152,7 +152,7 @@ Flags
 | `0x01` | CLI command               | the command text of the message                            |
 | `0x02` | signed plain text message | two bytes of sender prefix, followed by plain text message |
 
-# Anonymous request
+# Identified request
 
 | Field            | Size (bytes)    | Description                               |
 |------------------|-----------------|-------------------------------------------|

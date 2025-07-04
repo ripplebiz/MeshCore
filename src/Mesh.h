@@ -107,10 +107,10 @@ protected:
   /**
    * \brief  A (now decrypted) data packet has been received.
    *         NOTE: these can be received multiple times (per sender/contents), via different routes
-   * \param  type  one of: PAYLOAD_TYPE_ANON_REQ
+   * \param  type  one of: PAYLOAD_TYPE_ID_REQ
    * \param  sender  public key provided by sender
   */
-  virtual void onAnonDataRecv(Packet* packet, uint8_t type, const Identity& sender, uint8_t* data, size_t len) { }
+  virtual void onIdDataRecv(Packet* packet, uint8_t type, const Identity& sender, uint8_t* data, size_t len) { }
 
   /**
    * \brief  A path TO 'sender' has been received. (also with optional 'extra' data encoded)
@@ -162,7 +162,7 @@ public:
 
   Packet* createAdvert(const LocalIdentity& id, const uint8_t* app_data=NULL, size_t app_data_len=0);
   Packet* createDatagram(uint8_t type, const Identity& dest, const uint8_t* secret, const uint8_t* data, size_t len);
-  Packet* createAnonDatagram(uint8_t type, const LocalIdentity& sender, const Identity& dest, const uint8_t* secret, const uint8_t* data, size_t data_len);
+  Packet* createIdDatagram(uint8_t type, const LocalIdentity& sender, const Identity& dest, const uint8_t* secret, const uint8_t* data, size_t data_len);
   Packet* createGroupDatagram(uint8_t type, const GroupChannel& channel, const uint8_t* data, size_t data_len);
   Packet* createAck(uint32_t ack_crc);
   Packet* createPathReturn(const uint8_t* dest_hash, const uint8_t* secret, const uint8_t* path, uint8_t path_len, uint8_t extra_type, const uint8_t*extra, size_t extra_len);

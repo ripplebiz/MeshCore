@@ -131,7 +131,7 @@ struct PostInfo {
 #define REQ_TYPE_KEEP_ALIVE          0x02
 #define REQ_TYPE_GET_TELEMETRY_DATA  0x03
 
-#define RESP_SERVER_LOGIN_OK      0   // response to ANON_REQ
+#define RESP_SERVER_LOGIN_OK      0   // response to ID_REQ
 
 struct ServerStats {
   uint16_t batt_milli_volts;
@@ -432,8 +432,8 @@ protected:
     return true;
   }
 
-  void onAnonDataRecv(mesh::Packet* packet, uint8_t type, const mesh::Identity& sender, uint8_t* data, size_t len) override {
-    if (type == PAYLOAD_TYPE_ANON_REQ) {  // received an initial request by a possible admin client (unknown at this stage)
+  void onIdDataRecv(mesh::Packet* packet, uint8_t type, const mesh::Identity& sender, uint8_t* data, size_t len) override {
+    if (type == PAYLOAD_TYPE_ID_REQ) {  // received an initial request by a possible admin client (unknown at this stage)
       uint32_t sender_timestamp, sender_sync_since;
       memcpy(&sender_timestamp, data, 4);
       memcpy(&sender_sync_since, &data[4], 4);  // sender's "sync messags SINCE x" timestamp

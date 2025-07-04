@@ -18,7 +18,7 @@
 #define REQ_TYPE_GET_STATUS      0x01   // same as _GET_STATS
 #define REQ_TYPE_KEEP_ALIVE      0x02
 
-#define RESP_SERVER_LOGIN_OK      0   // response to ANON_REQ
+#define RESP_SERVER_LOGIN_OK      0   // response to ID_REQ
 
 class ContactVisitor {
 public:

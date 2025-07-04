@@ -418,7 +418,7 @@ int BaseChatMesh::sendLogin(const ContactInfo& recipient, const char* password, 
     tlen = 4 + len;
   }
 
-  auto pkt = createAnonDatagram(PAYLOAD_TYPE_ANON_REQ, self_id, recipient.id, recipient.shared_secret, temp, tlen);
+  auto pkt = createIdDatagram(PAYLOAD_TYPE_ID_REQ, self_id, recipient.id, recipient.shared_secret, temp, tlen);
   if (pkt) {
     uint32_t t = _radio->getEstAirtimeFor(pkt->getRawLength());
     if (recipient.out_path_len < 0) {

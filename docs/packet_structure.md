@@ -33,13 +33,13 @@ bit 0 means the lowest bit (1s place)
 | Value  | Name                      | Description                                   |
 |--------|---------------------------|-----------------------------------------------|
 | `0x00` | `PAYLOAD_TYPE_REQ`        | Request (destination/source hashes + MAC).    |
-| `0x01` | `PAYLOAD_TYPE_RESPONSE`   | Response to REQ or ANON_REQ.                  |
+| `0x01` | `PAYLOAD_TYPE_RESPONSE`   | Response to REQ or ID_REQ.                    |
 | `0x02` | `PAYLOAD_TYPE_TXT_MSG`    | Plain text message.                           |
 | `0x03` | `PAYLOAD_TYPE_ACK`        | Acknowledgment.                               |
 | `0x04` | `PAYLOAD_TYPE_ADVERT`     | Node advertisement.                           |
 | `0x05` | `PAYLOAD_TYPE_GRP_TXT`    | Group text message (unverified).              |
 | `0x06` | `PAYLOAD_TYPE_GRP_DATA`   | Group datagram (unverified).                  |
-| `0x07` | `PAYLOAD_TYPE_ANON_REQ`   | Anonymous request.                            |
+| `0x07` | `PAYLOAD_TYPE_ID_REQ`     | Request with senders public key.              |
 | `0x08` | `PAYLOAD_TYPE_PATH`       | Returned path.                                |
 | `0x09` | `PAYLOAD_TYPE_TRACE`      | trace a path, collecting SNI for each hop.    |
 | `0x0F` | `PAYLOAD_TYPE_RAW_CUSTOM` | Custom packet (raw bytes, custom encryption). |

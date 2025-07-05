@@ -6,6 +6,11 @@
 #include <Utils.h>
 #include <string.h>
 
+#ifdef BRIDGE_OVER_SERIAL
+#include "bridge/serial/SerialBridge.h"
+extern bridge::SerialBridge *bridge_interface;
+#endif
+
 namespace mesh {
 
 /**

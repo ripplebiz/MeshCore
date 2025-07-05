@@ -72,6 +72,11 @@
   static UITask ui_task(display);
 #endif
 
+#ifdef BRIDGE_OVER_SERIAL
+#include "bridge/serial/SerialBridge.h"
+bridge::SerialBridge *bridge_interface;
+#endif
+
 #define FIRMWARE_ROLE "repeater"
 
 #define PACKET_LOG_FILE  "/packet_log"
@@ -752,7 +757,14 @@ void setup() {
   }
 #endif
 
-  if (!radio_init()) { halt(); }
+#ifdef BRIDGE_OVER_SERIAL
+  bridge_interface = new bridge::SerialBridge();
+  bridge_interface->setup();
+#endif
+
+  if (!radio_init()) {
+    halt();
+  }
 
   fast_rng.begin(radio_get_rng_seed());
 
@@ -824,6 +836,10 @@ void loop() {
 
     command[0] = 0;  // reset command buffer
   }
+
+#ifdef BRIDGE_OVER_SERIAL
+  bridge_interface->loop();
+#endif
 
   the_mesh.loop();
   sensors.loop();

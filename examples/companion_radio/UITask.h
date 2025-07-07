@@ -2,6 +2,7 @@
 
 #include <MeshCore.h>
 #include <helpers/ui/DisplayDriver.h>
+#include <helpers/BaseSerialInterface.h>
 #include <helpers/SensorManager.h>
 #include <stddef.h>
 
@@ -29,6 +30,7 @@ class UITask {
 #ifdef PIN_BUZZER
   genericBuzzer buzzer;
 #endif
+  BaseSerialInterface* _serial;
   unsigned long _next_refresh, _auto_off;
   bool _connected;
   NodePrefs* _node_prefs;
@@ -64,12 +66,12 @@ class UITask {
  
 public:
 
-  UITask(mesh::MainBoard* board) : _board(board), _display(NULL), _sensors(NULL) {
+  UITask(mesh::MainBoard* board) : _board(board), _display(NULL), _sensors(NULL), _serial(NULL) {
       _next_refresh = 0;
       ui_started_at = 0;
       _connected = false;
   }
-  void begin(DisplayDriver* display, SensorManager* sensors, NodePrefs* node_prefs);
+  void begin(DisplayDriver* display, SensorManager* sensors, BaseSerialInterface* serial, NodePrefs* node_prefs);
 
   void setHasConnection(bool connected) { _connected = connected; }
   bool hasDisplay() const { return _display != NULL; }

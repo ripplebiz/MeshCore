@@ -1499,7 +1499,7 @@ bool MyMesh::advert() {
     pkt = createSelfAdvert(_prefs.node_name, sensors.node_lat, sensors.node_lon);
   }
   if (pkt) {
-    sendZeroHop(pkt);
+    sendFlood(pkt);
     return true;
   } else {
     return false;

@@ -45,6 +45,7 @@ public:
   virtual void formatNeighborsReply(char *reply) = 0;
   virtual const uint8_t* getSelfIdPubKey() = 0;
   virtual void clearStats() = 0;
+  virtual void setBootTime(uint32_t bootTime) = 0;
 };
 
 class CommonCLI {
@@ -62,6 +63,7 @@ public:
   CommonCLI(mesh::MainBoard& board, mesh::RTCClock& rtc, NodePrefs* prefs, CommonCLICallbacks* callbacks)
       : _board(&board), _rtc(&rtc), _prefs(prefs), _callbacks(callbacks) { }
 
+  uint32_t bootTime = 0;
   void loadPrefs(FILESYSTEM* _fs);
   void savePrefs(FILESYSTEM* _fs);
   void handleCommand(uint32_t sender_timestamp, const char* command, char* reply);

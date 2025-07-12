@@ -34,7 +34,7 @@ namespace mesh {
 #define PAYLOAD_VER_3       0x02   // FUTURE
 #define PAYLOAD_VER_4       0x03   // FUTURE
 
-#define PACKER_SOURCE_NONE        0x00
+#define PACKET_SOURCE_NONE        0x00
 #define PACKET_SOURCE_LORA        0x01
 #define PACKET_SOURCE_UDP_BRIDGE  0x02
 

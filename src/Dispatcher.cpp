@@ -270,7 +270,7 @@ Packet* Dispatcher::obtainNewPacket() {
   } else {
     pkt->payload_len = pkt->path_len = 0;
     pkt->_snr = 0;
-    pkt->_source = PACKER_SOURCE_NONE;
+    pkt->_source = PACKET_SOURCE_NONE;
   }
   return pkt;
 }

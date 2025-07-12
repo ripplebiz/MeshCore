@@ -4,6 +4,10 @@
 #include "NodePrefs.h"
 #include "MyMesh.h"
 
+#ifdef ESP32
+#include <WiFi.h>
+#endif
+
 #define AUTO_OFF_MILLIS     15000   // 15 seconds
 #define BOOT_SCREEN_MILLIS   3000   // 3 seconds
 
@@ -199,7 +203,7 @@ void UITask::renderCurrScreen() {
     _display->setCursor(_display->width() - 28, 9);
     _display->setTextSize(2);
     _display->setColor(DisplayDriver::ORANGE);
-    sprintf(tmp, "%d", _msgcount);
+    snprintf(tmp, sizeof(tmp), "%d", _msgcount);
     _display->print(tmp);
     _display->setColor(DisplayDriver::YELLOW); // last color will be kept on T114
   } else if ((millis() - ui_started_at) < BOOT_SCREEN_MILLIS) { // boot screen
@@ -217,30 +221,47 @@ void UITask::renderCurrScreen() {
   } else {  // home screen
     // node name
     _display->setCursor(0, 0);
-    _display->setTextSize(1);
+    _display->setTextSize(0.8);
     _display->setColor(DisplayDriver::GREEN);
     _display->print(_node_prefs->node_name);
 
     // battery voltage
     renderBatteryIndicator(_board->getBattMilliVolts());
 
-    // freq / sf
-    _display->setCursor(0, 20);
+    // WiFi status 
+    _display->setCursor(0, 14);
+    _display->setTextSize(0.8);
+    _display->setColor(DisplayDriver::BLUE);
+    #ifdef ESP32
+    if (the_mesh.getWiFiConnectionStatus() == WIFI_STATUS_CONNECTED) {
+      snprintf(tmp, sizeof(tmp), "WiFi:%s:%d", WiFi.localIP().toString().c_str(), the_mesh.getNodePrefs()->wifi_tcp_port);
+    } else {
+      snprintf(tmp, sizeof(tmp), "WiFi:disconnected");
+    }
+    #else
+    snprintf(tmp, sizeof(tmp), "WiFi:not supported");
+    #endif
+    _display->print(tmp);
+
+    // freq / sf (compact format)
+    _display->setCursor(0, 24);
+    _display->setTextSize(0.8);
     _display->setColor(DisplayDriver::YELLOW);
-    sprintf(tmp, "FREQ: %06.3f SF%d", _node_prefs->freq, _node_prefs->sf);
+    snprintf(tmp, sizeof(tmp), "FREQ:%.3f SF%d", _node_prefs->freq, _node_prefs->sf);
     _display->print(tmp);
 
-    // bw / cr
-    _display->setCursor(0, 30);
-    sprintf(tmp, "BW: %03.2f CR: %d", _node_prefs->bw, _node_prefs->cr);
+    // bw / cr (compact format)
+    _display->setCursor(0, 34);
+    _display->setTextSize(0.8);
+    snprintf(tmp, sizeof(tmp), "BW:%.1f CR:%d", _node_prefs->bw, _node_prefs->cr);
     _display->print(tmp);
 
-    // BT pin
+    // BT pin (if needed)
     if (!_connected && the_mesh.getBLEPin() != 0) {
       _display->setColor(DisplayDriver::RED);
-      _display->setTextSize(2);
-      _display->setCursor(0, 43);
-      sprintf(tmp, "Pin:%d", the_mesh.getBLEPin());
+      _display->setTextSize(1.2);
+      _display->setCursor(0, 46);
+      snprintf(tmp, sizeof(tmp), "Pin:%d", the_mesh.getBLEPin());
       _display->print(tmp);
       _display->setColor(DisplayDriver::GREEN);
     } else {

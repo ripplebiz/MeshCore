@@ -92,6 +92,10 @@ public:
   void handleCmdFrame(size_t len);
   bool advert();
   void enterCLIRescue();
+  bool initializeWiFiConnection();
+  void disconnectWiFi();
+  uint8_t getWiFiConnectionStatus();
+  void handleWiFiEvents();
 
 protected:
   float getAirtimeBudgetFactor() const override;
@@ -202,6 +206,14 @@ private:
   };
   #define ADVERT_PATH_TABLE_SIZE   16
   AdvertPath advert_paths[ADVERT_PATH_TABLE_SIZE]; // circular table
+  #ifdef ESP32
+  bool _wifi_initialized;
+  uint8_t _wifi_status;
+  unsigned long _wifi_last_attempt;
+  unsigned long _wifi_connect_start_time;
+  #define WIFI_RETRY_INTERVAL 30000 
+  #define WIFI_CONNECT_TIMEOUT 10000
+  #endif
 };
 
 extern MyMesh the_mesh;

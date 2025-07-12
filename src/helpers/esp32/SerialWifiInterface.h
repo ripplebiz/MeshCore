@@ -4,6 +4,7 @@
 #include <WiFi.h>
 
 class SerialWifiInterface : public BaseSerialInterface {
+  
   bool deviceConnected;
   bool _isEnabled;
   unsigned long _last_write;

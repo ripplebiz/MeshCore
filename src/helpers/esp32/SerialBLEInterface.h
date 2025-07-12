@@ -7,6 +7,7 @@
 #include <BLE2902.h>
 
 class SerialBLEInterface : public BaseSerialInterface, BLESecurityCallbacks, BLEServerCallbacks, BLECharacteristicCallbacks {
+  
   BLEServer *pServer;
   BLEService *pService;
   BLECharacteristic * pTxCharacteristic;

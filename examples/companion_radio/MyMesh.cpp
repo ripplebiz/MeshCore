@@ -3,6 +3,10 @@
 #include <Arduino.h> // needed for PlatformIO
 #include <Mesh.h>
 
+#ifdef ESP32
+#include <WiFi.h>
+#endif
+
 #define CMD_APP_START                 1
 #define CMD_SEND_TXT_MSG              2
 #define CMD_SEND_CHANNEL_TXT_MSG      3
@@ -46,6 +50,12 @@
 #define CMD_SET_CUSTOM_VAR            41
 #define CMD_GET_ADVERT_PATH           42
 #define CMD_GET_TUNING_PARAMS         43
+#define CMD_SET_WIFI_CREDENTIALS      44
+#define CMD_SET_WIFI_ENABLED          45
+#define CMD_GET_WIFI_STATUS           46
+#define CMD_WIFI_CONNECT              47
+#define CMD_WIFI_DISCONNECT           48
+
 
 #define RESP_CODE_OK                  0
 #define RESP_CODE_ERR                 1
@@ -71,6 +81,7 @@
 #define RESP_CODE_CUSTOM_VARS         21
 #define RESP_CODE_ADVERT_PATH         22
 #define RESP_CODE_TUNING_PARAMS       23
+#define RESP_CODE_WIFI_STATUS         24 // a reply to CMD_GET_WIFI_STATUS
 
 #define SEND_TIMEOUT_BASE_MILLIS        500
 #define FLOOD_SEND_TIMEOUT_FACTOR       16.0f
@@ -100,6 +111,7 @@
 #define ERR_CODE_BAD_STATE              4
 #define ERR_CODE_FILE_IO_ERROR          5
 #define ERR_CODE_ILLEGAL_ARG            6
+#define ERR_CODE_DEVICE_BUSY            7
 
 #define MAX_SIGN_DATA_LEN               (8 * 1024) // 8K
 
@@ -563,7 +575,7 @@ MyMesh::MyMesh(mesh::Radio &radio, mesh::RNG &rng, mesh::RTCClock &rtc, SimpleMe
     : BaseChatMesh(radio, *new ArduinoMillis(), rng, rtc, *new StaticPoolPacketManager(16), tables),
       _serial(NULL), telemetry(MAX_PACKET_PAYLOAD - 4), _store(&store) {
   _iter_started = false;
-  _cli_rescue = false;
+  _cli_rescue = false; 
   offline_queue_len = 0;
   app_target_ver = 0;
   pending_login = pending_status = pending_telemetry = 0;
@@ -571,6 +583,14 @@ MyMesh::MyMesh(mesh::Radio &radio, mesh::RNG &rng, mesh::RTCClock &rtc, SimpleMe
   sign_data = NULL;
   dirty_contacts_expiry = 0;
   memset(advert_paths, 0, sizeof(advert_paths));
+
+  // Initialize WiFi state
+  #ifdef ESP32
+  _wifi_initialized = false;
+  _wifi_status = WIFI_STATUS_DISABLED;
+  _wifi_last_attempt = 0;
+  _wifi_connect_start_time = 0;
+  #endif
 
   // defaults
   memset(&_prefs, 0, sizeof(_prefs));
@@ -582,6 +602,13 @@ MyMesh::MyMesh(mesh::Radio &radio, mesh::RNG &rng, mesh::RTCClock &rtc, SimpleMe
   _prefs.cr = LORA_CR;
   _prefs.tx_power_dbm = LORA_TX_POWER;
   //_prefs.rx_delay_base = 10.0f;  enable once new algo fixed
+  
+  // WiFi defaults
+  _prefs.wifi_tcp_port = 5000;
+  _prefs.wifi_enabled = 0;
+  _prefs.wifi_auto_connect = 0;
+  strcpy(_prefs.wifi_ssid, "");
+  strcpy(_prefs.wifi_password, "");
 }
 
 void MyMesh::begin(bool has_display) {
@@ -619,6 +646,12 @@ void MyMesh::begin(bool has_display) {
   _prefs.cr = constrain(_prefs.cr, 5, 8);
   _prefs.tx_power_dbm = constrain(_prefs.tx_power_dbm, 1, MAX_LORA_TX_POWER);
 
+  // Initialize WiFi defaults if not set
+  if (_prefs.wifi_tcp_port == 0) {
+    _prefs.wifi_tcp_port = 5000;  // Default TCP port
+  }
+  // Leave wifi_enabled, wifi_auto_connect, wifi_ssid, wifi_password at their loaded/default values
+
 #ifdef BLE_PIN_CODE // 123456 by default
   if (_prefs.ble_pin == 0) {
 #ifdef DISPLAY_CLASS
@@ -644,6 +677,13 @@ void MyMesh::begin(bool has_display) {
 
   radio_set_params(_prefs.freq, _prefs.bw, _prefs.sf, _prefs.cr);
   radio_set_tx_power(_prefs.tx_power_dbm);
+
+  // WiFi auto-connect if enabled
+  #ifdef ESP32
+  if (_prefs.wifi_enabled && _prefs.wifi_auto_connect && strlen(_prefs.wifi_ssid) > 0) {
+    initializeWiFiConnection();
+  }
+  #endif
 }
 
 const char *MyMesh::getNodeName() {
@@ -1325,6 +1365,59 @@ void MyMesh::handleCmdFrame(size_t len) {
     } else {
       writeErrFrame(ERR_CODE_NOT_FOUND);
     }
+  } else if (cmd_frame[0] == CMD_SET_WIFI_CREDENTIALS && len >= 3) {
+    // Format: CMD_SET_WIFI_CREDENTIALS | ssid_len | ssid | password_len | password
+    uint8_t ssid_len = cmd_frame[1];
+    if (len >= 2 + ssid_len + 1) {
+      uint8_t password_len = cmd_frame[2 + ssid_len];
+      if (len >= 3 + ssid_len + password_len && ssid_len < sizeof(_prefs.wifi_ssid) && password_len < sizeof(_prefs.wifi_password)) {
+        // Copy SSID
+        memcpy(_prefs.wifi_ssid, &cmd_frame[2], ssid_len);
+        _prefs.wifi_ssid[ssid_len] = 0;
+        // Copy password
+        memcpy(_prefs.wifi_password, &cmd_frame[3 + ssid_len], password_len);
+        _prefs.wifi_password[password_len] = 0;
+        savePrefs();
+        writeOKFrame();
+      } else {
+        writeErrFrame(ERR_CODE_ILLEGAL_ARG);
+      }
+    } else {
+      writeErrFrame(ERR_CODE_ILLEGAL_ARG);
+    }
+  } else if (cmd_frame[0] == CMD_SET_WIFI_ENABLED && len >= 2) {
+    uint8_t enabled = cmd_frame[1];
+    if (enabled <= 1) {
+      _prefs.wifi_enabled = enabled;
+      if (enabled) {
+        _prefs.wifi_auto_connect = 1; // Enable auto-connect when enabling WiFi
+      }
+      savePrefs();
+      writeOKFrame();
+    } else {
+      writeErrFrame(ERR_CODE_ILLEGAL_ARG);
+    }
+  } else if (cmd_frame[0] == CMD_GET_WIFI_STATUS) {
+    out_frame[0] = RESP_CODE_WIFI_STATUS;
+    out_frame[1] = _prefs.wifi_enabled;
+    out_frame[2] = getWiFiConnectionStatus();
+    memcpy(&out_frame[3], &_prefs.wifi_tcp_port, 2);
+    out_frame[5] = strlen(_prefs.wifi_ssid);
+    memcpy(&out_frame[6], _prefs.wifi_ssid, out_frame[5]);
+    _serial->writeFrame(out_frame, 6 + out_frame[5]);
+  } else if (cmd_frame[0] == CMD_WIFI_CONNECT) {
+    if (_prefs.wifi_enabled && strlen(_prefs.wifi_ssid) > 0) {
+      if (initializeWiFiConnection()) {
+        writeOKFrame();
+      } else {
+        writeErrFrame(ERR_CODE_DEVICE_BUSY);
+      }
+    } else {
+      writeErrFrame(ERR_CODE_BAD_STATE);
+    }
+  } else if (cmd_frame[0] == CMD_WIFI_DISCONNECT) {
+    disconnectWiFi();
+    writeOKFrame();
   } else {
     writeErrFrame(ERR_CODE_UNSUPPORTED_CMD);
     MESH_DEBUG_PRINTLN("ERROR: unknown command: %02X", cmd_frame[0]);
@@ -1449,6 +1542,95 @@ void MyMesh::checkCLIRescueCmd() {
 
     } else if (strcmp(cli_command, "reboot") == 0) {
       board.reboot();  // doesn't return
+    } else if (memcmp(cli_command, "wifi ", 5) == 0) {
+      const char* wifi_cmd = &cli_command[5];
+      if (memcmp(wifi_cmd, "set ", 4) == 0) {
+        // Format: wifi set SSID PASSWORD
+        const char* params = &wifi_cmd[4];
+        char* space = strchr((char*)params, ' ');
+        if (space) {
+          *space = 0; // null terminate SSID
+          const char* ssid = params;
+          const char* password = space + 1;
+          
+          if (strlen(ssid) < sizeof(_prefs.wifi_ssid) && strlen(password) < sizeof(_prefs.wifi_password)) {
+            strcpy(_prefs.wifi_ssid, ssid);
+            strcpy(_prefs.wifi_password, password);
+            savePrefs();
+            Serial.printf("  > WiFi credentials set: %s\n", ssid);
+          } else {
+            Serial.println("  Error: SSID or password too long");
+          }
+        } else {
+          Serial.println("  Error: Usage: wifi set SSID PASSWORD");
+        }
+      } else if (strcmp(wifi_cmd, "enable") == 0) {
+        _prefs.wifi_enabled = 1;
+        _prefs.wifi_auto_connect = 1;
+        savePrefs();
+        Serial.println("  > WiFi enabled");
+      } else if (strcmp(wifi_cmd, "disable") == 0) {
+        _prefs.wifi_enabled = 0;
+        _prefs.wifi_auto_connect = 0;
+        savePrefs();
+        disconnectWiFi();
+        Serial.println("  > WiFi disabled");
+      } else if (strcmp(wifi_cmd, "connect") == 0) {
+        if (_prefs.wifi_enabled && strlen(_prefs.wifi_ssid) > 0) {
+          Serial.println("  > Connecting to WiFi...");
+          if (initializeWiFiConnection()) {
+#ifdef ESP32
+            Serial.printf("  > Connected! IP: %s\n", WiFi.localIP().toString().c_str());
+#else
+            Serial.println("  > Connected!");
+#endif
+          } else {
+            Serial.println("  > Connection failed");
+          }
+        } else {
+          Serial.println("  Error: WiFi not enabled or no credentials set");
+        }
+      } else if (strcmp(wifi_cmd, "disconnect") == 0) {
+        disconnectWiFi();
+        Serial.println("  > WiFi disconnected");
+      } else if (strcmp(wifi_cmd, "status") == 0) {
+        Serial.printf("  > WiFi enabled: %s\n", _prefs.wifi_enabled ? "yes" : "no");
+        Serial.printf("  > SSID: %s\n", strlen(_prefs.wifi_ssid) > 0 ? _prefs.wifi_ssid : "(not set)");
+        Serial.printf("  > Auto-connect: %s\n", _prefs.wifi_auto_connect ? "yes" : "no");
+        Serial.printf("  > TCP port: %d\n", _prefs.wifi_tcp_port);
+        
+        uint8_t status = getWiFiConnectionStatus();
+        const char* status_str;
+        switch(status) {
+          case WIFI_STATUS_DISABLED: status_str = "disabled"; break;
+          case WIFI_STATUS_ENABLED: status_str = "enabled"; break;
+          case WIFI_STATUS_CONNECTING: status_str = "connecting"; break;
+          case WIFI_STATUS_CONNECTED: status_str = "connected"; break;
+          case WIFI_STATUS_FAILED: status_str = "failed"; break;
+          default: status_str = "unknown"; break;
+        }
+        Serial.printf("  > Status: %s\n", status_str);
+        
+        if (status == WIFI_STATUS_CONNECTED) {
+#ifdef ESP32
+          Serial.printf("  > IP address: %s\n", WiFi.localIP().toString().c_str());
+#else
+          Serial.println("  > IP address: (WiFi not supported)");
+#endif
+        }
+      } else if (strcmp(wifi_cmd, "help") == 0) {
+        Serial.println("  WiFi commands:");
+        Serial.println("    wifi set SSID PASSWORD  - Set WiFi credentials");
+        Serial.println("    wifi enable              - Enable WiFi");
+        Serial.println("    wifi disable             - Disable WiFi");
+        Serial.println("    wifi connect             - Connect to WiFi");
+        Serial.println("    wifi disconnect          - Disconnect from WiFi");
+        Serial.println("    wifi status              - Show WiFi status");
+        Serial.println("    wifi help                - Show this help");
+      } else {
+        Serial.printf("  Error: unknown wifi command: %s\n", wifi_cmd);
+        Serial.println("  Type 'wifi help' for available commands");
+      }
     } else {
       Serial.println("  Error: unknown command");
     }
@@ -1489,9 +1671,12 @@ void MyMesh::loop() {
 
   if (_cli_rescue) {
     checkCLIRescueCmd();
-  } else {
+  }else{
     checkSerialInterface();
   }
+
+  // Handle WiFi events
+  handleWiFiEvents();
 
   // is there are pending dirty contacts write needed?
   if (dirty_contacts_expiry && millisHasNowPassed(dirty_contacts_expiry)) {
@@ -1518,3 +1703,98 @@ bool MyMesh::advert() {
     return false;
   }
 }
+
+// WiFi management functions implementation
+#ifdef ESP32
+#include <WiFi.h>
+
+bool MyMesh::initializeWiFiConnection() {
+  if (!_prefs.wifi_enabled || strlen(_prefs.wifi_ssid) == 0) {
+    return false;
+  }
+
+  // Don't attempt too frequently
+  if (_wifi_last_attempt > 0 && millis() - _wifi_last_attempt < WIFI_RETRY_INTERVAL) {
+    return false;
+  }
+
+  _wifi_last_attempt = millis();
+  
+  // Disconnect if already connected to different network
+  if (WiFi.status() == WL_CONNECTED && strcmp(WiFi.SSID().c_str(), _prefs.wifi_ssid) != 0) {
+    WiFi.disconnect();
+    delay(100);
+  }
+
+  // Start connection (non-blocking)
+  WiFi.begin(_prefs.wifi_ssid, _prefs.wifi_password);
+  _wifi_status = WIFI_STATUS_CONNECTING;
+  _wifi_connect_start_time = millis();
+  
+  MESH_DEBUG_PRINTLN("WiFi connection started to %s", _prefs.wifi_ssid);
+  return true;
+}
+
+void MyMesh::disconnectWiFi() {
+  if (_wifi_initialized) {
+    WiFi.disconnect();
+    _wifi_status = WIFI_STATUS_DISABLED;
+    _wifi_initialized = false;
+    MESH_DEBUG_PRINTLN("WiFi disconnected");
+  }
+}
+
+uint8_t MyMesh::getWiFiConnectionStatus() {
+  if (!_prefs.wifi_enabled) {
+    return WIFI_STATUS_DISABLED;
+  }
+
+  // Update status based on actual WiFi state
+  if (WiFi.status() == WL_CONNECTED) {
+    if (_wifi_status != WIFI_STATUS_CONNECTED) {
+      _wifi_status = WIFI_STATUS_CONNECTED;
+      _wifi_initialized = true;
+    }
+  } else if (_wifi_status == WIFI_STATUS_CONNECTED) {
+    // Was connected but now isn't
+    _wifi_status = WIFI_STATUS_FAILED;
+    _wifi_initialized = false;
+  }
+
+  return _wifi_status;
+}
+
+void MyMesh::handleWiFiEvents() {
+  if (!_prefs.wifi_enabled) {
+    return;
+  }
+
+  // Handle connection state machine
+  if (_wifi_status == WIFI_STATUS_CONNECTING) {
+    if (WiFi.status() == WL_CONNECTED) {
+      _wifi_status = WIFI_STATUS_CONNECTED;
+      _wifi_initialized = true;
+      MESH_DEBUG_PRINTLN("WiFi connected to %s, IP: %s", _prefs.wifi_ssid, WiFi.localIP().toString().c_str());
+    } else if (millis() - _wifi_connect_start_time > WIFI_CONNECT_TIMEOUT) {
+      _wifi_status = WIFI_STATUS_FAILED;
+      MESH_DEBUG_PRINTLN("WiFi connection timeout to %s", _prefs.wifi_ssid);
+    }
+  }
+  
+  // Auto-reconnect if enabled and not connected
+  if (_prefs.wifi_auto_connect && 
+      _wifi_status != WIFI_STATUS_CONNECTED && 
+      _wifi_status != WIFI_STATUS_CONNECTING) {
+    // Only attempt reconnect if enough time has passed
+    if (_wifi_last_attempt == 0 || millis() - _wifi_last_attempt > WIFI_RETRY_INTERVAL) {
+      initializeWiFiConnection();
+    }
+  }
+}
+#else
+// Non-ESP32 platforms - stub implementations
+bool MyMesh::initializeWiFiConnection() { return false; }
+void MyMesh::disconnectWiFi() { }
+uint8_t MyMesh::getWiFiConnectionStatus() { return WIFI_STATUS_DISABLED; }
+void MyMesh::handleWiFiEvents() { }
+#endif

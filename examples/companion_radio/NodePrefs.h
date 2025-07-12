@@ -8,6 +8,12 @@
 #define ADVERT_LOC_NONE       0
 #define ADVERT_LOC_SHARE      1
 
+#define WIFI_STATUS_DISABLED     0
+#define WIFI_STATUS_ENABLED      1
+#define WIFI_STATUS_CONNECTING   2
+#define WIFI_STATUS_CONNECTED    3
+#define WIFI_STATUS_FAILED       4
+
 struct NodePrefs {  // persisted to file
   float airtime_factor;
   char node_name[32];
@@ -24,4 +30,12 @@ struct NodePrefs {  // persisted to file
   float rx_delay_base;
   uint32_t ble_pin;
   uint8_t  advert_loc_policy;
+  
+  // WiFi configuration
+  char wifi_ssid[64];          // WiFi network name
+  char wifi_password[64];      // WiFi password
+  uint16_t wifi_tcp_port;      // TCP port for WiFi interface (default: 5000)
+  uint8_t wifi_enabled;        // WiFi enable/disable flag
+  uint8_t wifi_auto_connect;   // Auto-connect on startup
+  uint8_t reserved_wifi[2];    // Reserved for future WiFi settings
 };

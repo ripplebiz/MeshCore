@@ -166,6 +166,22 @@ void DataStore::loadPrefsInt(const char *filename, NodePrefs& _prefs, double& no
     file.read(pad, 3);                                                                     // 77
     file.read((uint8_t *)&_prefs.ble_pin, sizeof(_prefs.ble_pin));                         // 80
 
+    if (file.available()) {
+      file.read((uint8_t *)_prefs.wifi_ssid, sizeof(_prefs.wifi_ssid));                   // 84
+      file.read((uint8_t *)_prefs.wifi_password, sizeof(_prefs.wifi_password));           // 148
+      file.read((uint8_t *)&_prefs.wifi_tcp_port, sizeof(_prefs.wifi_tcp_port));          // 212
+      file.read((uint8_t *)&_prefs.wifi_enabled, sizeof(_prefs.wifi_enabled));            // 214
+      file.read((uint8_t *)&_prefs.wifi_auto_connect, sizeof(_prefs.wifi_auto_connect));  // 215
+      file.read((uint8_t *)_prefs.reserved_wifi, sizeof(_prefs.reserved_wifi));           // 216
+    } else {
+      memset(_prefs.wifi_ssid, 0, sizeof(_prefs.wifi_ssid));
+      memset(_prefs.wifi_password, 0, sizeof(_prefs.wifi_password));
+      _prefs.wifi_tcp_port = 5000;  // Default TCP port
+      _prefs.wifi_enabled = 0;      // Disabled by default
+      _prefs.wifi_auto_connect = 0; // No auto-connect by default
+      memset(_prefs.reserved_wifi, 0, sizeof(_prefs.reserved_wifi));
+    }
+
     file.close();
   }
 }
@@ -195,6 +211,12 @@ void DataStore::savePrefs(const NodePrefs& _prefs, double node_lat, double node_
     file.write((uint8_t *)&_prefs.advert_loc_policy, sizeof(_prefs.advert_loc_policy));     // 76
     file.write(pad, 3);                                                                     // 77
     file.write((uint8_t *)&_prefs.ble_pin, sizeof(_prefs.ble_pin));                         // 80
+    file.write((uint8_t *)_prefs.wifi_ssid, sizeof(_prefs.wifi_ssid));                      // 84
+    file.write((uint8_t *)_prefs.wifi_password, sizeof(_prefs.wifi_password));              // 148
+    file.write((uint8_t *)&_prefs.wifi_tcp_port, sizeof(_prefs.wifi_tcp_port));             // 212
+    file.write((uint8_t *)&_prefs.wifi_enabled, sizeof(_prefs.wifi_enabled));               // 214
+    file.write((uint8_t *)&_prefs.wifi_auto_connect, sizeof(_prefs.wifi_auto_connect));     // 215
+    file.write((uint8_t *)_prefs.reserved_wifi, sizeof(_prefs.reserved_wifi));              // 216
 
     file.close();
   }

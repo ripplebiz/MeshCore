@@ -58,6 +58,8 @@ void CommonCLI::loadPrefsInt(FILESYSTEM* fs, const char* filename) {
     file.read((uint8_t *) &_prefs->flood_max, sizeof(_prefs->flood_max));   // 124
     file.read((uint8_t *) &_prefs->flood_advert_interval, sizeof(_prefs->flood_advert_interval));  // 125
     file.read((uint8_t *) &_prefs->interference_threshold, sizeof(_prefs->interference_threshold));  // 126
+    file.read((uint8_t *) &_prefs->voltage_multiplier, sizeof(_prefs->voltage_multiplier));  
+
 
     // sanitise bad pref values
     _prefs->rx_delay_base = constrain(_prefs->rx_delay_base, 0, 20.0f);
@@ -69,6 +71,7 @@ void CommonCLI::loadPrefsInt(FILESYSTEM* fs, const char* filename) {
     _prefs->sf = constrain(_prefs->sf, 7, 12);
     _prefs->cr = constrain(_prefs->cr, 5, 8);
     _prefs->tx_power_dbm = constrain(_prefs->tx_power_dbm, 1, 30);
+    _prefs->voltage_multiplier = constrain(_prefs->voltage_multiplier, 1, 10);
 
     file.close();
   }
@@ -113,6 +116,7 @@ void CommonCLI::savePrefs(FILESYSTEM* fs) {
     file.write((uint8_t *) &_prefs->flood_max, sizeof(_prefs->flood_max));   // 124
     file.write((uint8_t *) &_prefs->flood_advert_interval, sizeof(_prefs->flood_advert_interval));  // 125
     file.write((uint8_t *) &_prefs->interference_threshold, sizeof(_prefs->interference_threshold));  // 126
+    file.write((uint8_t *) &_prefs->voltage_multiplier, sizeof(_prefs->voltage_multiplier)); 
 
     file.close();
   }
@@ -218,6 +222,8 @@ void CommonCLI::handleCommand(uint32_t sender_timestamp, const char* command, ch
         mesh::Utils::toHex(&reply[2], _callbacks->getSelfIdPubKey(), PUB_KEY_SIZE);
       } else if (memcmp(config, "role", 4) == 0) {
         sprintf(reply, "> %s", _callbacks->getRole());
+      } else if (memcmp(config, "voltage_multiplier", 18) == 0) {
+        sprintf(reply, "> %s", StrHelper::ftoa(_prefs->voltage_multiplier));
       } else {
         sprintf(reply, "??: %s", config);
       }
@@ -342,6 +348,15 @@ void CommonCLI::handleCommand(uint32_t sender_timestamp, const char* command, ch
         _prefs->freq = atof(&config[5]);
         savePrefs();
         strcpy(reply, "OK - reboot to apply");
+      } else if (memcmp(config, "voltage_multiplier ", 19) == 0) {
+        float f = atof(&config[19]);
+        if (f >= 0) {
+          _prefs->voltage_multiplier = f;
+          savePrefs();
+          strcpy(reply, "OK");
+        } else {
+          strcpy(reply, "Error, cannot be negative");
+        }
       } else {
         sprintf(reply, "unknown config: %s", config);
       }

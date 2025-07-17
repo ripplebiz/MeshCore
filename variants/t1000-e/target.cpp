@@ -54,14 +54,15 @@ bool radio_init() {
 
   SPI.setPins(P_LORA_MISO, P_LORA_SCLK, P_LORA_MOSI);
   SPI.begin();
-  int status = radio.begin(LORA_FREQ, LORA_BW, LORA_SF, LORA_CR, RADIOLIB_LR11X0_LORA_SYNC_WORD_PRIVATE, LORA_TX_POWER, 8, tcxo);
+  int status = radio.begin(LORA_FREQ, LORA_BW, LORA_SF, LORA_CR, RADIOLIB_LR11X0_LORA_SYNC_WORD_PRIVATE, LORA_TX_POWER, 16, tcxo);
   if (status != RADIOLIB_ERR_NONE) {
     Serial.print("ERROR: radio init failed: ");
     Serial.println(status);
     return false;  // fail
   }
   
-  radio.setCRC(1);
+  radio.setCRC(2);
+  radio.explicitHeader();
 
 #ifdef RF_SWITCH_TABLE
   radio.setRfSwitchTable(rfswitch_dios, rfswitch_table);

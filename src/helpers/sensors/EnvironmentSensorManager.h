@@ -13,6 +13,8 @@ protected:
   bool BMP280_initialized = false;
   bool INA3221_initialized = false;
   bool INA219_initialized = false;
+  bool SHTC3_initialized = false;
+  bool LPS22HB_initialized = false;
 
   bool gps_detected = false;
   bool gps_active = false;

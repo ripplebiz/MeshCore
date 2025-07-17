@@ -134,6 +134,7 @@ public:
   bool sendGroupMessage(uint32_t timestamp, mesh::GroupChannel& channel, const char* sender_name, const char* text, int text_len);
   int  sendLogin(const ContactInfo& recipient, const char* password, uint32_t& est_timeout);
   int  sendRequest(const ContactInfo& recipient, uint8_t req_type, uint32_t& tag, uint32_t& est_timeout);
+  int  sendRequest(const ContactInfo& recipient, const uint8_t* req_data, uint8_t data_len, uint32_t& tag, uint32_t& est_timeout);
   bool shareContactZeroHop(const ContactInfo& contact);
   uint8_t exportContact(const ContactInfo& contact, uint8_t dest_buf[]);
   bool importContact(const uint8_t src_buf[], uint8_t len);

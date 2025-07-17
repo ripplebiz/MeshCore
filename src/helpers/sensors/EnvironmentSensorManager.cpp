@@ -24,6 +24,14 @@ static Adafruit_BME280 BME280;
 static Adafruit_BMP280 BMP280;
 #endif
 
+#if ENV_INCLUDE_SHTC3
+#include <Adafruit_SHTC3.h>
+static Adafruit_SHTC3 SHTC3;
+#endif
+
+#if ENV_INCLUDE_LPS22HB
+#include <Arduino_LPS22HB.h>
+#endif
 
 #if ENV_INCLUDE_INA3221
 #define TELEM_INA3221_ADDRESS   0x42      // INA3221 3 channel current sensor I2C address
@@ -76,28 +84,48 @@ bool EnvironmentSensorManager::begin() {
   }
   #endif
 
+  #if ENV_INCLUDE_SHTC3
+  if (SHTC3.begin()) {
+    MESH_DEBUG_PRINTLN("Found sensor: SHTC3");
+    SHTC3_initialized = true;
+  } else {
+    SHTC3_initialized = false;
+    MESH_DEBUG_PRINTLN("SHTC3 was not found at I2C address %02X", 0x70);
+  }
+  #endif
+
+  #if ENV_INCLUDE_LPS22HB
+  if (BARO.begin()) {
+    MESH_DEBUG_PRINTLN("Found sensor: LPS22HB");
+    LPS22HB_initialized = true;
+  } else {
+    LPS22HB_initialized = false;
+    MESH_DEBUG_PRINTLN("LPS22HB was not found at I2C address %02X", 0x5C);
+  }
+  #endif
+
   #if ENV_INCLUDE_INA3221
   if (INA3221.begin(TELEM_INA3221_ADDRESS, &Wire)) {
-      MESH_DEBUG_PRINTLN("Found INA3221 at address: %02X", TELEM_INA3221_ADDRESS);
-      MESH_DEBUG_PRINTLN("%04X %04X", INA3221.getDieID(), INA3221.getManufacturerID());
+    MESH_DEBUG_PRINTLN("Found INA3221 at address: %02X", TELEM_INA3221_ADDRESS);
+    MESH_DEBUG_PRINTLN("%04X %04X", INA3221.getDieID(), INA3221.getManufacturerID());
 
-      for(int i = 0; i < 3; i++) {
-        INA3221.setShuntResistance(i, TELEM_INA3221_SHUNT_VALUE);
-      }
-      INA3221_initialized = true;
+    for(int i = 0; i < 3; i++) {
+      INA3221.setShuntResistance(i, TELEM_INA3221_SHUNT_VALUE);
+    }
+    INA3221_initialized = true;
   } else {
-      INA3221_initialized = false;
-      MESH_DEBUG_PRINTLN("INA3221 was not found at I2C address %02X", TELEM_INA3221_ADDRESS);
+    INA3221_initialized = false;
+    MESH_DEBUG_PRINTLN("INA3221 was not found at I2C address %02X", TELEM_INA3221_ADDRESS);
   }
   #endif
 
   #if ENV_INCLUDE_INA219
   if (INA219.begin(&Wire)) {
-      MESH_DEBUG_PRINTLN("Found INA219 at address: %02X", TELEM_INA219_ADDRESS);
-      INA219_initialized = true;
+    MESH_DEBUG_PRINTLN("Found INA219 at address: %02X", TELEM_INA219_ADDRESS);
+    INA219_initialized = true;
   } else {
-      INA219_initialized = false;
-      MESH_DEBUG_PRINTLN("INA219 was not found at I2C address %02X", TELEM_INA219_ADDRESS);
+    INA219_initialized = false;
+    MESH_DEBUG_PRINTLN("INA219 was not found at I2C address %02X", TELEM_INA219_ADDRESS);
   }
   #endif
 
@@ -126,7 +154,7 @@ bool EnvironmentSensorManager::querySensors(uint8_t requester_permissions, Cayen
     if (BME280_initialized) {
       telemetry.addTemperature(TELEM_CHANNEL_SELF, BME280.readTemperature());
       telemetry.addRelativeHumidity(TELEM_CHANNEL_SELF, BME280.readHumidity());
-      telemetry.addBarometricPressure(TELEM_CHANNEL_SELF, BME280.readPressure());
+      telemetry.addBarometricPressure(TELEM_CHANNEL_SELF, BME280.readPressure()/100);
       telemetry.addAltitude(TELEM_CHANNEL_SELF, BME280.readAltitude(TELEM_BME280_SEALEVELPRESSURE_HPA));
     }
     #endif
@@ -136,6 +164,23 @@ bool EnvironmentSensorManager::querySensors(uint8_t requester_permissions, Cayen
       telemetry.addTemperature(TELEM_CHANNEL_SELF, BMP280.readTemperature());
       telemetry.addBarometricPressure(TELEM_CHANNEL_SELF, BMP280.readPressure());
       telemetry.addAltitude(TELEM_CHANNEL_SELF, BME280.readAltitude(TELEM_BME280_SEALEVELPRESSURE_HPA));
+    }
+    #endif
+
+    #if ENV_INCLUDE_SHTC3
+    if (SHTC3_initialized) {
+      sensors_event_t humidity, temp;
+      SHTC3.getEvent(&humidity, &temp);
+
+      telemetry.addTemperature(TELEM_CHANNEL_SELF, temp.temperature);
+      telemetry.addRelativeHumidity(TELEM_CHANNEL_SELF, humidity.relative_humidity);
+    }
+    #endif
+
+    #if ENV_INCLUDE_LPS22HB
+    if (LPS22HB_initialized) {
+      telemetry.addTemperature(TELEM_CHANNEL_SELF, BARO.readTemperature());
+      telemetry.addBarometricPressure(TELEM_CHANNEL_SELF, BARO.readPressure());
     }
     #endif
 
@@ -157,10 +202,10 @@ bool EnvironmentSensorManager::querySensors(uint8_t requester_permissions, Cayen
 
     #if ENV_INCLUDE_INA219
     if (INA219_initialized) {
-        telemetry.addVoltage(next_available_channel, INA219.getBusVoltage_V());
-        telemetry.addCurrent(next_available_channel, INA219.getCurrent_mA() / 1000);
-        telemetry.addPower(next_available_channel, INA219.getPower_mW() / 1000);
-        next_available_channel++;
+      telemetry.addVoltage(next_available_channel, INA219.getBusVoltage_V());
+      telemetry.addCurrent(next_available_channel, INA219.getCurrent_mA() / 1000);
+      telemetry.addPower(next_available_channel, INA219.getPower_mW() / 1000);
+      next_available_channel++;
     }
     #endif
 

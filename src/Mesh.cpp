@@ -135,7 +135,7 @@ DispatcherAction Mesh::onRecvPacket(Packet* pkt) {
                 int k = 0;
                 uint8_t path_len = data[k++];
                 uint8_t* path = &data[k]; k += path_len;
-                uint8_t extra_type = data[k++];
+                uint8_t extra_type = data[k++] & 0x0F;   // upper 4 bits reserved for future use
                 uint8_t* extra = &data[k];
                 uint8_t extra_len = len - k;   // remainder of packet (may be padded with zeroes!)
                 if (onPeerPathRecv(pkt, j, secret, path, path_len, extra_type, extra, extra_len)) {
@@ -181,7 +181,7 @@ DispatcherAction Mesh::onRecvPacket(Packet* pkt) {
           uint8_t data[MAX_PACKET_PAYLOAD];
           int len = Utils::MACThenDecrypt(secret, data, macAndData, pkt->payload_len - i);
           if (len > 0) {  // success!
-            onAnonDataRecv(pkt, pkt->getPayloadType(), sender, data, len);
+            onAnonDataRecv(pkt, secret, sender, data, len);
             pkt->markDoNotRetransmit();
           }
         }

@@ -107,10 +107,10 @@ protected:
   /**
    * \brief  A (now decrypted) data packet has been received.
    *         NOTE: these can be received multiple times (per sender/contents), via different routes
-   * \param  type  one of: PAYLOAD_TYPE_ANON_REQ
+   * \param  secret  ECDH shared secret
    * \param  sender  public key provided by sender
   */
-  virtual void onAnonDataRecv(Packet* packet, uint8_t type, const Identity& sender, uint8_t* data, size_t len) { }
+  virtual void onAnonDataRecv(Packet* packet, const uint8_t* secret, const Identity& sender, uint8_t* data, size_t len) { }
 
   /**
    * \brief  A path TO 'sender' has been received. (also with optional 'extra' data encoded)

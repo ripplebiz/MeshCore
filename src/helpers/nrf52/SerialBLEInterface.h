@@ -5,10 +5,8 @@
 
 class SerialBLEInterface : public BaseSerialInterface {
   BLEUart bleuart;
-  bool deviceConnected;
-  bool oldDeviceConnected;
-  bool checkAdvRestart;
   bool _isEnabled;
+  bool _isDeviceConnected;
   unsigned long _last_write;
 
   struct Frame {
@@ -21,18 +19,19 @@ class SerialBLEInterface : public BaseSerialInterface {
   Frame send_queue[FRAME_QUEUE_SIZE];
 
   void clearBuffers() { send_queue_len = 0; }
-  void startAdv();
+  static void onConnect(uint16_t connection_handle);
+  static void onDisconnect(uint16_t connection_handle, uint8_t reason);
 
 public:
   SerialBLEInterface() {
-    deviceConnected = false;
-    oldDeviceConnected = false;
-    checkAdvRestart = false;
     _isEnabled = false;
+    _isDeviceConnected = false;
     _last_write = 0;
     send_queue_len = 0;
   }
 
+  void startAdv();
+  void stopAdv();
   void begin(const char* device_name, uint32_t pin_code);
 
   // BaseSerialInterface methods

@@ -7,14 +7,14 @@
 #endif
 
 /*------------ Frame Protocol --------------*/
-#define FIRMWARE_VER_CODE 6
+#define FIRMWARE_VER_CODE 7
 
 #ifndef FIRMWARE_BUILD_DATE
-#define FIRMWARE_BUILD_DATE "29 Jun 2025"
+#define FIRMWARE_BUILD_DATE "15 Jul 2025"
 #endif
 
 #ifndef FIRMWARE_VERSION
-#define FIRMWARE_VERSION "v1.7.1"
+#define FIRMWARE_VERSION "v1.7.3"
 #endif
 
 #if defined(NRF52_PLATFORM) || defined(STM32_PLATFORM)
@@ -160,7 +160,8 @@ private:
   NodePrefs _prefs;
   uint32_t pending_login;
   uint32_t pending_status;
-  uint32_t pending_telemetry;
+  uint32_t pending_telemetry;   // pending _TELEMETRY_REQ
+  uint32_t pending_req;   // pending _BINARY_REQ
   BaseSerialInterface *_serial;
 
   ContactsIterator _iter;

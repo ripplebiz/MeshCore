@@ -22,11 +22,11 @@
 /* ------------------------------ Config -------------------------------- */
 
 #ifndef FIRMWARE_BUILD_DATE
-  #define FIRMWARE_BUILD_DATE   "29 Jun 2025"
+  #define FIRMWARE_BUILD_DATE   "15 Jul 2025"
 #endif
 
 #ifndef FIRMWARE_VERSION
-  #define FIRMWARE_VERSION   "v1.7.1"
+  #define FIRMWARE_VERSION   "v1.7.3"
 #endif
 
 #ifndef LORA_FREQ
@@ -188,7 +188,6 @@ class MyMesh : public mesh::Mesh, public CommonCLICallbacks {
     newClient->id = id;
     newClient->out_path_len = -1;  // initially out_path is unknown
     newClient->last_timestamp = 0;
-    self_id.calcSharedSecret(newClient->secret, id);   // calc ECDH shared secret
     return newClient;
   }
 
@@ -334,7 +333,7 @@ class MyMesh : public mesh::Mesh, public CommonCLICallbacks {
     }
     return 0;  // unknown command
   }
-   
+
 protected:
   float getAirtimeBudgetFactor() const override {
     return _prefs.airtime_factor;
@@ -432,8 +431,8 @@ protected:
     return true;
   }
 
-  void onAnonDataRecv(mesh::Packet* packet, uint8_t type, const mesh::Identity& sender, uint8_t* data, size_t len) override {
-    if (type == PAYLOAD_TYPE_ANON_REQ) {  // received an initial request by a possible admin client (unknown at this stage)
+  void onAnonDataRecv(mesh::Packet* packet, const uint8_t* secret, const mesh::Identity& sender, uint8_t* data, size_t len) override {
+    if (packet->getPayloadType() == PAYLOAD_TYPE_ANON_REQ) {  // received an initial request by a possible admin client (unknown at this stage)
       uint32_t sender_timestamp, sender_sync_since;
       memcpy(&sender_timestamp, data, 4);
       memcpy(&sender_sync_since, &data[4], 4);  // sender's "sync messags SINCE x" timestamp
@@ -465,6 +464,7 @@ protected:
       client->sync_since = sender_sync_since;
       client->pending_ack = 0;
       client->push_failures = 0;
+      memcpy(client->secret, secret, PUB_KEY_SIZE);
 
       uint32_t now = getRTCClock()->getCurrentTime();
       client->last_activity = now;
@@ -555,7 +555,7 @@ protected:
             if (is_retry) {
               temp[5] = 0;  // no reply
             } else {
-              _cli.handleCommand(sender_timestamp, (const char *) &data[5], (char *) &temp[5]);
+              handleCommand(sender_timestamp, (char *) &data[5], (char *) &temp[5]);
               temp[4] = (TXT_TYPE_CLI_DATA << 2);  // attempt and flags,  (NOTE: legacy was: TXT_TYPE_PLAIN)
             }
             send_ack = false;
@@ -743,8 +743,6 @@ public:
     _num_posted = _num_post_pushes = 0;
   }
 
-  CommonCLI* getCLI() { return &_cli; }
-
   void begin(FILESYSTEM* fs) {
     mesh::Mesh::begin();
     _fs = fs;
@@ -843,6 +841,18 @@ public:
     radio_driver.resetStats();
     resetStats();
     ((SimpleMeshTables *)getTables())->resetStats();
+  }
+
+  void handleCommand(uint32_t sender_timestamp, char* command, char* reply) {
+    while (*command == ' ') command++;   // skip leading spaces
+
+    if (strlen(command) > 4 && command[2] == '|') {  // optional prefix (for companion radio CLI)
+      memcpy(reply, command, 3);  // reflect the prefix back
+      reply += 3;
+      command += 3;
+    }
+
+    _cli.handleCommand(sender_timestamp, command, reply);  // common CLI commands
   }
 
   void loop() {
@@ -998,7 +1008,7 @@ void loop() {
   if (len > 0 && command[len - 1] == '\r') {  // received complete line
     command[len - 1] = 0;  // replace newline with C string null terminator
     char reply[160];
-    the_mesh.getCLI()->handleCommand(0, command, reply);  // NOTE: there is no sender_timestamp via serial!
+    the_mesh.handleCommand(0, command, reply);  // NOTE: there is no sender_timestamp via serial!
     if (reply[0]) {
       Serial.print("  -> "); Serial.println(reply);
     }

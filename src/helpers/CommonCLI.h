@@ -55,10 +55,7 @@ class CommonCLI {
   char tmp[80];
 
   mesh::RTCClock* getRTCClock() { return _rtc; }
-  void savePrefs() { _callbacks->savePrefs(); }
-
-  void checkAdvertInterval();
-
+  void savePrefs();
   void loadPrefsInt(FILESYSTEM* _fs, const char* filename);
 
 public:

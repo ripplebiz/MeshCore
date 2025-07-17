@@ -403,22 +403,52 @@ bool BaseChatMesh::importContact(const uint8_t src_buf[], uint8_t len) {
 }
 
 int BaseChatMesh::sendLogin(const ContactInfo& recipient, const char* password, uint32_t& est_timeout) {
-  int tlen;
-  uint8_t temp[24];
-  uint32_t now = getRTCClock()->getCurrentTimeUnique();
-  memcpy(temp, &now, 4);   // mostly an extra blob to help make packet_hash unique
-  if (recipient.type == ADV_TYPE_ROOM) {
-    memcpy(&temp[4], &recipient.sync_since, 4);
-    int len = strlen(password); if (len > 15) len = 15;  // max 15 chars currently
-    memcpy(&temp[8], password, len);
-    tlen = 8 + len;
-  } else {
-    int len = strlen(password); if (len > 15) len = 15;  // max 15 chars currently
-    memcpy(&temp[4], password, len);
-    tlen = 4 + len;
-  }
+  mesh::Packet* pkt;
+  {
+    int tlen;
+    uint8_t temp[24];
+    uint32_t now = getRTCClock()->getCurrentTimeUnique();
+    memcpy(temp, &now, 4);   // mostly an extra blob to help make packet_hash unique
+    if (recipient.type == ADV_TYPE_ROOM) {
+      memcpy(&temp[4], &recipient.sync_since, 4);
+      int len = strlen(password); if (len > 15) len = 15;  // max 15 chars currently
+      memcpy(&temp[8], password, len);
+      tlen = 8 + len;
+    } else {
+      int len = strlen(password); if (len > 15) len = 15;  // max 15 chars currently
+      memcpy(&temp[4], password, len);
+      tlen = 4 + len;
+    }
 
-  auto pkt = createAnonDatagram(PAYLOAD_TYPE_ANON_REQ, self_id, recipient.id, recipient.shared_secret, temp, tlen);
+    pkt = createAnonDatagram(PAYLOAD_TYPE_ANON_REQ, self_id, recipient.id, recipient.shared_secret, temp, tlen);
+  }
+  if (pkt) {
+    uint32_t t = _radio->getEstAirtimeFor(pkt->getRawLength());
+    if (recipient.out_path_len < 0) {
+      sendFlood(pkt);
+      est_timeout = calcFloodTimeoutMillisFor(t);
+      return MSG_SEND_SENT_FLOOD;
+    } else {
+      sendDirect(pkt, recipient.out_path, recipient.out_path_len);
+      est_timeout = calcDirectTimeoutMillisFor(t, recipient.out_path_len);
+      return MSG_SEND_SENT_DIRECT;
+    }
+  }
+  return MSG_SEND_FAILED;
+}
+
+int  BaseChatMesh::sendRequest(const ContactInfo& recipient, const uint8_t* req_data, uint8_t data_len, uint32_t& tag, uint32_t& est_timeout) {
+  if (data_len > MAX_PACKET_PAYLOAD - 16) return MSG_SEND_FAILED;
+
+  mesh::Packet* pkt;
+  {
+    uint8_t temp[MAX_PACKET_PAYLOAD];
+    tag = getRTCClock()->getCurrentTimeUnique();
+    memcpy(temp, &tag, 4);   // mostly an extra blob to help make packet_hash unique
+    memcpy(&temp[4], req_data, data_len);
+
+    pkt = createDatagram(PAYLOAD_TYPE_REQ, recipient.id, recipient.shared_secret, temp, 4 + data_len);
+  }
   if (pkt) {
     uint32_t t = _radio->getEstAirtimeFor(pkt->getRawLength());
     if (recipient.out_path_len < 0) {
@@ -435,14 +465,17 @@ int BaseChatMesh::sendLogin(const ContactInfo& recipient, const char* password, 
 }
 
 int  BaseChatMesh::sendRequest(const ContactInfo& recipient, uint8_t req_type, uint32_t& tag, uint32_t& est_timeout) {
-  uint8_t temp[13];
-  tag = getRTCClock()->getCurrentTimeUnique();
-  memcpy(temp, &tag, 4);   // mostly an extra blob to help make packet_hash unique
-  temp[4] = req_type;
-  memset(&temp[5], 0, 4);  // reserved (possibly for 'since' param)
-  getRNG()->random(&temp[9], 4);   // random blob to help make packet-hash unique
+  mesh::Packet* pkt;
+  {
+    uint8_t temp[13];
+    tag = getRTCClock()->getCurrentTimeUnique();
+    memcpy(temp, &tag, 4);   // mostly an extra blob to help make packet_hash unique
+    temp[4] = req_type;
+    memset(&temp[5], 0, 4);  // reserved (possibly for 'since' param)
+    getRNG()->random(&temp[9], 4);   // random blob to help make packet-hash unique
 
-  auto pkt = createDatagram(PAYLOAD_TYPE_REQ, recipient.id, recipient.shared_secret, temp, sizeof(temp));
+    pkt = createDatagram(PAYLOAD_TYPE_REQ, recipient.id, recipient.shared_secret, temp, sizeof(temp));
+  }
   if (pkt) {
     uint32_t t = _radio->getEstAirtimeFor(pkt->getRawLength());
     if (recipient.out_path_len < 0) {

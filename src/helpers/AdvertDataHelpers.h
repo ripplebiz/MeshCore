@@ -8,7 +8,8 @@
 #define ADV_TYPE_CHAT         1
 #define ADV_TYPE_REPEATER     2
 #define ADV_TYPE_ROOM         3
-//FUTURE: 4..15
+#define ADV_TYPE_SENSOR       4
+//FUTURE: 5..15
 
 #define ADV_LATLON_MASK       0x10
 #define ADV_FEAT1_MASK        0x20   // FUTURE

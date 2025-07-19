@@ -196,4 +196,6 @@ void loop() {
 #ifdef DISPLAY_CLASS
   ui_task.loop();
 #endif
+  
+  board.loop(); // Automatic light sleep power management
 }

@@ -19,6 +19,7 @@ class T1000SensorManager: public SensorManager {
   void start_gps();
   void sleep_gps();
   void stop_gps();
+  void cycleGpsPower();
 public:
   T1000SensorManager(LocationProvider &nmea): _nmea(&nmea) { }
   bool begin() override;

@@ -79,4 +79,7 @@ public:
   void soundBuzzer(UIEventType bet = UIEventType::none);
   void shutdown(bool restart = false);
   void loop();
+  
+  // Power management support
+  uint32_t getNextRefreshTime() const { return _next_refresh; }
 };

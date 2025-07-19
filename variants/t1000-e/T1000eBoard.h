@@ -2,6 +2,11 @@
 
 #include <MeshCore.h>
 #include <Arduino.h>
+#include <nrf_gpio.h>
+#ifdef PIN_BUZZER
+#include <NonBlockingRtttl.h>
+#endif
+#include <bluefruit.h>
 
 // LoRa and SPI pins
 #define  P_LORA_DIO_1   (32 + 1)  // P1.1
@@ -11,7 +16,7 @@
 #define  P_LORA_SCLK    (0 + 11)  // P0.11
 #define  P_LORA_MISO    (32 + 8)  // P1.8
 #define  P_LORA_MOSI    (32 + 9)  // P0.9
- 
+
 #define LR11X0_DIO_AS_RF_SWITCH  true
 #define LR11X0_DIO3_TCXO_VOLTAGE   1.6
 
@@ -26,19 +31,21 @@ protected:
 
 public:
   void begin();
+  void loop(); // Power management
 
+  // Battery voltage reading
   uint16_t getBattMilliVolts() override {
   #ifdef BATTERY_PIN
-   #ifdef PIN_3V3_EN
-    digitalWrite(PIN_3V3_EN, HIGH);
-   #endif
+    #ifdef PIN_3V3_EN
+      digitalWrite(PIN_3V3_EN, HIGH);
+    #endif
     analogReference(AR_INTERNAL_3_0);
     analogReadResolution(12);
     delay(10);
     float volts = (analogRead(BATTERY_PIN) * ADC_MULTIPLIER * AREF_VOLTAGE) / 4096;
-   #ifdef PIN_3V3_EN
-    digitalWrite(PIN_3V3_EN, LOW);
-   #endif
+    #ifdef PIN_3V3_EN
+      digitalWrite(PIN_3V3_EN, LOW);
+    #endif
 
     analogReference(AR_DEFAULT);  // put back to default
     analogReadResolution(10);
@@ -50,11 +57,12 @@ public:
   }
 
   uint8_t getStartupReason() const override { return startup_reason; }
-
-  const char* getManufacturerName() const override {
+  
+  const char* getManufacturerName() const override { 
     return "Seeed Tracker T1000-e";
-  }
+   }
 
+  // Button state tracking
   int buttonStateChanged() {
   #ifdef BUTTON_PIN
     uint8_t v = digitalRead(BUTTON_PIN);
@@ -66,29 +74,34 @@ public:
     return 0;
   }
 
+  // System power control
   void powerOff() override {
     #ifdef HAS_GPS
-        digitalWrite(GPS_VRTC_EN, LOW);
+      digitalWrite(GPS_VRTC_EN, LOW);
         digitalWrite(GPS_RESET, LOW);
-        digitalWrite(GPS_SLEEP_INT, LOW);
+      digitalWrite(GPS_SLEEP_INT, LOW);
         digitalWrite(GPS_RTC_INT, LOW);
-        pinMode(GPS_RESETB, OUTPUT);
-        digitalWrite(GPS_RESETB, LOW);
+      pinMode(GPS_RESETB, OUTPUT);
+      digitalWrite(GPS_RESETB, LOW);
     #endif
     
     #ifdef BUZZER_EN
-        digitalWrite(BUZZER_EN, LOW);
+      digitalWrite(BUZZER_EN, LOW);
     #endif
     
     #ifdef PIN_3V3_EN
-        digitalWrite(PIN_3V3_EN, LOW);
+      digitalWrite(PIN_3V3_EN, LOW);
     #endif
 
     #ifdef LED_PIN
-    digitalWrite(LED_PIN, LOW);
+      digitalWrite(LED_PIN, LOW);
     #endif
     #ifdef BUTTON_PIN
-    nrf_gpio_cfg_sense_input(digitalPinToInterrupt(BUTTON_PIN), NRF_GPIO_PIN_NOPULL, NRF_GPIO_PIN_SENSE_HIGH);
+      nrf_gpio_cfg_sense_input(
+        digitalPinToInterrupt(BUTTON_PIN),
+        NRF_GPIO_PIN_NOPULL,
+        NRF_GPIO_PIN_SENSE_HIGH
+      );
     #endif
     sd_power_system_off();
   }
@@ -97,5 +110,9 @@ public:
     NVIC_SystemReset();
   }
 
-//  bool startOTAUpdate(const char* id, char reply[]) override;
+  // Light sleep implementation
+  void enterLightSleep(uint32_t timeout_ms = 0);
+  void wakeFromSleep();
+  //  bool startOTAUpdate(const char* id, char reply[]) override;
+
 };

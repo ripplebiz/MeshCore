@@ -171,6 +171,7 @@ bool T1000SensorManager::querySensors(uint8_t requester_permissions, CayenneLPP&
 
 void T1000SensorManager::loop() {
   static long next_gps_update = 0;
+  static uint32_t last_gps_cycle = 0;
 
   _nmea->loop();
 
@@ -182,6 +183,15 @@ void T1000SensorManager::loop() {
       //Serial.printf("lat %f lon %f\r\n", _lat, _lon);
     }
     next_gps_update = millis() + 1000;
+  }
+
+  // GPS power cycling for battery optimization - only when GPS is active
+  if (gps_active) {
+    uint32_t now = millis();
+    if (now - last_gps_cycle > 300000) { // 5 minutes
+      cycleGpsPower();
+      last_gps_cycle = now;
+    }
   }
 }
 
@@ -206,4 +216,22 @@ bool T1000SensorManager::setSettingValue(const char* name, const char* value) {
     return true;
   }
   return false;  // not supported
+}
+
+void T1000SensorManager::cycleGpsPower() {
+  // GPS power cycling: 4.5 minutes on, 30 seconds off for battery optimization
+  static bool gps_currently_on = true;
+  static uint32_t gps_state_change = 0;
+  uint32_t now = millis();
+  
+  if (gps_currently_on && (now - gps_state_change > 270000)) { // 4.5 minutes
+    sleep_gps();
+    gps_currently_on = false;
+    gps_state_change = now;
+  } 
+  else if (!gps_currently_on && (now - gps_state_change > 30000)) { // 30 seconds
+    start_gps();
+    gps_currently_on = true;
+    gps_state_change = now;
+  }
 }

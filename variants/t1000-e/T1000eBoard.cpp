@@ -1,8 +1,11 @@
 #include <Arduino.h>
 #include "T1000eBoard.h"
+#include "SimpleHardwareTimer.h"
 #include <Wire.h>
-
 #include <bluefruit.h>
+#ifdef PIN_BUZZER
+#include <NonBlockingRtttl.h>
+#endif
 
 void T1000eBoard::begin() {
   // for future use, sub-classes SHOULD call this from their begin()
@@ -22,7 +25,8 @@ void T1000eBoard::begin() {
 #endif
 
   Wire.begin();
-
+  SimpleHardwareTimer::init();
+  
   delay(10);   // give sx1262 some time to power up
 }
 
@@ -85,3 +89,92 @@ bool TrackerT1000eBoard::startOTAUpdate(const char* id, char reply[]) {
   return true;
 }
 #endif
+
+void T1000eBoard::loop() {
+  static uint32_t last_sleep_check = 0;
+  uint32_t now = millis();
+  
+  // Light sleep check every second
+  if (now - last_sleep_check > 1000) {
+    #ifdef PIN_BUZZER
+    if (!rtttl::isPlaying()) {
+      enterLightSleep(500);
+      wakeFromSleep();
+    }
+    #else
+    enterLightSleep(500);
+    wakeFromSleep();
+    #endif
+    
+    last_sleep_check = now;
+  }
+}
+
+void T1000eBoard::enterLightSleep(uint32_t timeout_ms) {
+  // Skip sleep if buzzer is active
+#ifdef PIN_BUZZER
+  if (rtttl::isPlaying()) {
+    return;
+  }
+#endif
+
+  // Configure button wake-up
+#ifdef BUTTON_PIN
+  nrf_gpio_cfg_sense_input(
+    digitalPinToInterrupt(BUTTON_PIN),
+    NRF_GPIO_PIN_PULLDOWN,
+    NRF_GPIO_PIN_SENSE_HIGH
+  );
+#endif
+
+  if (timeout_ms == 0) {
+    sd_app_evt_wait();
+    return;
+  }
+
+  // Controlled sleep loop with timeout handling
+  uint32_t sleep_start = millis();
+  
+  while ((millis() - sleep_start) < timeout_ms) {
+    // Check for immediate wake conditions
+#ifdef BUTTON_PIN
+    if (digitalRead(BUTTON_PIN) == HIGH) {
+      return;
+    }
+#endif
+    
+#ifdef PIN_BUZZER
+    if (rtttl::isPlaying()) {
+      return;
+    }
+#endif
+    
+    uint32_t elapsed = millis() - sleep_start;
+    if (elapsed >= timeout_ms) {
+      break;
+    }
+    
+    sd_app_evt_wait();
+    
+#ifdef PIN_BUZZER
+    if (rtttl::isPlaying()) {
+      return;
+    }
+#endif
+    
+    if ((millis() - sleep_start) >= timeout_ms) {
+      break;
+    }
+  }
+}
+
+void T1000eBoard::wakeFromSleep() {
+  // Clean up GPIO configuration
+#ifdef BUTTON_PIN
+  nrf_gpio_cfg_input(digitalPinToInterrupt(BUTTON_PIN), NRF_GPIO_PIN_NOPULL);
+#endif
+}
+
+
+
+

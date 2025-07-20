@@ -194,7 +194,7 @@ class MyMesh : public mesh::Mesh, public CommonCLICallbacks {
         stats.n_packets_recv = radio_driver.getPacketsRecv();
         stats.n_packets_sent = radio_driver.getPacketsSent();
         stats.total_air_time_secs = getTotalAirTime() / 1000;
-        stats.total_up_time_secs = _ms->getMillis() / 1000;
+        stats.total_up_time_secs = getUptimeSecs();
         stats.n_sent_flood = getNumSentFlood();
         stats.n_sent_direct = getNumSentDirect();
         stats.n_recv_flood = getNumRecvFlood();
@@ -252,6 +252,14 @@ protected:
     if (_prefs.disable_fwd) return false;
     if (packet->isRouteFlood() && packet->path_len >= _prefs.flood_max) return false;
     return true;
+  }
+  
+  uint32_t getUptimeSecs() const {
+    if (_cli.bootTime == 0) {
+      return _ms->getMillis() / 1000;
+    } else {
+      return (getRTCClock()->getCurrentTime() - _cli.bootTime);
+    }
   }
 
   const char* getLogDateTime() override {
@@ -648,6 +656,10 @@ public:
 
   void setLoggingOn(bool enable) override { _logging = enable; }
 
+  void setBootTime(uint32_t boot_time) {
+    _cli.bootTime = boot_time;
+  }
+  
   void eraseLogFile() override {
     _fs->remove(PACKET_LOG_FILE);
   }

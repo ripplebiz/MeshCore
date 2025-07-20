@@ -304,7 +304,7 @@ class MyMesh : public mesh::Mesh, public CommonCLICallbacks {
         stats.n_packets_recv = radio_driver.getPacketsRecv();
         stats.n_packets_sent = radio_driver.getPacketsSent();
         stats.total_air_time_secs = getTotalAirTime() / 1000;
-        stats.total_up_time_secs = _ms->getMillis() / 1000;
+        stats.total_up_time_secs = getUptimeSecs();
         stats.n_sent_flood = getNumSentFlood();
         stats.n_sent_direct = getNumSentDirect();
         stats.n_recv_flood = getNumRecvFlood();
@@ -400,6 +400,14 @@ protected:
   int calcRxDelay(float score, uint32_t air_time) const override {
     if (_prefs.rx_delay_base <= 0.0f) return 0;
     return (int) ((pow(_prefs.rx_delay_base, 0.85f - score) - 1.0) * air_time);
+  }
+
+  uint32_t getUptimeSecs() const {
+    if (_cli.bootTime == 0) {
+      return _ms->getMillis() / 1000;
+    } else {
+      return (getRTCClock()->getCurrentTime() - _cli.bootTime);
+    }
   }
 
   const char* getLogDateTime() override {
@@ -813,6 +821,10 @@ public:
     } else {
       next_flood_advert = 0;  // stop the timer
     }
+  }
+
+  void setBootTime(uint32_t boot_time) {
+    _cli.bootTime = boot_time;   // set the boot time for CLI
   }
 
   void setLoggingOn(bool enable) override { _logging = enable; }

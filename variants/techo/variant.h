@@ -61,9 +61,9 @@
 ////////////////////////////////////////////////////////////////////////////////
 // Builtin LEDs
 
-#define LED_RED                 (34)
-#define LED_GREEN               (33)
-#define LED_BLUE                (14)
+#define LED_RED                 (-1)
+#define LED_GREEN               (-1)
+#define LED_BLUE                (-1)
 
 #define PIN_STATUS_LED          LED_GREEN
 #define LED_BUILTIN             LED_GREEN

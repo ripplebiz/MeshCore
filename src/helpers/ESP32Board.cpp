@@ -37,7 +37,7 @@ bool ESP32Board::startOTAUpdate(const char* id, char reply[]) {
   return true;
 }
 
-bool ESP32Board::startWiFi(char* ssid, char* password, bool apMode=false){
+bool ESP32Board::startWiFi(char* ssid, char* password, bool apMode){
 
 
   if(apMode){

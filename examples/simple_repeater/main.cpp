@@ -90,6 +90,8 @@
 
 #ifndef UDP_PACKET_BUFFER_SIZE
   #define UDP_PACKET_BUFFER_SIZE 10
+#endif
+
 #ifndef SERVER_RESPONSE_DELAY
   #define SERVER_RESPONSE_DELAY   300
 #endif

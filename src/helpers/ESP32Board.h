@@ -51,6 +51,15 @@ public:
   void onAfterTransmit() override {
     digitalWrite(P_LORA_TX_LED, LOW);   // turn TX LED off
   }
+#elif defined(P_LORA_TX_NEOPIXEL_LED)
+  #define NEOPIXEL_BRIGHTNESS    64  // white brightness (max 255)
+
+  void onBeforeTransmit() override {
+    neopixelWrite(P_LORA_TX_NEOPIXEL_LED, NEOPIXEL_BRIGHTNESS, NEOPIXEL_BRIGHTNESS, NEOPIXEL_BRIGHTNESS);   // turn TX neopixel on (White)
+  }
+  void onAfterTransmit() override {
+    neopixelWrite(P_LORA_TX_NEOPIXEL_LED, 0, 0, 0);   // turn TX neopixel off
+  }
 #endif
 
   uint16_t getBattMilliVolts() override {

@@ -16,6 +16,7 @@ public:
 class MeshTables {
 public:
   virtual bool hasSeen(const Packet* packet) = 0;
+  virtual void clear(const Packet* packet) = 0;   // remove this packet hash from table
 };
 
 /**
@@ -26,6 +27,11 @@ class Mesh : public Dispatcher {
   RTCClock* _rtc;
   RNG* _rng;
   MeshTables* _tables;
+
+  void removeSelfFromPath(Packet* packet);
+  void routeDirectRecvAcks(Packet* packet, uint32_t delay_millis);
+  //void routeRecvAcks(Packet* packet, uint32_t delay_millis);
+  DispatcherAction forwardMultipartDirect(Packet* pkt);
 
 protected:
   DispatcherAction onRecvPacket(Packet* pkt) override;
@@ -52,6 +58,11 @@ protected:
    * \returns  number of milliseconds delay to apply to retransmitting the given packet, for DIRECT mode.
    */
   virtual uint32_t getDirectRetransmitDelay(const Packet* packet);
+
+  /**
+   * \returns  number of extra (Direct) ACK transmissions wanted.
+   */
+  virtual uint8_t getExtraAckTransmitCount() const;
 
   /**
    * \brief  Perform search of local DB of peers/contacts.
@@ -106,10 +117,10 @@ protected:
   /**
    * \brief  A (now decrypted) data packet has been received.
    *         NOTE: these can be received multiple times (per sender/contents), via different routes
-   * \param  type  one of: PAYLOAD_TYPE_ANON_REQ
+   * \param  secret  ECDH shared secret
    * \param  sender  public key provided by sender
   */
-  virtual void onAnonDataRecv(Packet* packet, uint8_t type, const Identity& sender, uint8_t* data, size_t len) { }
+  virtual void onAnonDataRecv(Packet* packet, const uint8_t* secret, const Identity& sender, uint8_t* data, size_t len) { }
 
   /**
    * \brief  A path TO 'sender' has been received. (also with optional 'extra' data encoded)
@@ -164,6 +175,7 @@ public:
   Packet* createAnonDatagram(uint8_t type, const LocalIdentity& sender, const Identity& dest, const uint8_t* secret, const uint8_t* data, size_t data_len);
   Packet* createGroupDatagram(uint8_t type, const GroupChannel& channel, const uint8_t* data, size_t data_len);
   Packet* createAck(uint32_t ack_crc);
+  Packet* createMultiAck(uint32_t ack_crc, uint8_t remaining);
   Packet* createPathReturn(const uint8_t* dest_hash, const uint8_t* secret, const uint8_t* path, uint8_t path_len, uint8_t extra_type, const uint8_t*extra, size_t extra_len);
   Packet* createPathReturn(const Identity& dest, const uint8_t* secret, const uint8_t* path, uint8_t path_len, uint8_t extra_type, const uint8_t*extra, size_t extra_len);
   Packet* createRawData(const uint8_t* data, size_t len);

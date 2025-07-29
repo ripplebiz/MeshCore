@@ -8,7 +8,7 @@
       "extra_flags": "-DARDUINO_NRF52840_FEATHER -DNRF52840_XXAA",
       "f_cpu": "64000000L",
       "hwids": [
-        [ 
+        [
           "0x239A",
           "0x00B3"
         ],
@@ -51,7 +51,8 @@
     ],
     "debug": {
       "jlink_device": "nRF52840_xxAA",
-      "svd_path": "nrf52840.svd"
+      "svd_path": "nrf52840.svd",
+      "openocd_target": "nrf52.cfg"
     },
     "frameworks": [
       "arduino",

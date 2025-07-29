@@ -8,6 +8,15 @@ PacketQueue::PacketQueue(int max_entries) {
   _num = 0;
 }
 
+int PacketQueue::countBefore(uint32_t now) const {
+  int n = 0;
+  for (int j = 0; j < _num; j++) {
+    if (_schedule_table[j] > now) continue;   // scheduled for future... ignore for now
+    n++;
+  }
+  return n;
+}
+
 mesh::Packet* PacketQueue::get(uint32_t now) {
   uint8_t min_pri = 0xFF;
   int best_idx = -1;
@@ -81,8 +90,8 @@ mesh::Packet* StaticPoolPacketManager::getNextOutbound(uint32_t now) {
   return send_queue.get(now);
 }
 
-int  StaticPoolPacketManager::getOutboundCount() const {
-  return send_queue.count();
+int  StaticPoolPacketManager::getOutboundCount(uint32_t now) const {
+  return send_queue.countBefore(now);
 }
 
 int StaticPoolPacketManager::getFreeCount() const {

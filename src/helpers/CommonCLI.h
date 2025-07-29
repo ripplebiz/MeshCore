@@ -21,9 +21,11 @@ struct NodePrefs {  // persisted to file
     uint8_t sf;
     uint8_t cr;
     uint8_t allow_read_only;
-    uint8_t reserved2;
+    uint8_t multi_acks;
     float bw;
     uint8_t flood_max;
+    uint8_t interference_threshold;
+    uint8_t agc_reset_interval;   // secs / 4
     bool wifi_enable;
     bool wifi_ap_enable;
     char wifi_ssid[32];
@@ -47,25 +49,26 @@ public:
   virtual void eraseLogFile() = 0;
   virtual void dumpLogFile() = 0;
   virtual void setTxPower(uint8_t power_dbm) = 0;
+  virtual void formatNeighborsReply(char *reply) = 0;
+  virtual const uint8_t* getSelfIdPubKey() = 0;
+  virtual void clearStats() = 0;
+  virtual void applyTempRadioParams(float freq, float bw, uint8_t sf, uint8_t cr, int timeout_mins) = 0;
 };
 
 class CommonCLI {
-  mesh::Mesh* _mesh;
+  mesh::RTCClock* _rtc;
   NodePrefs* _prefs;
   CommonCLICallbacks* _callbacks;
   mesh::MainBoard* _board;
   char tmp[80];
 
-  mesh::RTCClock* getRTCClock() { return _mesh->getRTCClock(); }
-  void savePrefs() { _callbacks->savePrefs(); }
-
-  void checkAdvertInterval();
-
+  mesh::RTCClock* getRTCClock() { return _rtc; }
+  void savePrefs();
   void loadPrefsInt(FILESYSTEM* _fs, const char* filename);
 
 public:
-  CommonCLI(mesh::MainBoard& board, mesh::Mesh* mesh, NodePrefs* prefs, CommonCLICallbacks* callbacks)
-      : _board(&board), _mesh(mesh), _prefs(prefs), _callbacks(callbacks) { }
+  CommonCLI(mesh::MainBoard& board, mesh::RTCClock& rtc, NodePrefs* prefs, CommonCLICallbacks* callbacks)
+      : _board(&board), _rtc(&rtc), _prefs(prefs), _callbacks(callbacks) { }
 
   void loadPrefs(FILESYSTEM* _fs);
   void savePrefs(FILESYSTEM* _fs);

@@ -1,8 +1,10 @@
 #pragma once
 
 #include <Arduino.h>
+#include <helpers/RefCountedDigitalPin.h>
 
 // LoRa radio module pins for Heltec V3
+// Also for Heltec Wireless Tracker/Paper
 #define  P_LORA_DIO_1   14
 #define  P_LORA_NSS      8
 #define  P_LORA_RESET   RADIOLIB_NC
@@ -12,12 +14,15 @@
 #define  P_LORA_MOSI    10
 
 // built-ins
-#define  PIN_VBAT_READ    1
-#define  PIN_ADC_CTRL    37
+#ifndef PIN_VBAT_READ              // set in platformio.ini for boards like Heltec Wireless Paper (20)
+  #define  PIN_VBAT_READ    1
+#endif
+#ifndef PIN_ADC_CTRL              // set in platformio.ini for Heltec Wireless Tracker (2)
+  #define  PIN_ADC_CTRL    37
+#endif
 #define  PIN_ADC_CTRL_ACTIVE    LOW
 #define  PIN_ADC_CTRL_INACTIVE  HIGH
-#define  PIN_LED_BUILTIN 35
-#define  PIN_VEXT_EN     36
+//#define  PIN_LED_BUILTIN 35
 
 #include "ESP32Board.h"
 
@@ -28,6 +33,10 @@ private:
   bool adc_active_state;
 
 public:
+  RefCountedDigitalPin periph_power;
+
+  HeltecV3Board() : periph_power(PIN_VEXT_EN) { }
+
   void begin() {
     ESP32Board::begin();
 
@@ -38,8 +47,7 @@ public:
     pinMode(PIN_ADC_CTRL, OUTPUT);
     digitalWrite(PIN_ADC_CTRL, !adc_active_state); // Initially inactive
 
-    pinMode(PIN_VEXT_EN, OUTPUT);
-    digitalWrite(PIN_VEXT_EN, LOW);  // for V3.2 boards
+    periph_power.begin();
 
     esp_reset_reason_t reason = esp_reset_reason();
     if (reason == ESP_RST_DEEPSLEEP) {
@@ -93,7 +101,7 @@ public:
 
     digitalWrite(PIN_ADC_CTRL, !adc_active_state);
 
-    return (5.2 * (3.3 / 1024.0) * raw) * 1000;
+    return (5.42 * (3.3 / 1024.0) * raw) * 1000;
   }
 
   const char* getManufacturerName() const override {

@@ -41,8 +41,8 @@
 ////////////////////////////////////////////////////////////////////////////////
 // UART pin definition
 
-#define PIN_SERIAL1_RX          (39)
-#define PIN_SERIAL1_TX          (37)
+#define PIN_SERIAL1_RX          (37)
+#define PIN_SERIAL1_TX          (39)
 
 #define PIN_SERIAL2_RX          (9)
 #define PIN_SERIAL2_TX          (10)
@@ -69,10 +69,10 @@
 #define LED_BUILTIN             (35)
 #define PIN_LED                 LED_BUILTIN
 #define LED_RED                 LED_BUILTIN
-#define LED_BLUE                LED_BUILTIN
+#define LED_BLUE                (-1)            // No blue led, prevents Bluefruit flashing the green LED during advertising
 #define LED_PIN                 LED_BUILTIN
 
-#define LED_STATE_ON            HIGH
+#define LED_STATE_ON            LOW
 
 #define PIN_NEOPIXEL            (14)
 #define NEOPIXEL_NUM            (2)
@@ -80,11 +80,13 @@
 ////////////////////////////////////////////////////////////////////////////////
 // Builtin buttons
 
-#define PIN_BUTTON1             (5)
+#define PIN_BUTTON1             (42)
 #define BUTTON_PIN              PIN_BUTTON1
 
-#define PIN_BUTTON2             (11)
-#define BUTTON_PIN2             PIN_BUTTON2
+// #define PIN_BUTTON2             (11)
+// #define BUTTON_PIN2             PIN_BUTTON2
+
+#define PIN_USER_BTN            BUTTON_PIN
 
 #define EXTERNAL_FLASH_DEVICES MX25R1635F
 #define EXTERNAL_FLASH_USE_QSPI
@@ -107,4 +109,21 @@
 ////////////////////////////////////////////////////////////////////////////////
 // Buzzer
 
-#define PIN_BUZZER              (46)
+// #define PIN_BUZZER              (46)
+
+
+////////////////////////////////////////////////////////////////////////////////
+// GPS
+
+#define GPS_EN                  (21)
+#define GPS_RESET               (38)
+
+////////////////////////////////////////////////////////////////////////////////
+// TFT
+#define PIN_TFT_SCL             (40)
+#define PIN_TFT_SDA             (41)
+#define PIN_TFT_RST             (2)
+#define PIN_TFT_VDD_CTL         (3)
+#define PIN_TFT_LEDA_CTL        (15)
+#define PIN_TFT_CS              (11)
+#define PIN_TFT_DC              (12)

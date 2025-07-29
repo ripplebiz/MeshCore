@@ -68,7 +68,7 @@ public:
     }
     raw = raw / 8;
 
-    return (1.883 * (2 / 1024.0) * raw) * 1000;
+    return (1.98 * (2 / 1024.0) * raw) * 1000;
   }
 
   const char* getManufacturerName() const override {

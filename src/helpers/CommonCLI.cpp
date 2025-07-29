@@ -24,7 +24,11 @@ void CommonCLI::loadPrefs(FILESYSTEM* fs) {
 }
 
 void CommonCLI::loadPrefsInt(FILESYSTEM* fs, const char* filename) {
+#if defined(RP2040_PLATFORM)
+  File file = fs->open(filename, "r");
+#else
   File file = fs->open(filename);
+#endif
   if (file) {
     uint8_t pad[8];
 
@@ -47,17 +51,21 @@ void CommonCLI::loadPrefsInt(FILESYSTEM* fs, const char* filename) {
     file.read((uint8_t *) &_prefs->sf, sizeof(_prefs->sf));  // 112
     file.read((uint8_t *) &_prefs->cr, sizeof(_prefs->cr));  // 113
     file.read((uint8_t *) &_prefs->allow_read_only, sizeof(_prefs->allow_read_only));  // 114
-    file.read((uint8_t *) &_prefs->reserved2, sizeof(_prefs->reserved2));  // 115
+    file.read((uint8_t *) &_prefs->multi_acks, sizeof(_prefs->multi_acks));  // 115
     file.read((uint8_t *) &_prefs->bw, sizeof(_prefs->bw));  // 116
-    file.read(pad, 4);   // 120
+    file.read((uint8_t *) &_prefs->agc_reset_interval, sizeof(_prefs->agc_reset_interval));  // 120
+    file.read(pad, 3);   // 121
     file.read((uint8_t *) &_prefs->flood_max, sizeof(_prefs->flood_max));   // 124
     file.read((uint8_t *) &_prefs->flood_advert_interval, sizeof(_prefs->flood_advert_interval));  // 125
-    file.read((uint8_t*) &_prefs->wifi_enable, sizeof(_prefs->wifi_enable));         //126
-    file.read((uint8_t*) &_prefs->wifi_ap_enable, sizeof(_prefs->wifi_ap_enable));   //127
-    file.read((uint8_t*) &_prefs->wifi_ssid, sizeof(_prefs->wifi_ssid));             //128
-    file.read((uint8_t*) &_prefs->wifi_password, sizeof(_prefs->wifi_password));     //160
-    file.read((uint8_t*) &_prefs->udp_bridge_enable, sizeof(_prefs->udp_bridge_enable));  //192
-    file.read((uint8_t*) &_prefs->udp_bridge_server_port, sizeof(_prefs->udp_bridge_server_port));  //193
+
+    file.read((uint8_t *) &_prefs->interference_threshold, sizeof(_prefs->interference_threshold));  // 126
+
+    file.read((uint8_t*) &_prefs->wifi_enable, sizeof(_prefs->wifi_enable));         //127
+    file.read((uint8_t*) &_prefs->wifi_ap_enable, sizeof(_prefs->wifi_ap_enable));   //128
+    file.read((uint8_t*) &_prefs->wifi_ssid, sizeof(_prefs->wifi_ssid));             //129
+    file.read((uint8_t*) &_prefs->wifi_password, sizeof(_prefs->wifi_password));     //161
+    file.read((uint8_t*) &_prefs->udp_bridge_enable, sizeof(_prefs->udp_bridge_enable));  //193
+    file.read((uint8_t*) &_prefs->udp_bridge_server_port, sizeof(_prefs->udp_bridge_server_port));  //194
 
 
     // sanitise bad pref values
@@ -70,15 +78,18 @@ void CommonCLI::loadPrefsInt(FILESYSTEM* fs, const char* filename) {
     _prefs->sf = constrain(_prefs->sf, 7, 12);
     _prefs->cr = constrain(_prefs->cr, 5, 8);
     _prefs->tx_power_dbm = constrain(_prefs->tx_power_dbm, 1, 30);
+    _prefs->multi_acks = constrain(_prefs->multi_acks, 0, 1);
 
     file.close();
   }
 }
 
 void CommonCLI::savePrefs(FILESYSTEM* fs) {
-#if defined(NRF52_PLATFORM)
+#if defined(NRF52_PLATFORM) || defined(STM32_PLATFORM)
+  fs->remove("/com_prefs");
   File file = fs->open("/com_prefs", FILE_O_WRITE);
-  if (file) { file.seek(0); file.truncate(); }
+#elif defined(RP2040_PLATFORM)
+  File file = fs->open("/com_prefs", "w");
 #else
   File file = fs->open("/com_prefs", "w", true);
 #endif
@@ -105,49 +116,49 @@ void CommonCLI::savePrefs(FILESYSTEM* fs) {
     file.write((uint8_t *) &_prefs->sf, sizeof(_prefs->sf));  // 112
     file.write((uint8_t *) &_prefs->cr, sizeof(_prefs->cr));  // 113
     file.write((uint8_t *) &_prefs->allow_read_only, sizeof(_prefs->allow_read_only));  // 114
-    file.write((uint8_t *) &_prefs->reserved2, sizeof(_prefs->reserved2));  // 115
+    file.write((uint8_t *) &_prefs->multi_acks, sizeof(_prefs->multi_acks));  // 115
     file.write((uint8_t *) &_prefs->bw, sizeof(_prefs->bw));  // 116
-    file.write(pad, 4);   // 120
+    file.write((uint8_t *) &_prefs->agc_reset_interval, sizeof(_prefs->agc_reset_interval));  // 120
+    file.write(pad, 3);   // 121
     file.write((uint8_t *) &_prefs->flood_max, sizeof(_prefs->flood_max));   // 124
     file.write((uint8_t *) &_prefs->flood_advert_interval, sizeof(_prefs->flood_advert_interval));  // 125
-    file.write((uint8_t*) &_prefs->wifi_enable, sizeof(_prefs->wifi_enable));         //126
-    file.write((uint8_t*) &_prefs->wifi_ap_enable, sizeof(_prefs->wifi_ap_enable));   //127
-    file.write((uint8_t*) &_prefs->wifi_ssid, sizeof(_prefs->wifi_ssid));             //128
-    file.write((uint8_t*) &_prefs->wifi_password, sizeof(_prefs->wifi_password));     //160
-    file.write((uint8_t*) &_prefs->udp_bridge_enable, sizeof(_prefs->udp_bridge_enable));  //192
-    file.write((uint8_t*) &_prefs->udp_bridge_server_port, sizeof(_prefs->udp_bridge_server_port));  //193
     
+    file.write((uint8_t *) &_prefs->interference_threshold, sizeof(_prefs->interference_threshold));  // 126
+
+    file.write((uint8_t*) &_prefs->wifi_enable, sizeof(_prefs->wifi_enable));         //127
+    file.write((uint8_t*) &_prefs->wifi_ap_enable, sizeof(_prefs->wifi_ap_enable));   //128
+    file.write((uint8_t*) &_prefs->wifi_ssid, sizeof(_prefs->wifi_ssid));             //129
+    file.write((uint8_t*) &_prefs->wifi_password, sizeof(_prefs->wifi_password));     //161
+    file.write((uint8_t*) &_prefs->udp_bridge_enable, sizeof(_prefs->udp_bridge_enable));  //193
+    file.write((uint8_t*) &_prefs->udp_bridge_server_port, sizeof(_prefs->udp_bridge_server_port));  //194
+    
+
     file.close();
   }
 }
 
 #define MIN_LOCAL_ADVERT_INTERVAL   60
 
-void CommonCLI::checkAdvertInterval() {
+void CommonCLI::savePrefs() {
   if (_prefs->advert_interval * 2 < MIN_LOCAL_ADVERT_INTERVAL) {
     _prefs->advert_interval = 0;  // turn it off, now that device has been manually configured
   }
+  _callbacks->savePrefs();
 }
 
 void CommonCLI::handleCommand(uint32_t sender_timestamp, const char* command, char* reply) {
-    while (*command == ' ') command++;   // skip leading spaces
-
-    if (strlen(command) > 4 && command[2] == '|') {  // optional prefix (for companion radio CLI)
-      memcpy(reply, command, 3);  // reflect the prefix back
-      reply += 3;
-      command += 3;
-    }
-
     if (memcmp(command, "reboot", 6) == 0) {
       _board->reboot();  // doesn't return
     } else if (memcmp(command, "advert", 6) == 0) {
-      _callbacks->sendSelfAdvertisement(400);
+      _callbacks->sendSelfAdvertisement(1500);  // longer delay, give CLI response time to be sent first
       strcpy(reply, "OK - Advert sent");
     } else if (memcmp(command, "clock sync", 10) == 0) {
       uint32_t curr = getRTCClock()->getCurrentTime();
       if (sender_timestamp > curr) {
         getRTCClock()->setCurrentTime(sender_timestamp + 1);
-        strcpy(reply, "OK - clock set");
+        uint32_t now = getRTCClock()->getCurrentTime();
+        DateTime dt = DateTime(now);
+        sprintf(reply, "OK - clock set: %02d:%02d - %d/%d/%d UTC", dt.hour(), dt.minute(), dt.day(), dt.month(), dt.year());
       } else {
         strcpy(reply, "ERR: clock cannot go backwards");
       }
@@ -164,20 +175,47 @@ void CommonCLI::handleCommand(uint32_t sender_timestamp, const char* command, ch
       uint32_t curr = getRTCClock()->getCurrentTime();
       if (secs > curr) {
         getRTCClock()->setCurrentTime(secs);
-        strcpy(reply, "(OK - clock set!)");
+        uint32_t now = getRTCClock()->getCurrentTime();
+        DateTime dt = DateTime(now);
+        sprintf(reply, "OK - clock set: %02d:%02d - %d/%d/%d UTC", dt.hour(), dt.minute(), dt.day(), dt.month(), dt.year());
       } else {
         strcpy(reply, "(ERR: clock cannot go backwards)");
+      }
+    } else if (memcmp(command, "neighbors", 9) == 0) {
+      _callbacks->formatNeighborsReply(reply);
+    } else if (memcmp(command, "tempradio ", 10) == 0) {
+      strcpy(tmp, &command[10]);
+      const char *parts[5];
+      int num = mesh::Utils::parseTextParts(tmp, parts, 5);
+      float freq  = num > 0 ? atof(parts[0]) : 0.0f;
+      float bw    = num > 1 ? atof(parts[1]) : 0.0f;
+      uint8_t sf  = num > 2 ? atoi(parts[2]) : 0;
+      uint8_t cr  = num > 3 ? atoi(parts[3]) : 0;
+      int temp_timeout_mins  = num > 4 ? atoi(parts[4]) : 0;
+      if (freq >= 300.0f && freq <= 2500.0f && sf >= 7 && sf <= 12 && cr >= 5 && cr <= 8 && bw >= 7.0f && bw <= 500.0f && temp_timeout_mins > 0) {
+        _callbacks->applyTempRadioParams(freq, bw, sf, cr, temp_timeout_mins);
+        sprintf(reply, "OK - temp params for %d mins", temp_timeout_mins);
+      } else {
+        strcpy(reply, "Error, invalid params");
       }
     } else if (memcmp(command, "password ", 9) == 0) {
       // change admin password
       StrHelper::strncpy(_prefs->password, &command[9], sizeof(_prefs->password));
-      checkAdvertInterval();
       savePrefs();
       sprintf(reply, "password now: %s", _prefs->password);   // echo back just to let admin know for sure!!
+    } else if (memcmp(command, "clear stats", 11) == 0) {
+      _callbacks->clearStats();
+      strcpy(reply, "(OK - stats reset)");
     } else if (memcmp(command, "get ", 4) == 0) {
       const char* config = &command[4];
       if (memcmp(config, "af", 2) == 0) {
         sprintf(reply, "> %s", StrHelper::ftoa(_prefs->airtime_factor));
+      } else if (memcmp(config, "int.thresh", 10) == 0) {
+        sprintf(reply, "> %d", (uint32_t) _prefs->interference_threshold);
+      } else if (memcmp(config, "agc.reset.interval", 18) == 0) {
+        sprintf(reply, "> %d", ((uint32_t) _prefs->agc_reset_interval) * 4);
+      } else if (memcmp(config, "multi.acks", 10) == 0) {
+        sprintf(reply, "> %d", (uint32_t) _prefs->multi_acks);
       } else if (memcmp(config, "allow.read.only", 15) == 0) {
         sprintf(reply, "> %s", _prefs->allow_read_only ? "on" : "off");
       } else if (memcmp(config, "flood.advert.interval", 21) == 0) {
@@ -225,7 +263,7 @@ void CommonCLI::handleCommand(uint32_t sender_timestamp, const char* command, ch
         sprintf(reply, "> %s", StrHelper::ftoa(_prefs->freq));
       } else if (memcmp(config, "public.key", 10) == 0) {
         strcpy(reply, "> ");
-        mesh::Utils::toHex(&reply[2], _mesh->self_id.pub_key, PUB_KEY_SIZE);
+        mesh::Utils::toHex(&reply[2], _callbacks->getSelfIdPubKey(), PUB_KEY_SIZE);
       } else if (memcmp(config, "role", 4) == 0) {
         sprintf(reply, "> %s", _callbacks->getRole());
       } else {
@@ -237,16 +275,26 @@ void CommonCLI::handleCommand(uint32_t sender_timestamp, const char* command, ch
         _prefs->airtime_factor = atof(&config[3]);
         savePrefs();
         strcpy(reply, "OK");
+      } else if (memcmp(config, "int.thresh ", 11) == 0) {
+        _prefs->interference_threshold = atoi(&config[11]);
+        savePrefs();
+        strcpy(reply, "OK");
+      } else if (memcmp(config, "agc.reset.interval ", 19) == 0) {
+        _prefs->agc_reset_interval = atoi(&config[19]) / 4;
+        savePrefs();
+        strcpy(reply, "OK");
+      } else if (memcmp(config, "multi.acks ", 11) == 0) {
+        _prefs->multi_acks = atoi(&config[11]);
+        savePrefs();
+        strcpy(reply, "OK");
       } else if (memcmp(config, "allow.read.only ", 16) == 0) {
         _prefs->allow_read_only = memcmp(&config[16], "on", 2) == 0;
         savePrefs();
         strcpy(reply, "OK");
       } else if (memcmp(config, "flood.advert.interval ", 22) == 0) {
         int hours = _atoi(&config[22]);
-        if (hours > 0 && hours < 3) {
-          sprintf(reply, "Error: min is 3 hours");
-        } else if (hours > 48) {
-          strcpy(reply, "Error: max is 48 hours");
+        if ((hours > 0 && hours < 3) || (hours > 48)) {
+          strcpy(reply, "Error: interval range is 3-48 hours");
         } else {
           _prefs->flood_advert_interval = (uint8_t)(hours);
           _callbacks->updateFloodAdvertTimer();
@@ -255,10 +303,8 @@ void CommonCLI::handleCommand(uint32_t sender_timestamp, const char* command, ch
         }
       } else if (memcmp(config, "advert.interval ", 16) == 0) {
         int mins = _atoi(&config[16]);
-        if (mins > 0 && mins < MIN_LOCAL_ADVERT_INTERVAL) {
-          sprintf(reply, "Error: min is %d mins", MIN_LOCAL_ADVERT_INTERVAL);
-        } else if (mins > 240) {
-          strcpy(reply, "Error: max is 240 mins");
+        if ((mins > 0 && mins < MIN_LOCAL_ADVERT_INTERVAL) || (mins > 240)) {
+          sprintf(reply, "Error: interval range is %d-240 minutes", MIN_LOCAL_ADVERT_INTERVAL);
         } else {
           _prefs->advert_interval = (uint8_t)(mins / 2);
           _callbacks->updateAdvertTimer();
@@ -271,7 +317,6 @@ void CommonCLI::handleCommand(uint32_t sender_timestamp, const char* command, ch
         strcpy(reply, "OK");
       } else if (memcmp(config, "name ", 5) == 0) {
         StrHelper::strncpy(_prefs->node_name, &config[5], sizeof(_prefs->node_name));
-        checkAdvertInterval();
         savePrefs();
         strcpy(reply, "OK");
       } else if (memcmp(config, "repeat ", 7) == 0) {
@@ -298,12 +343,10 @@ void CommonCLI::handleCommand(uint32_t sender_timestamp, const char* command, ch
         }
       } else if (memcmp(config, "lat ", 4) == 0) {
         _prefs->node_lat = atof(&config[4]);
-        checkAdvertInterval();
         savePrefs();
         strcpy(reply, "OK");
       } else if (memcmp(config, "lon ", 4) == 0) {
         _prefs->node_lon = atof(&config[4]);
-        checkAdvertInterval();
         savePrefs();
         strcpy(reply, "OK");
       } else if (memcmp(config, "rxdelay ", 8) == 0) {
@@ -397,6 +440,6 @@ void CommonCLI::handleCommand(uint32_t sender_timestamp, const char* command, ch
       _callbacks->dumpLogFile();
       strcpy(reply, "   EOF");
     } else {
-      sprintf(reply, "Unknown: %s", command);
+      strcpy(reply, "Unknown command");
     }
 }

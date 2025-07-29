@@ -83,13 +83,13 @@ void initVariant()
   pinMode(GPS_RTC_INT, OUTPUT);
   pinMode(LED_PIN, OUTPUT);
 
-  digitalWrite(PIN_3V3_EN, HIGH);
+  digitalWrite(PIN_3V3_EN, LOW);
   digitalWrite(PIN_3V3_ACC_EN, LOW);
   digitalWrite(BUZZER_EN, LOW);
   digitalWrite(SENSOR_EN, LOW);
   digitalWrite(GPS_EN, LOW);
   digitalWrite(GPS_RESET, LOW);
-  digitalWrite(GPS_VRTC_EN, HIGH);
+  digitalWrite(GPS_VRTC_EN, LOW);
   digitalWrite(GPS_SLEEP_INT, HIGH);
   digitalWrite(GPS_RTC_INT, LOW);
   digitalWrite(LED_PIN, LOW);

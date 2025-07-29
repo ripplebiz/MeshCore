@@ -1,5 +1,7 @@
 #include <Arduino.h>
+#include "t1000e_sensors.h"
 #include "target.h"
+#include <helpers/sensors/MicroNMEALocationProvider.h>
 
 T1000eBoard board;
 
@@ -8,6 +10,12 @@ RADIO_CLASS radio = new Module(P_LORA_NSS, P_LORA_DIO_1, P_LORA_RESET, P_LORA_BU
 WRAPPER_CLASS radio_driver(radio, board);
 
 VolatileRTCClock rtc_clock;
+MicroNMEALocationProvider nmea = MicroNMEALocationProvider(Serial1, &rtc_clock);
+T1000SensorManager sensors = T1000SensorManager(nmea);
+
+#ifdef DISPLAY_CLASS
+  NullDisplayDriver display;
+#endif
 
 #ifndef LORA_CR
   #define LORA_CR      5
@@ -46,14 +54,15 @@ bool radio_init() {
 
   SPI.setPins(P_LORA_MISO, P_LORA_SCLK, P_LORA_MOSI);
   SPI.begin();
-  int status = radio.begin(LORA_FREQ, LORA_BW, LORA_SF, LORA_CR, RADIOLIB_LR11X0_LORA_SYNC_WORD_PRIVATE, LORA_TX_POWER, 8, tcxo);
+  int status = radio.begin(LORA_FREQ, LORA_BW, LORA_SF, LORA_CR, RADIOLIB_LR11X0_LORA_SYNC_WORD_PRIVATE, LORA_TX_POWER, 16, tcxo);
   if (status != RADIOLIB_ERR_NONE) {
     Serial.print("ERROR: radio init failed: ");
     Serial.println(status);
     return false;  // fail
   }
   
-  radio.setCRC(1);
+  radio.setCRC(2);
+  radio.explicitHeader();
 
 #ifdef RF_SWITCH_TABLE
   radio.setRfSwitchTable(rfswitch_dios, rfswitch_table);
@@ -83,4 +92,118 @@ void radio_set_tx_power(uint8_t dbm) {
 mesh::LocalIdentity radio_new_identity() {
   RadioNoiseListener rng(radio);
   return mesh::LocalIdentity(&rng);  // create new random identity
+}
+
+void T1000SensorManager::start_gps() {
+  gps_active = true;
+  //_nmea->begin();
+  // this init sequence should be better 
+  // comes from seeed examples and deals with all gps pins
+  pinMode(GPS_EN, OUTPUT);
+  digitalWrite(GPS_EN, HIGH);
+  delay(10);
+  pinMode(GPS_VRTC_EN, OUTPUT);
+  digitalWrite(GPS_VRTC_EN, HIGH);
+  delay(10);
+       
+  pinMode(GPS_RESET, OUTPUT);
+  digitalWrite(GPS_RESET, HIGH);
+  delay(10);
+  digitalWrite(GPS_RESET, LOW);
+       
+  pinMode(GPS_SLEEP_INT, OUTPUT);
+  digitalWrite(GPS_SLEEP_INT, HIGH);
+  pinMode(GPS_RTC_INT, OUTPUT);
+  digitalWrite(GPS_RTC_INT, LOW);
+  pinMode(GPS_RESETB, INPUT_PULLUP);
+}
+
+void T1000SensorManager::sleep_gps() {
+  gps_active = false;
+  digitalWrite(GPS_VRTC_EN, HIGH);
+  digitalWrite(GPS_EN, LOW);
+  digitalWrite(GPS_RESET, HIGH);
+  digitalWrite(GPS_SLEEP_INT, HIGH);
+  digitalWrite(GPS_RTC_INT, LOW);
+  pinMode(GPS_RESETB, OUTPUT);
+  digitalWrite(GPS_RESETB, LOW);
+  //_nmea->stop();
+}
+
+void T1000SensorManager::stop_gps() {
+  gps_active = false;
+  digitalWrite(GPS_VRTC_EN, LOW);
+  digitalWrite(GPS_EN, LOW);
+  digitalWrite(GPS_RESET, HIGH);
+  digitalWrite(GPS_SLEEP_INT, HIGH);
+  digitalWrite(GPS_RTC_INT, LOW);
+  pinMode(GPS_RESETB, OUTPUT);
+  digitalWrite(GPS_RESETB, LOW);
+  //_nmea->stop();
+}
+
+
+bool T1000SensorManager::begin() {
+  // init GPS
+  Serial1.begin(115200);
+
+  // make sure gps pin are off
+  digitalWrite(GPS_VRTC_EN, LOW);
+  digitalWrite(GPS_RESET, LOW);
+  digitalWrite(GPS_SLEEP_INT, LOW);
+  digitalWrite(GPS_RTC_INT, LOW);
+  pinMode(GPS_RESETB, OUTPUT);
+  digitalWrite(GPS_RESETB, LOW);
+
+  return true;
+}
+
+bool T1000SensorManager::querySensors(uint8_t requester_permissions, CayenneLPP& telemetry) {
+  if (requester_permissions & TELEM_PERM_LOCATION) {   // does requester have permission?
+    telemetry.addGPS(TELEM_CHANNEL_SELF, node_lat, node_lon, node_altitude);
+  }
+  if (requester_permissions & TELEM_PERM_ENVIRONMENT) {
+    telemetry.addLuminosity(TELEM_CHANNEL_SELF, t1000e_get_light());
+    telemetry.addTemperature(TELEM_CHANNEL_SELF, t1000e_get_temperature());
+  }
+  return true;
+}
+
+void T1000SensorManager::loop() {
+  static long next_gps_update = 0;
+
+  _nmea->loop();
+
+  if (millis() > next_gps_update) {
+    if (gps_active && _nmea->isValid()) {
+      node_lat = ((double)_nmea->getLatitude())/1000000.;
+      node_lon = ((double)_nmea->getLongitude())/1000000.;
+      node_altitude = ((double)_nmea->getAltitude()) / 1000.0;
+      //Serial.printf("lat %f lon %f\r\n", _lat, _lon);
+    }
+    next_gps_update = millis() + 1000;
+  }
+}
+
+int T1000SensorManager::getNumSettings() const { return 1; }  // just one supported: "gps" (power switch)
+
+const char* T1000SensorManager::getSettingName(int i) const {
+  return i == 0 ? "gps" : NULL;
+}
+const char* T1000SensorManager::getSettingValue(int i) const {
+  if (i == 0) {
+    return gps_active ? "1" : "0";
+  }
+  return NULL;
+}
+bool T1000SensorManager::setSettingValue(const char* name, const char* value) {
+  if (strcmp(name, "gps") == 0) {
+    if (strcmp(value, "0") == 0) {
+      sleep_gps(); // sleep for faster fix !
+    } else {
+      start_gps();
+    }
+    return true;
+  }
+  return false;  // not supported
 }

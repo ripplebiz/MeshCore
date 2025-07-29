@@ -7,19 +7,7 @@
 
 #define MAX_TEXT_LEN    (10*CIPHER_BLOCK_SIZE)  // must be LESS than (MAX_PACKET_PAYLOAD - 4 - CIPHER_MAC_SIZE - 1)
 
-struct ContactInfo {
-  mesh::Identity id;
-  char name[32];
-  uint8_t type;   // on of ADV_TYPE_*
-  uint8_t flags;
-  int8_t out_path_len;
-  uint8_t out_path[MAX_PATH_SIZE];
-  uint32_t last_advert_timestamp;   // by THEIR clock
-  uint8_t shared_secret[PUB_KEY_SIZE];
-  uint32_t lastmod;  // by OUR clock
-  int32_t gps_lat, gps_lon;    // 6 dec places
-  uint32_t sync_since;
-};
+#include "ContactInfo.h"
 
 #define MAX_SEARCH_RESULTS   8
 
@@ -61,10 +49,7 @@ struct ConnectionInfo {
   uint32_t expected_ack;
 };
 
-struct ChannelDetails {
-  mesh::GroupChannel channel;
-  char name[32];
-};
+#include "ChannelDetails.h"
 
 /**
  *  \brief  abstract Mesh class for common 'chat' client
@@ -87,6 +72,7 @@ class BaseChatMesh : public mesh::Mesh {
   ConnectionInfo connections[MAX_CONNECTIONS];
 
   mesh::Packet* composeMsgPacket(const ContactInfo& recipient, uint32_t timestamp, uint8_t attempt, const char *text, uint32_t& expected_ack);
+  void sendAckTo(const ContactInfo& dest, uint32_t ack_hash);
 
 protected:
   BaseChatMesh(mesh::Radio& radio, mesh::MillisecondClock& ms, mesh::RNG& rng, mesh::RTCClock& rtc, mesh::PacketManager& mgr, mesh::MeshTables& tables)
@@ -103,7 +89,8 @@ protected:
   }
 
   // 'UI' concepts, for sub-classes to implement
-  virtual void onDiscoveredContact(ContactInfo& contact, bool is_new) = 0;
+  virtual bool isAutoAddEnabled() const { return true; }
+  virtual void onDiscoveredContact(ContactInfo& contact, bool is_new, uint8_t path_len, const uint8_t* path) = 0;
   virtual bool processAck(const uint8_t *data) = 0;
   virtual void onContactPathUpdated(const ContactInfo& contact) = 0;
   virtual void onMessageRecv(const ContactInfo& contact, mesh::Packet* pkt, uint32_t sender_timestamp, const char *text) = 0;
@@ -113,6 +100,7 @@ protected:
   virtual uint32_t calcDirectTimeoutMillisFor(uint32_t pkt_airtime_millis, uint8_t path_len) const = 0;
   virtual void onSendTimeout() = 0;
   virtual void onChannelMessageRecv(const mesh::GroupChannel& channel, mesh::Packet* pkt, uint32_t timestamp, const char *text) = 0;
+  virtual uint8_t onContactRequest(const ContactInfo& contact, uint32_t sender_timestamp, const uint8_t* data, uint8_t len, uint8_t* reply) = 0;
   virtual void onContactResponse(const ContactInfo& contact, const uint8_t* data, uint8_t len) = 0;
 
   // storage concepts, for sub-classes to override/implement
@@ -140,12 +128,14 @@ protected:
   void checkConnections();
 
 public:
-  mesh::Packet* createSelfAdvert(const char* name, double lat=0.0, double lon=0.0);
+  mesh::Packet* createSelfAdvert(const char* name);
+  mesh::Packet* createSelfAdvert(const char* name, double lat, double lon);
   int  sendMessage(const ContactInfo& recipient, uint32_t timestamp, uint8_t attempt, const char* text, uint32_t& expected_ack, uint32_t& est_timeout);
   int  sendCommandData(const ContactInfo& recipient, uint32_t timestamp, uint8_t attempt, const char* text, uint32_t& est_timeout);
   bool sendGroupMessage(uint32_t timestamp, mesh::GroupChannel& channel, const char* sender_name, const char* text, int text_len);
   int  sendLogin(const ContactInfo& recipient, const char* password, uint32_t& est_timeout);
-  int  sendStatusRequest(const ContactInfo& recipient, uint32_t& est_timeout);
+  int  sendRequest(const ContactInfo& recipient, uint8_t req_type, uint32_t& tag, uint32_t& est_timeout);
+  int  sendRequest(const ContactInfo& recipient, const uint8_t* req_data, uint8_t data_len, uint32_t& tag, uint32_t& est_timeout);
   bool shareContactZeroHop(const ContactInfo& contact);
   uint8_t exportContact(const ContactInfo& contact, uint8_t dest_buf[]);
   bool importContact(const uint8_t src_buf[], uint8_t len);
@@ -156,6 +146,7 @@ public:
   bool  removeContact(ContactInfo& contact);
   bool  addContact(const ContactInfo& contact);
   int getNumContacts() const { return num_contacts; }
+  bool getContactByIdx(uint32_t idx, ContactInfo& contact);
   ContactsIterator startContactsIterator();
   ChannelDetails* addChannel(const char* name, const char* psk_base64);
   bool getChannel(int idx, ChannelDetails& dest);

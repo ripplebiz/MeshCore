@@ -80,7 +80,32 @@ public:
     return false;
   }
 
+  void clear(const mesh::Packet* packet) override {
+    if (packet->getPayloadType() == PAYLOAD_TYPE_ACK) {
+      uint32_t ack;
+      memcpy(&ack, packet->payload, 4);
+      for (int i = 0; i < MAX_PACKET_ACKS; i++) {
+        if (ack == _acks[i]) { 
+          _acks[i] = 0;
+          break;
+        }
+      }
+    } else {
+      uint8_t hash[MAX_HASH_SIZE];
+      packet->calculatePacketHash(hash);
+
+      uint8_t* sp = _hashes;
+      for (int i = 0; i < MAX_PACKET_HASHES; i++, sp += MAX_HASH_SIZE) {
+        if (memcmp(hash, sp, MAX_HASH_SIZE) == 0) { 
+          memset(sp, 0, MAX_HASH_SIZE);
+          break;
+        }
+      }
+    }
+  }
+
   uint32_t getNumDirectDups() const { return _direct_dups; }
   uint32_t getNumFloodDups() const { return _flood_dups; }
 
+  void resetStats() { _direct_dups = _flood_dups = 0; }
 };

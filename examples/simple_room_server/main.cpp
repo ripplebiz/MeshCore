@@ -3,6 +3,8 @@
 
 #if defined(NRF52_PLATFORM)
   #include <InternalFileSystem.h>
+#elif defined(RP2040_PLATFORM)
+  #include <LittleFS.h>
 #elif defined(ESP32)
   #include <SPIFFS.h>
 #endif
@@ -20,11 +22,11 @@
 /* ------------------------------ Config -------------------------------- */
 
 #ifndef FIRMWARE_BUILD_DATE
-  #define FIRMWARE_BUILD_DATE   "30 Mar 2025"
+  #define FIRMWARE_BUILD_DATE   "24 Jul 2025"
 #endif
 
 #ifndef FIRMWARE_VERSION
-  #define FIRMWARE_VERSION   "v1.4.2"
+  #define FIRMWARE_VERSION   "v1.7.4"
 #endif
 
 #ifndef LORA_FREQ
@@ -65,11 +67,15 @@
   #define MAX_UNSYNCED_POSTS    32
 #endif
 
+#ifndef SERVER_RESPONSE_DELAY
+  #define SERVER_RESPONSE_DELAY   300
+#endif
+
+#ifndef TXT_ACK_DELAY
+  #define TXT_ACK_DELAY     200
+#endif
+
 #ifdef DISPLAY_CLASS
-  #include <helpers/ui/SSD1306Display.h>
-
-  static DISPLAY_CLASS  display;
-
   #include "UITask.h"
   static UITask ui_task(display);
 #endif
@@ -117,17 +123,20 @@ struct PostInfo {
 #define PUSH_TIMEOUT_BASE          4000
 #define PUSH_ACK_TIMEOUT_FACTOR    2000
 
-#define CLIENT_KEEP_ALIVE_SECS   128
+#define POST_SYNC_DELAY_SECS       6
 
-#define REQ_TYPE_GET_STATUS      0x01   // same as _GET_STATS
-#define REQ_TYPE_KEEP_ALIVE      0x02
+#define CLIENT_KEEP_ALIVE_SECS     0     // Now Disabled (was 128)
+
+#define REQ_TYPE_GET_STATUS          0x01   // same as _GET_STATS
+#define REQ_TYPE_KEEP_ALIVE          0x02
+#define REQ_TYPE_GET_TELEMETRY_DATA  0x03
 
 #define RESP_SERVER_LOGIN_OK      0   // response to ANON_REQ
 
 struct ServerStats {
   uint16_t batt_milli_volts;
   uint16_t curr_tx_queue_len;
-  uint16_t curr_free_queue_len;
+  int16_t  noise_floor;
   int16_t  last_rssi;
   uint32_t n_packets_recv;
   uint32_t n_packets_sent;
@@ -135,7 +144,7 @@ struct ServerStats {
   uint32_t total_up_time_secs;
   uint32_t n_sent_flood, n_sent_direct;
   uint32_t n_recv_flood, n_recv_direct;
-  uint16_t n_full_events;
+  uint16_t err_events;          // was 'n_full_events'
   int16_t  last_snr;   // x 4
   uint16_t n_direct_dups, n_flood_dups;
   uint16_t n_posted, n_post_push;
@@ -155,6 +164,12 @@ class MyMesh : public mesh::Mesh, public CommonCLICallbacks {
   int next_client_idx;  // for round-robin polling
   int next_post_idx;
   PostInfo posts[MAX_UNSYNCED_POSTS];   // cyclic queue
+  CayenneLPP telemetry;
+  unsigned long set_radio_at, revert_radio_at;
+  float pending_freq;
+  float pending_bw;
+  uint8_t pending_sf;
+  uint8_t pending_cr;
 
   ClientInfo* putClient(const mesh::Identity& id) {
     for (int i = 0; i < num_clients; i++) {
@@ -178,7 +193,6 @@ class MyMesh : public mesh::Mesh, public CommonCLICallbacks {
     newClient->id = id;
     newClient->out_path_len = -1;  // initially out_path is unknown
     newClient->last_timestamp = 0;
-    self_id.calcSharedSecret(newClient->secret, id);   // calc ECDH shared secret
     return newClient;
   }
 
@@ -204,7 +218,10 @@ class MyMesh : public mesh::Mesh, public CommonCLICallbacks {
   void pushPostToClient(ClientInfo* client, PostInfo& post) {
     int len = 0;
     memcpy(&reply_data[len], &post.post_timestamp, 4); len += 4;   // this is a PAST timestamp... but should be accepted by client
-    reply_data[len++] = (TXT_TYPE_SIGNED_PLAIN << 2);  // 'signed' plain text
+
+    uint8_t attempt;
+    getRNG()->random(&attempt, 1);   // need this for re-tries, so packet hash (and ACK) will be different
+    reply_data[len++] = (TXT_TYPE_SIGNED_PLAIN << 2) | (attempt & 3);  // 'signed' plain text
 
     // encode prefix of post.author.pub_key
     memcpy(&reply_data[len], post.author.pub_key, 4); len += 4;   // just first 4 bytes
@@ -230,6 +247,17 @@ class MyMesh : public mesh::Mesh, public CommonCLICallbacks {
       client->pending_ack = 0;
       MESH_DEBUG_PRINTLN("Unable to push post to client");
     }
+  }
+
+  uint8_t getUnsyncedCount(ClientInfo* client) {
+    uint8_t count = 0;
+    for (int k = 0; k < MAX_UNSYNCED_POSTS; k++) {
+      if (posts[k].post_timestamp > client->sync_since   // is new post for this Client?
+        && !posts[k].author.matches(client->id)) {    // don't push posts to the author
+        count++;
+      }
+    }
+    return count;
   }
 
   bool processAck(const uint8_t *data) {
@@ -259,10 +287,57 @@ class MyMesh : public mesh::Mesh, public CommonCLICallbacks {
   File openAppend(const char* fname) {
     #if defined(NRF52_PLATFORM)
       return _fs->open(fname, FILE_O_WRITE);
+    #elif defined(RP2040_PLATFORM)
+      return _fs->open(fname, "a");
     #else
       return _fs->open(fname, "a", true);
     #endif
     }
+
+  int handleRequest(ClientInfo* sender, uint32_t sender_timestamp, uint8_t* payload, size_t payload_len) {
+    // uint32_t now = getRTCClock()->getCurrentTimeUnique();
+    // memcpy(reply_data, &now, 4);   // response packets always prefixed with timestamp
+    memcpy(reply_data, &sender_timestamp, 4);   // reflect sender_timestamp back in response packet (kind of like a 'tag')
+   
+    switch (payload[0]) {
+      case REQ_TYPE_GET_STATUS: {
+        ServerStats stats;
+        stats.batt_milli_volts = board.getBattMilliVolts();
+        stats.curr_tx_queue_len = _mgr->getOutboundCount(0xFFFFFFFF);
+        stats.noise_floor = (int16_t)_radio->getNoiseFloor();
+        stats.last_rssi = (int16_t) radio_driver.getLastRSSI();
+        stats.n_packets_recv = radio_driver.getPacketsRecv();
+        stats.n_packets_sent = radio_driver.getPacketsSent();
+        stats.total_air_time_secs = getTotalAirTime() / 1000;
+        stats.total_up_time_secs = _ms->getMillis() / 1000;
+        stats.n_sent_flood = getNumSentFlood();
+        stats.n_sent_direct = getNumSentDirect();
+        stats.n_recv_flood = getNumRecvFlood();
+        stats.n_recv_direct = getNumRecvDirect();
+        stats.err_events = _err_flags;
+        stats.last_snr = (int16_t)(radio_driver.getLastSNR() * 4);
+        stats.n_direct_dups = ((SimpleMeshTables *)getTables())->getNumDirectDups();
+        stats.n_flood_dups = ((SimpleMeshTables *)getTables())->getNumFloodDups();
+        stats.n_posted = _num_posted;
+        stats.n_post_push = _num_post_pushes;
+
+        memcpy(&reply_data[4], &stats, sizeof(stats));
+        return 4 + sizeof(stats);
+      }
+
+      case REQ_TYPE_GET_TELEMETRY_DATA: {
+        telemetry.reset();
+        telemetry.addVoltage(TELEM_CHANNEL_SELF, (float)board.getBattMilliVolts() / 1000.0f);
+        // query other sensors -- target specific
+        sensors.querySensors(sender->permission == RoomPermission::ADMIN ? 0xFF : 0x00, telemetry);
+
+        uint8_t tlen = telemetry.getSize();
+        memcpy(&reply_data[4], telemetry.getBuffer(), tlen);
+        return 4 + tlen;  // reply_len
+      }
+    }
+    return 0;  // unknown command
+  }
 
 protected:
   float getAirtimeBudgetFactor() const override {
@@ -348,6 +423,15 @@ protected:
     uint32_t t = (_radio->getEstAirtimeFor(packet->path_len + packet->payload_len + 2) * _prefs.direct_tx_delay_factor);
     return getRNG()->nextInt(0, 6)*t;
   }
+  int getInterferenceThreshold() const override {
+    return _prefs.interference_threshold;
+  }
+  int getAGCResetInterval() const override {
+    return ((int)_prefs.agc_reset_interval) * 4000;   // milliseconds
+  }
+  uint8_t getExtraAckTransmitCount() const override {
+    return _prefs.multi_acks;
+  }
 
   bool allowPacketForward(const mesh::Packet* packet) override {
     if (_prefs.disable_fwd) return false;
@@ -355,8 +439,8 @@ protected:
     return true;
   }
 
-  void onAnonDataRecv(mesh::Packet* packet, uint8_t type, const mesh::Identity& sender, uint8_t* data, size_t len) override {
-    if (type == PAYLOAD_TYPE_ANON_REQ) {  // received an initial request by a possible admin client (unknown at this stage)
+  void onAnonDataRecv(mesh::Packet* packet, const uint8_t* secret, const mesh::Identity& sender, uint8_t* data, size_t len) override {
+    if (packet->getPayloadType() == PAYLOAD_TYPE_ANON_REQ) {  // received an initial request by a possible admin client (unknown at this stage)
       uint32_t sender_timestamp, sender_sync_since;
       memcpy(&sender_timestamp, data, 4);
       memcpy(&sender_sync_since, &data[4], 4);  // sender's "sync messags SINCE x" timestamp
@@ -388,6 +472,7 @@ protected:
       client->sync_since = sender_sync_since;
       client->pending_ack = 0;
       client->push_failures = 0;
+      memcpy(client->secret, secret, PUB_KEY_SIZE);
 
       uint32_t now = getRTCClock()->getCurrentTime();
       client->last_activity = now;
@@ -398,7 +483,7 @@ protected:
       reply_data[4] = RESP_SERVER_LOGIN_OK;
       reply_data[5] = (CLIENT_KEEP_ALIVE_SECS >> 4);  // NEW: recommended keep-alive interval (secs / 16)
       reply_data[6] = (perm == RoomPermission::ADMIN ? 1 : (perm == RoomPermission::GUEST ? 0 : 2));
-      reply_data[7] = 0;  // FUTURE: reserved
+      reply_data[7] = getUnsyncedCount(client);  // NEW
       memcpy(&reply_data[8], "OK", 2);  // REVISIT: not really needed
 
       next_push = futureMillis(PUSH_NOTIFY_DELAY_MILLIS);  // delay next push, give RESPONSE packet time to arrive first
@@ -407,14 +492,14 @@ protected:
         // let this sender know path TO here, so they can use sendDirect(), and ALSO encode the response
         mesh::Packet* path = createPathReturn(sender, client->secret, packet->path, packet->path_len,
                                               PAYLOAD_TYPE_RESPONSE, reply_data, 8 + 2);
-        if (path) sendFlood(path);
+        if (path) sendFlood(path, SERVER_RESPONSE_DELAY);
       } else {
         mesh::Packet* reply = createDatagram(PAYLOAD_TYPE_RESPONSE, sender, client->secret, reply_data, 8 + 2);
         if (reply) {
           if (client->out_path_len >= 0) {  // we have an out_path, so send DIRECT
-            sendDirect(reply, client->out_path, client->out_path_len);
+            sendDirect(reply, client->out_path, client->out_path_len, SERVER_RESPONSE_DELAY);
           } else {
-            sendFlood(reply);
+            sendFlood(reply, SERVER_RESPONSE_DELAY);
           }
         }
       }
@@ -478,7 +563,7 @@ protected:
             if (is_retry) {
               temp[5] = 0;  // no reply
             } else {
-              _cli.handleCommand(sender_timestamp, (const char *) &data[5], (char *) &temp[5]);
+              handleCommand(sender_timestamp, (char *) &data[5], (char *) &temp[5]);
               temp[4] = (TXT_TYPE_CLI_DATA << 2);  // attempt and flags,  (NOTE: legacy was: TXT_TYPE_PLAIN)
             }
             send_ack = false;
@@ -501,15 +586,22 @@ protected:
 
         uint32_t delay_millis;
         if (send_ack) {
-          mesh::Packet* ack = createAck(ack_hash);
-          if (ack) {
-            if (client->out_path_len < 0) {
-              sendFlood(ack);
-            } else {
-              sendDirect(ack, client->out_path, client->out_path_len);
+          if (client->out_path_len < 0) {
+            mesh::Packet* ack = createAck(ack_hash);
+            if (ack) sendFlood(ack, TXT_ACK_DELAY);
+            delay_millis = TXT_ACK_DELAY + REPLY_DELAY_MILLIS;
+          } else {
+            uint32_t d = TXT_ACK_DELAY;
+            if (getExtraAckTransmitCount() > 0) {
+              mesh::Packet* a1 = createMultiAck(ack_hash, 1);
+              if (a1) sendDirect(a1, client->out_path, client->out_path_len, d);
+              d += 300;
             }
+
+            mesh::Packet* a2 = createAck(ack_hash);
+            if (a2) sendDirect(a2, client->out_path, client->out_path_len, d);
+            delay_millis = d + REPLY_DELAY_MILLIS;
           }
-          delay_millis = REPLY_DELAY_MILLIS;
         } else {
           delay_millis = 0;
         }
@@ -528,9 +620,9 @@ protected:
           auto reply = createDatagram(PAYLOAD_TYPE_TXT_MSG, client->id, secret, temp, 5 + text_len);
           if (reply) {
             if (client->out_path_len < 0) {
-              sendFlood(reply, delay_millis);
+              sendFlood(reply, delay_millis + SERVER_RESPONSE_DELAY);
             } else {
-              sendDirect(reply, client->out_path, client->out_path_len, delay_millis);
+              sendDirect(reply, client->out_path, client->out_path_len, delay_millis + SERVER_RESPONSE_DELAY);
             }
           }
         }
@@ -572,47 +664,26 @@ protected:
 
             auto reply = createAck(ack_hash);
             if (reply) {
-              sendDirect(reply, client->out_path, client->out_path_len);
+              reply->payload[reply->payload_len++] = getUnsyncedCount(client);  // NEW: add unsynced counter to end of ACK packet
+              sendDirect(reply, client->out_path, client->out_path_len, SERVER_RESPONSE_DELAY);
             }
           }
-        } else if (data[4] == REQ_TYPE_GET_STATUS) {
-          ServerStats stats;
-          stats.batt_milli_volts = board.getBattMilliVolts();
-          stats.curr_tx_queue_len = _mgr->getOutboundCount();
-          stats.curr_free_queue_len = _mgr->getFreeCount();
-          stats.last_rssi = (int16_t) radio_driver.getLastRSSI();
-          stats.n_packets_recv = radio_driver.getPacketsRecv();
-          stats.n_packets_sent = radio_driver.getPacketsSent();
-          stats.total_air_time_secs = getTotalAirTime() / 1000;
-          stats.total_up_time_secs = _ms->getMillis() / 1000;
-          stats.n_sent_flood = getNumSentFlood();
-          stats.n_sent_direct = getNumSentDirect();
-          stats.n_recv_flood = getNumRecvFlood();
-          stats.n_recv_direct = getNumRecvDirect();
-          stats.n_full_events = getNumFullEvents();
-          stats.last_snr = (int16_t)(radio_driver.getLastSNR() * 4);
-          stats.n_direct_dups = ((SimpleMeshTables *)getTables())->getNumDirectDups();
-          stats.n_flood_dups = ((SimpleMeshTables *)getTables())->getNumFloodDups();
-          stats.n_posted = _num_posted;
-          stats.n_post_push = _num_post_pushes;
-
-          now = getRTCClock()->getCurrentTimeUnique();
-          memcpy(reply_data, &now, 4);   // response packets always prefixed with timestamp
-          memcpy(&reply_data[4], &stats, sizeof(stats));
-          uint8_t reply_len = 4 + sizeof(stats);
-
-          if (packet->isRouteFlood()) {
-            // let this sender know path TO here, so they can use sendDirect(), and ALSO encode the response
-            mesh::Packet* path = createPathReturn(client->id, secret, packet->path, packet->path_len,
-                                                  PAYLOAD_TYPE_RESPONSE, reply_data, reply_len);
-            if (path) sendFlood(path);
-          } else {
-            mesh::Packet* reply = createDatagram(PAYLOAD_TYPE_RESPONSE, client->id, secret, reply_data, reply_len);
-            if (reply) {
-              if (client->out_path_len >= 0) {  // we have an out_path, so send DIRECT
-                sendDirect(reply, client->out_path, client->out_path_len);
-              } else {
-                sendFlood(reply);
+        } else {
+          int reply_len = handleRequest(client, sender_timestamp, &data[4], len - 4);
+          if (reply_len > 0) {  // valid command
+            if (packet->isRouteFlood()) {
+              // let this sender know path TO here, so they can use sendDirect(), and ALSO encode the response
+              mesh::Packet* path = createPathReturn(client->id, secret, packet->path, packet->path_len,
+                                                    PAYLOAD_TYPE_RESPONSE, reply_data, reply_len);
+              if (path) sendFlood(path, SERVER_RESPONSE_DELAY);
+            } else {
+              mesh::Packet* reply = createDatagram(PAYLOAD_TYPE_RESPONSE, client->id, secret, reply_data, reply_len);
+              if (reply) {
+                if (client->out_path_len >= 0) {  // we have an out_path, so send DIRECT
+                  sendDirect(reply, client->out_path, client->out_path_len, SERVER_RESPONSE_DELAY);
+                } else {
+                  sendFlood(reply, SERVER_RESPONSE_DELAY);
+                }
               }
             }
           }
@@ -651,10 +722,11 @@ protected:
 public:
   MyMesh(mesh::MainBoard& board, mesh::Radio& radio, mesh::MillisecondClock& ms, mesh::RNG& rng, mesh::RTCClock& rtc, mesh::MeshTables& tables)
      : mesh::Mesh(radio, ms, rng, rtc, *new StaticPoolPacketManager(32), tables),
-      _cli(board, this, &_prefs, this)
+      _cli(board, rtc, &_prefs, this), telemetry(MAX_PACKET_PAYLOAD - 4)
   {
     next_local_advert = next_flood_advert = 0;
     _logging = false;
+    set_radio_at = revert_radio_at = 0;
 
     // defaults
     memset(&_prefs, 0, sizeof(_prefs));
@@ -674,6 +746,7 @@ public:
     _prefs.advert_interval = 1;  // default to 2 minutes for NEW installs
     _prefs.flood_advert_interval = 3;   // 3 hours
     _prefs.flood_max = 64;
+    _prefs.interference_threshold = 0;  // disabled 
   #ifdef ROOM_PASSWORD
     StrHelper::strncpy(_prefs.guest_password, ROOM_PASSWORD, sizeof(_prefs.guest_password));
   #endif
@@ -685,8 +758,6 @@ public:
     memset(posts, 0, sizeof(posts));
     _num_posted = _num_post_pushes = 0;
   }
-
-  CommonCLI* getCLI() { return &_cli; }
 
   void begin(FILESYSTEM* fs) {
     mesh::Mesh::begin();
@@ -705,14 +776,29 @@ public:
   const char* getBuildDate() override { return FIRMWARE_BUILD_DATE; }
   const char* getRole() override { return FIRMWARE_ROLE; }
   const char* getNodeName() { return _prefs.node_name; }
+  NodePrefs* getNodePrefs() { 
+    return &_prefs; 
+  }
 
   void savePrefs() override {
     _cli.savePrefs(_fs);
   }
 
+  void applyTempRadioParams(float freq, float bw, uint8_t sf, uint8_t cr, int timeout_mins) override {
+    set_radio_at = futureMillis(2000);   // give CLI reply some time to be sent back, before applying temp radio params
+    pending_freq = freq;
+    pending_bw = bw;
+    pending_sf = sf;
+    pending_cr = cr;
+
+    revert_radio_at = futureMillis(2000 + timeout_mins*60*1000);   // schedule when to revert radio params
+  }
+
   bool formatFileSystem() override {
     #if defined(NRF52_PLATFORM)
       return InternalFS.format();
+    #elif defined(RP2040_PLATFORM)
+      return LittleFS.format();
     #elif defined(ESP32)
       return SPIFFS.format();
     #else
@@ -752,7 +838,11 @@ public:
   }
 
   void dumpLogFile() override {
+  #if defined(RP2040_PLATFORM)
+    File f = _fs->open(PACKET_LOG_FILE, "r");
+  #else
     File f = _fs->open(PACKET_LOG_FILE);
+  #endif
     if (f) {
       while (f.available()) {
         int c = f.read();
@@ -765,6 +855,30 @@ public:
 
   void setTxPower(uint8_t power_dbm) override {
     radio_set_tx_power(power_dbm);
+  }
+
+  void formatNeighborsReply(char *reply) override {
+    strcpy(reply, "not supported");
+  }
+
+  const uint8_t* getSelfIdPubKey() override { return self_id.pub_key; }
+
+  void clearStats() override {
+    radio_driver.resetStats();
+    resetStats();
+    ((SimpleMeshTables *)getTables())->resetStats();
+  }
+
+  void handleCommand(uint32_t sender_timestamp, char* command, char* reply) {
+    while (*command == ' ') command++;   // skip leading spaces
+
+    if (strlen(command) > 4 && command[2] == '|') {  // optional prefix (for companion radio CLI)
+      memcpy(reply, command, 3);  // reflect the prefix back
+      reply += 3;
+      command += 3;
+    }
+
+    _cli.handleCommand(sender_timestamp, command, reply);  // common CLI commands
   }
 
   void loop() {
@@ -785,13 +899,15 @@ public:
       bool did_push = false;
       if (client->pending_ack == 0 && client->last_activity != 0 && client->push_failures < 3) {  // not already waiting for ACK, AND not evicted, AND retries not max
         MESH_DEBUG_PRINTLN("loop - checking for client %02X", (uint32_t) client->id.pub_key[0]);
+        uint32_t now = getRTCClock()->getCurrentTime();
         for (int k = 0, idx = next_post_idx; k < MAX_UNSYNCED_POSTS; k++) {
-          if (posts[idx].post_timestamp > client->sync_since   // is new post for this Client?
-            && !posts[idx].author.matches(client->id)) {    // don't push posts to the author
+          auto p = &posts[idx];
+          if (now >= p->post_timestamp + POST_SYNC_DELAY_SECS && p->post_timestamp > client->sync_since   // is new post for this Client?
+            && !p->author.matches(client->id)) {    // don't push posts to the author
             // push this post to Client, then wait for ACK
-            pushPostToClient(client, posts[idx]);
+            pushPostToClient(client, *p);
             did_push = true;
-            MESH_DEBUG_PRINTLN("loop - pushed to client %02X: %s", (uint32_t) client->id.pub_key[0], posts[idx].text);
+            MESH_DEBUG_PRINTLN("loop - pushed to client %02X: %s", (uint32_t) client->id.pub_key[0], p->text);
             break;
           }
           idx = (idx + 1) % MAX_UNSYNCED_POSTS;   // wrap to start of cyclic queue
@@ -822,6 +938,18 @@ public:
       updateAdvertTimer();   // schedule next local advert
     }
 
+    if (set_radio_at && millisHasNowPassed(set_radio_at)) {   // apply pending (temporary) radio params
+      set_radio_at = 0;  // clear timer
+      radio_set_params(pending_freq, pending_bw, pending_sf, pending_cr);
+      MESH_DEBUG_PRINTLN("Temp radio params");
+    }
+
+    if (revert_radio_at && millisHasNowPassed(revert_radio_at)) {   // revert radio params to orig
+      revert_radio_at = 0;  // clear timer
+      radio_set_params(_prefs.freq, _prefs.bw, _prefs.sf, _prefs.cr);
+      MESH_DEBUG_PRINTLN("Radio params restored");
+    }
+
   #ifdef DISPLAY_CLASS
     ui_task.loop();
   #endif
@@ -847,7 +975,7 @@ void setup() {
   board.begin();
 
 #ifdef DISPLAY_CLASS
-  if(display.begin()){
+  if (display.begin()) {
     display.startFrame();
     display.print("Please wait...");
     display.endFrame();
@@ -863,6 +991,11 @@ void setup() {
   InternalFS.begin();
   fs = &InternalFS;
   IdentityStore store(InternalFS, "");
+#elif defined(RP2040_PLATFORM)
+  LittleFS.begin();
+  fs = &LittleFS;
+  IdentityStore store(LittleFS, "/identity");
+  store.begin();
 #elif defined(ESP32)
   SPIFFS.begin(true);
   fs = &SPIFFS;
@@ -884,10 +1017,12 @@ void setup() {
 
   command[0] = 0;
 
+  sensors.begin();
+
   the_mesh.begin(fs);
 
 #ifdef DISPLAY_CLASS
-  ui_task.begin(the_mesh.getNodeName(), FIRMWARE_BUILD_DATE);
+  ui_task.begin(the_mesh.getNodePrefs(), FIRMWARE_BUILD_DATE, FIRMWARE_VERSION);
 #endif
 
   // send out initial Advertisement to the mesh
@@ -911,7 +1046,7 @@ void loop() {
   if (len > 0 && command[len - 1] == '\r') {  // received complete line
     command[len - 1] = 0;  // replace newline with C string null terminator
     char reply[160];
-    the_mesh.getCLI()->handleCommand(0, command, reply);  // NOTE: there is no sender_timestamp via serial!
+    the_mesh.handleCommand(0, command, reply);  // NOTE: there is no sender_timestamp via serial!
     if (reply[0]) {
       Serial.print("  -> "); Serial.println(reply);
     }
@@ -920,4 +1055,5 @@ void loop() {
   }
 
   the_mesh.loop();
+  sensors.loop();
 }

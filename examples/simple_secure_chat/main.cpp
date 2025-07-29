@@ -3,6 +3,8 @@
 
 #if defined(NRF52_PLATFORM)
   #include <InternalFileSystem.h>
+#elif defined(RP2040_PLATFORM)
+  #include <LittleFS.h>
 #elif defined(ESP32)
   #include <SPIFFS.h>
 #endif
@@ -88,7 +90,11 @@ class MyMesh : public BaseChatMesh, ContactVisitor {
 
   void loadContacts() {
     if (_fs->exists("/contacts")) {
+    #if defined(RP2040_PLATFORM)
+      File file = _fs->open("/contacts", "r");
+    #else
       File file = _fs->open("/contacts");
+    #endif
       if (file) {
         bool full = false;
         while (!full) {
@@ -121,8 +127,10 @@ class MyMesh : public BaseChatMesh, ContactVisitor {
 
   void saveContacts() {
 #if defined(NRF52_PLATFORM)
+    _fs->remove("/contacts");
     File file = _fs->open("/contacts", FILE_O_WRITE);
-    if (file) { file.seek(0); file.truncate(); }
+#elif defined(RP2040_PLATFORM)
+    File file = _fs->open("/contacts", "w");
 #else
     File file = _fs->open("/contacts", "w", true);
 #endif
@@ -194,7 +202,7 @@ protected:
     return true;
   }
 
-  void onDiscoveredContact(ContactInfo& contact, bool is_new) override {
+  void onDiscoveredContact(ContactInfo& contact, bool is_new, uint8_t path_len, const uint8_t* path) override {
     // TODO: if not in favs,  prompt to add as fav(?)
 
     Serial.printf("ADVERT from -> %s\n", contact.name);
@@ -246,6 +254,10 @@ protected:
     Serial.printf("   %s\n", text);
   }
 
+  uint8_t onContactRequest(const ContactInfo& contact, uint32_t sender_timestamp, const uint8_t* data, uint8_t len, uint8_t* reply) override {
+    return 0;  // unknown
+  }
+
   void onContactResponse(const ContactInfo& contact, const uint8_t* data, uint8_t len) override {
     // not supported
   }
@@ -287,6 +299,9 @@ public:
 
   #if defined(NRF52_PLATFORM)
     IdentityStore store(fs, "");
+  #elif defined(RP2040_PLATFORM)
+    IdentityStore store(fs, "/identity");
+    store.begin();
   #else
     IdentityStore store(fs, "/identity");
   #endif
@@ -309,7 +324,11 @@ public:
 
     // load persisted prefs
     if (_fs->exists("/node_prefs")) {
+    #if defined(RP2040_PLATFORM)
+      File file = _fs->open("/node_prefs", "r");
+    #else
       File file = _fs->open("/node_prefs");
+    #endif
       if (file) {
         file.read((uint8_t *) &_prefs, sizeof(_prefs));
         file.close();
@@ -322,8 +341,10 @@ public:
 
   void savePrefs() {
 #if defined(NRF52_PLATFORM)
+    _fs->remove("/node_prefs");
     File file = _fs->open("/node_prefs", FILE_O_WRITE);
-    if (file) { file.seek(0); file.truncate(); }
+#elif defined(RP2040_PLATFORM)
+    File file = _fs->open("/node_prefs", "w");
 #else
     File file = _fs->open("/node_prefs", "w", true);
 #endif
@@ -545,6 +566,9 @@ void setup() {
 #if defined(NRF52_PLATFORM)
   InternalFS.begin();
   the_mesh.begin(InternalFS);
+#elif defined(RP2040_PLATFORM)
+  LittleFS.begin();
+  the_mesh.begin(LittleFS);
 #elif defined(ESP32)
   SPIFFS.begin(true);
   the_mesh.begin(SPIFFS);

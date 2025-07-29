@@ -109,6 +109,7 @@ void setup() {
   fast_rng.begin(radio_get_rng_seed());
 
 #if defined(NRF52_PLATFORM) || defined(STM32_PLATFORM)
+  InternalFS.setFlashRegion(0xD4000, 0x19000); // use 100kb of app flash for internal FS instead of 28kb userdata partition.
   InternalFS.begin();
   store.begin();
   the_mesh.begin(

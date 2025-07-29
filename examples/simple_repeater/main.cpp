@@ -733,17 +733,15 @@ public:
     next_local_advert = next_flood_advert = 0;
     set_radio_at = revert_radio_at = 0;
     _logging = false;
-<<<<<<< HEAD
-    #ifdef WiFi_h
+    
+  #ifdef WiFi_h
     _isServerRunning = false;
-    #endif
-=======
+  #endif
 
   #if MAX_NEIGHBOURS
     memset(neighbours, 0, sizeof(neighbours));
   #endif
 
->>>>>>> 131e7a5a232a3893a9874546b70078e4b553fec7
     // defaults
     memset(&_prefs, 0, sizeof(_prefs));
     _prefs.airtime_factor = 1.0;    // one half
@@ -761,17 +759,16 @@ public:
     _prefs.advert_interval = 1;  // default to 2 minutes for NEW installs
     _prefs.flood_advert_interval = 3;   // 3 hours
     _prefs.flood_max = 64;
-<<<<<<< HEAD
-
+    
+    _prefs.interference_threshold = 0;  // disabled
+    
     _prefs.wifi_enable = WIFI_ENABLE;
     _prefs.wifi_ap_enable = WIFI_BRIDGE_HOST;
     StrHelper::strncpy(_prefs.wifi_ssid, WIFI_BRIDGE_SSID, sizeof(_prefs.wifi_ssid));
     StrHelper::strncpy(_prefs.wifi_password, WIFI_BRIDGE_PASSWORD, sizeof(_prefs.wifi_password));
     _prefs.udp_bridge_enable = UDP_SERVER_ENABLE;
     _prefs.udp_bridge_server_port = UDP_SERVER_PORT;
-=======
-    _prefs.interference_threshold = 0;  // disabled
->>>>>>> 131e7a5a232a3893a9874546b70078e4b553fec7
+    
   }
 
   void begin(FILESYSTEM* fs) {

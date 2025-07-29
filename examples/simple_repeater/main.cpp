@@ -64,7 +64,6 @@
   #define  ADMIN_PASSWORD  "password"
 #endif
 
-<<<<<<< HEAD
 #ifndef WIFI_ENABLE
   #define WIFI_ENABLE false
 #endif
@@ -91,14 +90,12 @@
 
 #ifndef UDP_PACKET_BUFFER_SIZE
   #define UDP_PACKET_BUFFER_SIZE 10
-=======
 #ifndef SERVER_RESPONSE_DELAY
   #define SERVER_RESPONSE_DELAY   300
 #endif
 
 #ifndef TXT_ACK_DELAY
   #define TXT_ACK_DELAY     200
->>>>>>> 131e7a5a232a3893a9874546b70078e4b553fec7
 #endif
 
 #ifdef DISPLAY_CLASS

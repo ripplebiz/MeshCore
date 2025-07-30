@@ -41,7 +41,8 @@ void DataStore::begin() {
 #elif defined(RP2040_PLATFORM)
   #include <LittleFS.h>
 #elif defined(NRF52_PLATFORM) || defined(STM32_PLATFORM)
-  #include <InternalFileSystem.h>
+  // #include <InternalFileSystem.h> // disabled for now, leaving here for dual fs branch
+  #include <../lib/nrf52/CustomLFS/src/CustomLFS.h>
 #endif
 
 #if defined(NRF52_PLATFORM) || defined(STM32_PLATFORM)
@@ -51,9 +52,9 @@ int _countLfsBlock(void *p, lfs_block_t block){
   return 0;
 }
 
-lfs_ssize_t _getLfsUsedBlockCount() {
+lfs_ssize_t _getLfsUsedBlockCount(FILESYSTEM* fs) {
   lfs_size_t size = 0;
-  lfs_traverse(InternalFS._getFS(), _countLfsBlock, &size);
+  lfs_traverse(fs->_getFS(), _countLfsBlock, &size);
   return size;
 }
 #endif
@@ -67,8 +68,8 @@ uint32_t DataStore::getStorageUsedKb() const {
   _fs->info(info);
   return info.usedBytes / 1024;
 #elif defined(NRF52_PLATFORM) || defined(STM32_PLATFORM)
-  const lfs_config* config = InternalFS._getFS()->cfg;
-  int usedBlockCount = _getLfsUsedBlockCount();
+  const lfs_config* config = _fs->_getFS()->cfg;
+  int usedBlockCount = _getLfsUsedBlockCount(_fs);
   int usedBytes = config->block_size * usedBlockCount;
   return usedBytes / 1024;
 #else
@@ -85,7 +86,7 @@ uint32_t DataStore::getStorageTotalKb() const {
   _fs->info(info);
   return info.totalBytes / 1024;
 #elif defined(NRF52_PLATFORM) || defined(STM32_PLATFORM)
-  const lfs_config* config = InternalFS._getFS()->cfg;
+  const lfs_config* config = _fs->_getFS()->cfg;
   int totalBytes = config->block_size * config->block_count;
   return totalBytes / 1024;
 #else
@@ -109,6 +110,7 @@ bool DataStore::removeFile(const char* filename) {
 
 bool DataStore::formatFileSystem() {
 #if defined(NRF52_PLATFORM) || defined(STM32_PLATFORM)
+  // InternalFS.format(); // leaving as placeholder to remind for dual fs branch
   return _fs->format();
 #elif defined(RP2040_PLATFORM)
   return LittleFS.format();

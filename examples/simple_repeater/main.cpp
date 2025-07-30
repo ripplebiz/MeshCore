@@ -645,6 +645,27 @@ public:
 
     updateAdvertTimer();
     updateFloodAdvertTimer();
+
+    #if defined(ESP32)
+
+    if(_prefs.wifi_enable){
+
+      Serial.println("wifi enabled, starting")
+
+      board.startWiFi(
+        _prefs.wifi_ssid,
+        _prefs.wifi_password,
+        _prefs.wifi_ap_enable
+      );
+
+    } else {
+
+      Serial.println("board has wifi but config disabled wifi");
+      
+    }
+
+    
+    #endif
   }
 
   const char* getFirmwareVer() override { return FIRMWARE_VERSION; }

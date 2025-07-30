@@ -64,8 +64,8 @@ void CommonCLI::loadPrefsInt(FILESYSTEM* fs, const char* filename) {
     file.read((uint8_t*) &_prefs->wifi_ap_enable, sizeof(_prefs->wifi_ap_enable));   //128
     file.read((uint8_t*) &_prefs->wifi_ssid, sizeof(_prefs->wifi_ssid));             //129
     file.read((uint8_t*) &_prefs->wifi_password, sizeof(_prefs->wifi_password));     //161
-    file.read((uint8_t*) &_prefs->udp_bridge_enable, sizeof(_prefs->udp_bridge_enable));  //193
-    file.read((uint8_t*) &_prefs->udp_bridge_server_port, sizeof(_prefs->udp_bridge_server_port));  //194
+    
+    file.read((uint8_t*) &_prefs->udpBridge, sizeof(_prefs->udpBridge));             //193 ( 19bytes = 1+2+16)
 
 
     // sanitise bad pref values
@@ -129,9 +129,8 @@ void CommonCLI::savePrefs(FILESYSTEM* fs) {
     file.write((uint8_t*) &_prefs->wifi_ap_enable, sizeof(_prefs->wifi_ap_enable));   //128
     file.write((uint8_t*) &_prefs->wifi_ssid, sizeof(_prefs->wifi_ssid));             //129
     file.write((uint8_t*) &_prefs->wifi_password, sizeof(_prefs->wifi_password));     //161
-    file.write((uint8_t*) &_prefs->udp_bridge_enable, sizeof(_prefs->udp_bridge_enable));  //193
-    file.write((uint8_t*) &_prefs->udp_bridge_server_port, sizeof(_prefs->udp_bridge_server_port));  //194
-    
+
+    file.write((uint8_t*) &_prefs->udpBridge, sizeof(_prefs->udpBridge)); //193 ( 19bytes = 1+2+16)    
 
     file.close();
   }
@@ -251,10 +250,14 @@ void CommonCLI::handleCommand(uint32_t sender_timestamp, const char* command, ch
         sprintf(reply, "> %s", _prefs->wifi_ssid);
       } else if (memcmp(config, "wifi.password", 13) == 0) {
         sprintf(reply, "> %s", _prefs->wifi_password);
-      } else if (memcmp(config, "udp.enable", 10) == 0) {
-        sprintf(reply, "> %s", _prefs->udp_bridge_enable ? "on" : "off");
+      } else if (memcmp(config, "udp.listen_enable", 17) == 0) {
+        sprintf(reply, "> %s", _prefs->udpBridge.flags.network_listen_enable ? "on" : "off");
+      } else if (memcmp(config, "udp.rx_enable", 13) == 0) {
+        sprintf(reply, "> %s", _prefs->udpBridge.flags.rx_enable ? "on" : "off");
+      } else if (memcmp(config, "udp.tx_enable", 13) == 0) {
+        sprintf(reply, "> %s", _prefs->udpBridge.flags.tx_enable ? "on" : "off");
       } else if (memcmp(config, "udp.port", 8) == 0) {
-        sprintf(reply, "> %d", (uint32_t) _prefs->udp_bridge_server_port);
+        sprintf(reply, "> %d", (uint32_t) _prefs->udpBridge.port);
       } else if (memcmp(config, "direct.txdelay", 14) == 0) {
         sprintf(reply, "> %s", StrHelper::ftoa(_prefs->direct_tx_delay_factor));
       } else if (memcmp(config, "tx", 2) == 0 && (config[2] == 0 || config[2] == ' ')) {

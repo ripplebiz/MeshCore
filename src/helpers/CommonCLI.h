@@ -2,6 +2,8 @@
 
 #include "Mesh.h"
 #include <helpers/IdentityStore.h>
+#include <bridges/UdpBridgeDetails.h>
+
 
 struct NodePrefs {  // persisted to file
     float airtime_factor;
@@ -30,9 +32,7 @@ struct NodePrefs {  // persisted to file
     bool wifi_ap_enable;
     char wifi_ssid[32];
     char wifi_password[32];
-    bool udp_bridge_enable;
-    uint16_t udp_bridge_server_port;
-    bool udp_bridge_all;
+    UDPBridgePrefs udpBridge;
 };
 
 class CommonCLICallbacks {

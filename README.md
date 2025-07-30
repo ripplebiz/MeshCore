@@ -26,10 +26,10 @@ You should **BACK UP ALL OF YOUR NODE DATA BEFORE FLASHING IN CASE SOMETHING GOE
 Your original 28kb UserData partition **SHOULD** stay untouched, you can switch back to the standard firmware and all **SHOULD** be well but **I MAKE NO PROMISES.**
 
 ### Other notes:
-- This code is based on Adafruit NRF52 Arduino framework v1.7.0, but I think currently MeshCore uses v1.6.0. Obviously this could potentially cause issues although I haven't seen any so far in my extremely limited testing. My intention is to refactor the FS code out into it's own separate library as a priority.
+- ~~This code is based on Adafruit NRF52 Arduino framework v1.7.0, but I think currently MeshCore uses v1.6.0. Obviously this could potentially cause issues although I haven't seen any so far in my extremely limited testing. My intention is to refactor the FS code out into it's own separate library as a priority.~~ Now using separate library, so back to the untouched v1.6.0 framework.
 
 #### TODO:
-- Refactor the modified InternalFS code so that it lives as a separate CustomFS library instead of as part of a modified framework.
-- Modify linker script (and board jsons?) so that application size is unable to grow large enough that it's overwriting the filesystem flash area.
+- ~~Refactor the modified InternalFS code so that it lives as a separate CustomFS library instead of as part of a modified framework.~~ [x]
+- Modify linker script (and board jsons?) so that application size is unable to grow large enough that it's overwriting the filesystem flash area. []
 - Refactor DataStore to make use of the dual filesystem ability, so that the identity data lives on the UserData partition and if the extra filesystem is available then contacts and advert blobs live in the extra partition? More advert blob storage probably?
 - Potentially favorite contacts might live on the original userdata partition?

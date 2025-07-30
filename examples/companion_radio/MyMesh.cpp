@@ -166,12 +166,12 @@ void MyMesh::updateContactFromFrame(ContactInfo &contact, uint32_t& last_mod, co
   i += 32;
   memcpy(&contact.last_advert_timestamp, &frame[i], 4);
   i += 4;
-  if (i + 8 >= len) { // optional fields
+  if (len >= i + 8) { // optional fields
     memcpy(&contact.gps_lat, &frame[i], 4);
     i += 4;
     memcpy(&contact.gps_lon, &frame[i], 4);
     i += 4;
-    if (i + 4 >= len) {
+    if (len >= i + 4) {
       memcpy(&last_mod, &frame[i], 4);
     }
   }
@@ -661,6 +661,7 @@ void MyMesh::begin(bool has_display) {
   _active_ble_pin = 0;
 #endif
 
+  resetContacts();
   _store->loadContacts(this);
   addChannel("Public", PUBLIC_GROUP_PSK); // pre-configure Andy's public channel
   _store->loadChannels(this);
@@ -1097,6 +1098,9 @@ void MyMesh::handleCmdFrame(size_t len) {
     if (_store->saveMainIdentity(identity)) {
       self_id = identity;
       writeOKFrame();
+      // re-load contacts, to recalc shared secrets
+      resetContacts();
+      _store->loadContacts(this);
     } else {
       writeErrFrame(ERR_CODE_FILE_IO_ERROR);
     }

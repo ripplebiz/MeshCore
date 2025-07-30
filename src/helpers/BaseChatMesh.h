@@ -88,6 +88,8 @@ protected:
     memset(connections, 0, sizeof(connections));
   }
 
+  void resetContacts() { num_contacts = 0; }
+
   // 'UI' concepts, for sub-classes to implement
   virtual bool isAutoAddEnabled() const { return true; }
   virtual void onDiscoveredContact(ContactInfo& contact, bool is_new, uint8_t path_len, const uint8_t* path) = 0;

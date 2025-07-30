@@ -13,8 +13,10 @@ static uint32_t _atoi(const char* sp) {
 }
 
 #if defined(NRF52_PLATFORM) || defined(STM32_PLATFORM)
-  #include <InternalFileSystem.h>
-  DataStore store(InternalFS, rtc_clock);
+  // #include <InternalFileSystem.h> // disabled for now, leaving here for dual fs branch
+  #include <../lib/nrf52/CustomLFS/src/CustomLFS.h>
+  CustomLFS ContactFS(0xD4000, 0x19000, 128);;
+  DataStore store(ContactFS, rtc_clock);
 #elif defined(RP2040_PLATFORM)
   #include <LittleFS.h>
   DataStore store(LittleFS, rtc_clock);
@@ -109,8 +111,8 @@ void setup() {
   fast_rng.begin(radio_get_rng_seed());
 
 #if defined(NRF52_PLATFORM) || defined(STM32_PLATFORM)
-  InternalFS.setFlashRegion(0xD4000, 0x19000); // use 100kb of app flash for internal FS instead of 28kb userdata partition.
-  InternalFS.begin();
+  // InternalFS.begin();
+  ContactFS.begin();
   store.begin();
   the_mesh.begin(
     #ifdef DISPLAY_CLASS

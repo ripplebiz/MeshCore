@@ -1,7 +1,7 @@
 
 # PROCEED WITH CAUTION! HERE BE DRAGONS!!!
 
-## NRF52 ONLY, NOT BUILDING ON RAK YET
+## NRF52 ONLY, SEE NOTES BELOW FOR WHAT HAS BEEN TESTED!!!
 
 ### READ ALL OF THE FOLLOWING!!! I WILL NOT BE HELD RESPONSIBLE FOR ANY DAMAGE TO YOUR MESHCORE NODE FROM USING THIS EXPERIMENTAL CODE.
 This is a **proof of concept + work in progress** for (some) NRF52 boards. It will 100kb at the end of the application flash area for a filesystem, leaving 100kb less for application size. This means 696kb for devices using softdevice S140 v6.1.1 or 692kb for S140 v7.3.0. . **The linker script has NOT been modified**, meaning if you flash an application large enough then expect this new filesystem area to get wiped. MeshCore currently fits easily within the 692kb. The standard nrf52 28kb UserData area is **CURRENTLY** not touched by this new code, so flashing back to a standard firmware will see you with all of your old contact DB etc.
@@ -16,7 +16,7 @@ This code has **ONLY HAD LIMITED TESTING** and **ONLY ON**:
 
 - Xiao BLE NRF52840
 
-  **NOT WORKING ON RAK4631 YET! PLEASE STANDBY...**
+- RAK4631
 
 ### Instructions:
 You should **BACK UP ALL OF YOUR NODE DATA BEFORE FLASHING IN CASE SOMETHING GOES WRONG**, and also so that you can restore your identity and contact list etc to the new empty filesystem.

@@ -13,10 +13,14 @@ static uint32_t _atoi(const char* sp) {
 }
 
 #if defined(NRF52_PLATFORM) || defined(STM32_PLATFORM)
-  // #include <InternalFileSystem.h> // disabled for now, leaving here for dual fs branch
-  #include <../lib/nrf52/CustomLFS/src/CustomLFS.h>
-  CustomLFS ContactFS(0xD4000, 0x19000, 128);;
-  DataStore store(ContactFS, rtc_clock);
+  #include <InternalFileSystem.h>
+  #if defined(EXTRAFS)
+    #include <../lib/nrf52/CustomLFS/src/CustomLFS.h>
+    CustomLFS ExtraFS(0xD4000, 0x19000, 128);
+    DataStore store(ExtraFS, rtc_clock);
+  #else
+    DataStore store(InternalFS, rtc_clock);
+  #endif
 #elif defined(RP2040_PLATFORM)
   #include <LittleFS.h>
   DataStore store(LittleFS, rtc_clock);
@@ -111,8 +115,10 @@ void setup() {
   fast_rng.begin(radio_get_rng_seed());
 
 #if defined(NRF52_PLATFORM) || defined(STM32_PLATFORM)
-  // InternalFS.begin();
-  ContactFS.begin();
+  InternalFS.begin();
+  #if defined(EXTRAFS)
+    ExtraFS.begin();
+  #endif
   store.begin();
   the_mesh.begin(
     #ifdef DISPLAY_CLASS

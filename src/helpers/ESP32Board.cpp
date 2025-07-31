@@ -36,8 +36,21 @@ bool ESP32Board::startOTAUpdate(const char* id, char reply[]) {
   return true;
 }
 
+void WiFiEvent(WiFiEvent_t event){
+  //Serial.printf("WiFi event %i\n", event);
+
+  switch(event){
+    case ARDUINO_EVENT_WIFI_STA_CONNECTED:
+      WiFi.enableIpV6();
+      break;
+    default:
+      break;
+  }
+}
+
 bool ESP32Board::startWiFi(char* ssid, char* password, bool apMode){
 
+  WiFi.onEvent(WiFiEvent);
 
   if(apMode){
     
@@ -50,7 +63,6 @@ bool ESP32Board::startWiFi(char* ssid, char* password, bool apMode){
 
     WiFi.mode(WIFI_MODE_STA);
     WiFi.disconnect(true);
-    WiFi.enableIpV6();
     WiFi.begin(ssid, password);
 
   }

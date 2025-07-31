@@ -4,6 +4,10 @@
 #include <RTClib.h>
 #include <bridges/UdpBridgeDetails.h>
 
+#if defined(ESP_PLATFORM)
+#include <WiFi.h>
+#endif
+
 // Believe it or not, this std C function is busted on some platforms!
 static uint32_t _atoi(const char* sp) {
   uint32_t n = 0;
@@ -251,7 +255,23 @@ void CommonCLI::handleCommand(uint32_t sender_timestamp, const char* command, ch
         sprintf(reply, "> %s", _prefs->wifi_ssid);
       } else if (memcmp(config, "wifi.password", 13) == 0) {
         sprintf(reply, "> %s", _prefs->wifi_password);
-      } else if (memcmp(config, "udp.network_bridge", 18) == 0) {
+      }
+      
+#if defined(ESP_PLATFORM)
+      
+      else if (memcmp(config, "wifi.info", 7) == 0) {
+
+
+        sprintf(reply, "> %s %s %s %s",
+          WiFi.getHostname(),
+          WiFi.localIP().toString().c_str(),
+          WiFi.localIPv6().toString().c_str(),
+          WiFi.macAddress().c_str()
+        );
+      }
+#endif
+
+      else if (memcmp(config, "udp.network_bridge", 18) == 0) {
         sprintf(reply, "> %s", _prefs->udpBridge.flags.network_bridge ? "on" : "off");
       } else if (memcmp(config, "udp.rx_bridge", 13) == 0) {
         sprintf(reply, "> %s", _prefs->udpBridge.flags.rx_bridge ? "on" : "off");
@@ -467,8 +487,8 @@ void CommonCLI::handleCommand(uint32_t sender_timestamp, const char* command, ch
           _prefs->udpBridge.flags.mode = UDP_BRIDGE_MODE_BROADCAST;
         } else if(udpMulticast){
           _prefs->udpBridge.flags.mode = UDP_BRIDGE_MODE_MULTICAST;
-        } else if(udpDirect){
-          _prefs->udpBridge.flags.mode = UDP_BRIDGE_MODE_DIRECT;
+        /*} else if(udpDirect){
+          _prefs->udpBridge.flags.mode = UDP_BRIDGE_MODE_DIRECT;*/
         } else {
           strcpy(reply, "ERROR - Unsupported option");
           return;

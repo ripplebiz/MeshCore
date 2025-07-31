@@ -3,7 +3,6 @@
 #include "ESP32Board.h"
 
 #if defined(ADMIN_PASSWORD) && !defined(DISABLE_WIFI_OTA)   // Repeater or Room Server only
-#include <WiFi.h>
 #include <AsyncTCP.h>
 #include <ESPAsyncWebServer.h>
 #include <AsyncElegantOTA.h>
@@ -42,14 +41,14 @@ bool ESP32Board::startWiFi(char* ssid, char* password, bool apMode){
 
   if(apMode){
     
-    WiFi.disconnect(true);
     WiFi.mode(WIFI_MODE_AP);
+    WiFi.disconnect(true);
     WiFi.softAP(ssid, password);
   
   } else {
 
-    WiFi.disconnect(true);
     WiFi.mode(WIFI_MODE_STA);
+    WiFi.disconnect(true);
     WiFi.begin(ssid, password);
 
   }

@@ -43,12 +43,14 @@ bool ESP32Board::startWiFi(char* ssid, char* password, bool apMode){
     
     WiFi.mode(WIFI_MODE_AP);
     WiFi.disconnect(true);
+    WiFi.softAPenableIpV6();
     WiFi.softAP(ssid, password);
   
   } else {
 
     WiFi.mode(WIFI_MODE_STA);
     WiFi.disconnect(true);
+    WiFi.enableIpV6();
     WiFi.begin(ssid, password);
 
   }

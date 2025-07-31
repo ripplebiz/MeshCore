@@ -36,8 +36,13 @@ bool ESP32Board::startOTAUpdate(const char* id, char reply[]) {
   return true;
 }
 
+WiFiEvent_t last_event = ARDUINO_EVENT_MAX;
+
 void WiFiEvent(WiFiEvent_t event){
-  Serial.printf("WiFi event %i\n", event);
+
+  if(last_event != event){
+    Serial.printf("WiFi event %i\n\r", event);
+  }
 
   switch(event){
     case ARDUINO_EVENT_WIFI_STA_CONNECTED:
@@ -46,6 +51,8 @@ void WiFiEvent(WiFiEvent_t event){
     default:
       break;
   }
+
+  last_event = event;
 }
 
 bool ESP32Board::startWiFi(char* ssid, char* password, bool apMode){

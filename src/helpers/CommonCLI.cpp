@@ -2,6 +2,7 @@
 #include "CommonCLI.h"
 #include "TxtDataHelpers.h"
 #include <RTClib.h>
+#include <bridges/UdpBridgeDetails.h>
 
 // Believe it or not, this std C function is busted on some platforms!
 static uint32_t _atoi(const char* sp) {
@@ -395,15 +396,85 @@ void CommonCLI::handleCommand(uint32_t sender_timestamp, const char* command, ch
         StrHelper::strncpy(_prefs->wifi_password, &config[14], sizeof(_prefs->wifi_password));
         savePrefs();
         strcpy(reply, "OK - Reboot to apply");
-      } else if (memcmp(config, "udp.enable ", 11) == 0) {
-        _prefs->udp_bridge_enable = memcmp(&config[11], "on", 2) == 0;
+      } else if (memcmp(config, "udp.network_bridge ", 19) == 0) {
+        
+        _prefs->udpBridge.flags.network_bridge = memcmp(&config[19], "off", 3) == 0;
         savePrefs();
-        strcpy(reply, _prefs->udp_bridge_enable ? "OK - Reboot to apply UDP server ON" : "OK - Reboot to apply UDP server OFF");
+        strcpy(reply, _prefs->udpBridge.flags.network_bridge ? "OK - udp network_bridge is now OFF" : "OK - udp network_bridge is now ON");
+
+      } else if (memcmp(config, "udp.rx_bridge ", 14) == 0) {
+        
+        _prefs->udpBridge.flags.rx_bridge = memcmp(&config[14], "off", 3) == 0;
+        savePrefs();
+        strcpy(reply, _prefs->udpBridge.flags.rx_bridge ? "OK - udp rx_bridge is now OFF" : "OK - udp rx_bridge is now ON");
+      
+      } else if (memcmp(config, "udp.tx_bridge ", 14) == 0) {
+
+        _prefs->udpBridge.flags.tx_bridge = memcmp(&config[14], "off", 3) == 0;
+        savePrefs();
+        strcpy(reply, _prefs->udpBridge.flags.tx_bridge ? "OK - udp tx_bridge is now OFF" : "OK - udp tx_bridge is now ON");
+      
+      } else if (memcmp(config, "udp.ip_version ", 15) == 0) {
+
+        _prefs->udpBridge.flags.ip_version = memcmp(&config[15], "ipv6", 4) == 0;
+        savePrefs();
+        strcpy(reply, _prefs->udpBridge.flags.ip_version ? "OK - udp ip_version is now ipv4" : "OK - udp ip_version is now ipv6");
+      
+      } else if (memcmp(config, "udp.mode ", 9) == 0) {
+
+        bool udpBroadcast = memcmp(&config[9], "broadcast", 9) ==0;
+        bool udpMulticast = memcmp(&config[9], "multicast", 9) == 0;
+        bool udpDirect = memcmp(&config[9], "direct", 6) == 0;
+
+        if(udpBroadcast){
+          _prefs->udpBridge.flags.mode = UDP_BRIDGE_MODE_BROADCAST;
+        } else if(udpMulticast){
+          _prefs->udpBridge.flags.mode = UDP_BRIDGE_MODE_MULTICAST;
+        } else if(udpDirect){
+          _prefs->udpBridge.flags.mode = UDP_BRIDGE_MODE_DIRECT;
+        } else {
+          strcpy(reply, "ERROR - Unsupported option");
+          return;
+        }
+
+        savePrefs();
+        strcpy(reply, "OK");
+
       } else if (memcmp(config, "udp.port ", 9) == 0) {
-        uint16_t p = atoi(&config[9]);
-        _prefs->udp_bridge_server_port = p;
+
+        _prefs->udpBridge.port = atoi(&config[9]);
         savePrefs();
-        strcpy(reply, "OK - Reboot to apply");
+        strcpy(reply,"OK");
+      
+      } else if (memcmp(config, "udp.address ", 12) == 0) {
+
+        if( _prefs->udpBridge.flags.ip_version == UDP_BRIDGE_IPV4){
+
+          IPAddress address;
+          bool success = address.fromString(&config[12]);
+
+          if(success){
+            uint32_t ip = address;
+            memcpy( _prefs->udpBridge.ipv6, (const uint8_t*)&ip,  4);
+  
+            savePrefs();
+            strcpy(reply, "OK");
+          } else {  strcpy(reply, "ERROR - failed to parse ipv4 address"); }
+
+        } else {
+
+          IPv6Address address;
+          bool success = address.fromString(&config[12]);
+
+          if(success){
+            memcpy( _prefs->udpBridge.ipv6, (const uint8_t*)address,  16);
+  
+            savePrefs();
+            strcpy(reply, "OK");
+          } else {  strcpy(reply, "ERROR - failed to parse ipv6 address"); }
+
+        }
+
       } else if (memcmp(config, "direct.txdelay ", 15) == 0) {
         float f = atof(&config[15]);
         if (f >= 0) {

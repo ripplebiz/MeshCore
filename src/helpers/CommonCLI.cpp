@@ -251,14 +251,51 @@ void CommonCLI::handleCommand(uint32_t sender_timestamp, const char* command, ch
         sprintf(reply, "> %s", _prefs->wifi_ssid);
       } else if (memcmp(config, "wifi.password", 13) == 0) {
         sprintf(reply, "> %s", _prefs->wifi_password);
-      } else if (memcmp(config, "udp.listen_enable", 17) == 0) {
-        sprintf(reply, "> %s", _prefs->udpBridge.flags.network_listen_enable ? "on" : "off");
-      } else if (memcmp(config, "udp.rx_enable", 13) == 0) {
-        sprintf(reply, "> %s", _prefs->udpBridge.flags.rx_enable ? "on" : "off");
-      } else if (memcmp(config, "udp.tx_enable", 13) == 0) {
-        sprintf(reply, "> %s", _prefs->udpBridge.flags.tx_enable ? "on" : "off");
+      } else if (memcmp(config, "udp.network_bridge", 18) == 0) {
+        sprintf(reply, "> %s", _prefs->udpBridge.flags.network_bridge ? "on" : "off");
+      } else if (memcmp(config, "udp.rx_bridge", 13) == 0) {
+        sprintf(reply, "> %s", _prefs->udpBridge.flags.rx_bridge ? "on" : "off");
+      } else if (memcmp(config, "udp.tx_bridge", 13) == 0) {
+        sprintf(reply, "> %s", _prefs->udpBridge.flags.tx_bridge ? "on" : "off");
+      } else if (memcmp(config, "udp.ip_version", 14) == 0) {
+        switch(_prefs->udpBridge.flags.ip_version){
+          case UDP_BRIDGE_IPV4:
+            sprintf(reply, "> ipv4");
+            break;
+          case UDP_BRIDGE_IPV6:
+            sprintf(reply, "> ipv6");
+            break;
+          default:
+            sprintf(reply, "> ERROR - Unsupported");
+            break;
+        }
+      } else if (memcmp(config, "udp.mode", 8) == 0) {
+        switch(_prefs->udpBridge.flags.mode){
+          case UDP_BRIDGE_MODE_BROADCAST:
+            sprintf(reply, "> broadcast");
+            break;
+          case UDP_BRIDGE_MODE_MULTICAST:
+            sprintf(reply, "> multicast");
+            break;
+          case UDP_BRIDGE_MODE_DIRECT:
+            sprintf(reply, "> direct");
+            break;
+          default:
+            sprintf(reply, "> ERROR - Unsupported");
+            break;
+        }
       } else if (memcmp(config, "udp.port", 8) == 0) {
         sprintf(reply, "> %d", (uint32_t) _prefs->udpBridge.port);
+      } else if (memcmp(config, "udp.address", 11) == 0) {
+        if(_prefs->udpBridge.flags.ip_version == UDP_BRIDGE_IPV4){
+          IPAddress address( (uint8_t) &_prefs->udpBridge.ipv4 );
+
+          sprintf(reply, "> %s", address.toString().c_str());
+        } else {
+          IPv6Address address( (uint8_t) &_prefs->udpBridge.ipv6 );
+
+          sprintf(reply, "> %s", address.toString().c_str());
+        }
       } else if (memcmp(config, "direct.txdelay", 14) == 0) {
         sprintf(reply, "> %s", StrHelper::ftoa(_prefs->direct_tx_delay_factor));
       } else if (memcmp(config, "tx", 2) == 0 && (config[2] == 0 || config[2] == ' ')) {

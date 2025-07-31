@@ -629,9 +629,15 @@ public:
     _prefs.wifi_ap_enable = WIFI_AP_ENABLE;
     StrHelper::strncpy(_prefs.wifi_ssid, WIFI_BRIDGE_SSID, sizeof(_prefs.wifi_ssid));
     StrHelper::strncpy(_prefs.wifi_password, WIFI_BRIDGE_PASSWORD, sizeof(_prefs.wifi_password));
-    _prefs.udp_bridge_enable = UDP_SERVER_ENABLE;
-    _prefs.udp_bridge_server_port = UDP_SERVER_PORT;
+
     
+    _prefs.udpBridge.flags.network_bridge = true;
+    _prefs.udpBridge.flags.rx_bridge = false;
+    _prefs.udpBridge.flags.tx_bridge = true;
+    _prefs.udpBridge.flags.ip_version = UDP_BRIDGE_IPV4;
+    _prefs.udpBridge.flags.mode = UDP_BRIDGE_MODE_BROADCAST;
+    _prefs.udpBridge.port = 8000;
+    memset( &_prefs.udpBridge.ipv6, 0x0, sizeof( UDPBridgePrefs.ipv6 ));
   }
 
   void begin(FILESYSTEM* fs) {
@@ -650,7 +656,7 @@ public:
 
     if(_prefs.wifi_enable){
 
-      Serial.println("wifi enabled, starting")
+      Serial.println("wifi enabled, starting");
 
       board.startWiFi(
         _prefs.wifi_ssid,

@@ -4,8 +4,10 @@
 #include <RTClib.h>
 #include <bridges/UdpBridgeDetails.h>
 
-#if defined(ESP_PLATFORM)
+#ifdef ESP32
+#include <IPAddress.h>
 #include <WiFi.h>
+#include <IPv6Address.h>
 #endif
 
 // Believe it or not, this std C function is busted on some platforms!
@@ -257,7 +259,7 @@ void CommonCLI::handleCommand(uint32_t sender_timestamp, const char* command, ch
         sprintf(reply, "> %s", _prefs->wifi_password);
       }
       
-#if defined(ESP_PLATFORM)
+#if defined(ESP32)
       
       else if (memcmp(config, "wifi.info", 9) == 0) {
 

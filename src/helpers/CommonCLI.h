@@ -32,7 +32,7 @@ struct NodePrefs {  // persisted to file
     bool wifi_ap_enable;
     char wifi_ssid[32];
     char wifi_password[32];
-    UDPBridgePrefs udpBridge;
+    mesh::UDPBridgePrefs udpBridge;
 };
 
 class CommonCLICallbacks {

@@ -1,6 +1,7 @@
 #pragma once
 
 #include <Bridge.h>
+#include <Dispatcher.h>
 #include <AsyncUDP.h>
 
 #include "UdpBridgeDetails.h"
@@ -8,17 +9,19 @@
 namespace mesh {
 
 
-class UdpBridge : Bridge {
+class UdpBridge : public mesh::Bridge {
 
 protected:
+  bool _listening;
   AsyncUDP _udp;
-  uint16_t _server_port;
-  UDPBridgeFlags _flags;
+  UDPBridgePrefs* _prefs;
+  mesh::Dispatcher* _dispatcher;
 
 public:
-  UdpBridge(UDPBridgeFlags flags, uint16_t port=8000, uint8_t* udp_bridge_server_address=NULL);
+  UdpBridge(UDPBridgePrefs* prefs);
   void start() override;
   void loop() override;
+  void stop();
   void onMeshPacketRx(mesh::Packet* packet) override;
   void onMeshPacketTx(mesh::Packet* packet) override;
 };

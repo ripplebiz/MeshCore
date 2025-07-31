@@ -7,8 +7,10 @@
 #define UDP_BRIDGE_MODE_MULTICAST 0x1
 #define UDP_BRIDGE_MODE_DIRECT 0x2
 
-#include <IPAddress.h>
-#include <IPv6Address.h>
+namespace mesh {
+
+//#include <IPAddress.h>
+//#include <IPv6Address.h>
 
 typedef struct UDPBridgeFlags {
     uint8_t network_bridge: 1;           // bridge udp network packets to lora
@@ -28,5 +30,6 @@ typedef struct UDPBridgePrefs {
         uint8_t ipv6[16];    
     };
 };
+}
 
 //bool udp_bridge_flags;  // bridge_rx_enable, bridge_tx_enable, bridge_listen_enable, ip_mode(ipv4, ipv6),

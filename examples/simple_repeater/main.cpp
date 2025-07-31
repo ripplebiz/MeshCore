@@ -1,6 +1,7 @@
 #include <Arduino.h>   // needed for PlatformIO
 #include <Mesh.h>
 
+
 #if defined(NRF52_PLATFORM) || defined(STM32_PLATFORM)
   #include <InternalFileSystem.h>
 #elif defined(RP2040_PLATFORM)
@@ -12,6 +13,7 @@
   #include <Vector.h>
   #include <Packet.h>
   #include <Dispatcher.h>
+  #include <bridges/UdpBridge.h>
 #endif
 
 #include <helpers/ArduinoHelpers.h>
@@ -631,6 +633,7 @@ public:
     StrHelper::strncpy(_prefs.wifi_ssid, WIFI_BRIDGE_SSID, sizeof(_prefs.wifi_ssid));
     StrHelper::strncpy(_prefs.wifi_password, WIFI_BRIDGE_PASSWORD, sizeof(_prefs.wifi_password));
 
+    #if defined(ESP32)
     
     _prefs.udpBridge.flags.network_bridge = true;
     _prefs.udpBridge.flags.rx_bridge = false;
@@ -639,6 +642,17 @@ public:
     _prefs.udpBridge.flags.mode = UDP_BRIDGE_MODE_BROADCAST;
     _prefs.udpBridge.port = 8000;
     memset( _prefs.udpBridge.ipv6, 0x0, sizeof( _prefs.udpBridge.ipv6 ));
+
+    bool udpEnabled = _prefs.udpBridge.flags.network_bridge || 
+                      _prefs.udpBridge.flags.rx_bridge ||
+                      _prefs.udpBridge.flags.tx_bridge;
+
+    if(udpEnabled){
+      mesh::UdpBridge* udpBridge = new mesh::UdpBridge( &_prefs.udpBridge );
+      setBridge( udpBridge );
+    }
+
+    #endif
   }
 
   void begin(FILESYSTEM* fs) {

@@ -22,6 +22,10 @@ void Dispatcher::begin() {
 
   _radio->begin();
   prev_isrecv_mode = _radio->isInRecvMode();
+
+  if(_bridge){
+    _bridge->start();
+  }
 }
 
 float Dispatcher::getAirtimeBudgetFactor() const {
@@ -208,6 +212,12 @@ void Dispatcher::checkRecv() {
       processRecvPacket(pkt);
     }
   }
+}
+
+void Dispatcher::setBridge(Bridge* bridge){
+
+  this->_bridge = bridge;
+
 }
 
 void Dispatcher::checkBridge() {

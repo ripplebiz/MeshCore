@@ -181,6 +181,8 @@ public:
     _err_flags = 0;
   }
 
+  void setBridge(Bridge* bridge);
+
   // helper methods
   bool millisHasNowPassed(unsigned long timestamp) const;
   unsigned long futureMillis(int millis_from_now) const;

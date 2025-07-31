@@ -1,9 +1,8 @@
 #pragma once
-
-#include <MeshCore.h>
 #include <Packet.h>
 
 #include <Vector.h>
+
 
 #define BRIDGE_PACKET_BUFFER_SIZE 10
 
@@ -23,14 +22,15 @@ class BridgePacket{
 class Bridge {
 
 protected:
-  bool _enabled;
-  bool _bridge_all;
-  bool _is_running;
-  mesh::BridgePacket* inboundBuffer[BRIDGE_PACKET_BUFFER_SIZE];
-  Vector<mesh::BridgePacket*> inboundPackets;
+  //bool _enabled;
+  //bool _bridge_all;
+  //bool _is_running;
+  
+  mesh::Packet* _inboundBuffer[BRIDGE_PACKET_BUFFER_SIZE];
+  Vector<mesh::Packet*> _inboundPackets;
 
   public:
-  Bridge(bool bridge_all=false);
+  //Bridge(bool bridge_all=false);
 
   virtual void start() = 0;
   virtual void loop() = 0;

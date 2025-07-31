@@ -637,7 +637,7 @@ public:
     _prefs.udpBridge.flags.ip_version = UDP_BRIDGE_IPV4;
     _prefs.udpBridge.flags.mode = UDP_BRIDGE_MODE_BROADCAST;
     _prefs.udpBridge.port = 8000;
-    memset( &_prefs.udpBridge.ipv6, 0x0, sizeof( UDPBridgePrefs.ipv6 ));
+    memset( _prefs.udpBridge.ipv6, 0x0, sizeof( _prefs.udpBridge.ipv6 ));
   }
 
   void begin(FILESYSTEM* fs) {

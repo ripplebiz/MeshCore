@@ -277,9 +277,9 @@ void CommonCLI::handleCommand(uint32_t sender_timestamp, const char* command, ch
           case UDP_BRIDGE_MODE_MULTICAST:
             sprintf(reply, "> multicast");
             break;
-          case UDP_BRIDGE_MODE_DIRECT:
+          /*case UDP_BRIDGE_MODE_DIRECT:
             sprintf(reply, "> direct");
-            break;
+            break;*/
           default:
             sprintf(reply, "> ERROR - Unsupported");
             break;
@@ -288,11 +288,11 @@ void CommonCLI::handleCommand(uint32_t sender_timestamp, const char* command, ch
         sprintf(reply, "> %d", (uint32_t) _prefs->udpBridge.port);
       } else if (memcmp(config, "udp.address", 11) == 0) {
         if(_prefs->udpBridge.flags.ip_version == UDP_BRIDGE_IPV4){
-          IPAddress address( (uint8_t) &_prefs->udpBridge.ipv4 );
+          IPAddress address( (uint8_t*) &_prefs->udpBridge.ipv4 );
 
           sprintf(reply, "> %s", address.toString().c_str());
         } else {
-          IPv6Address address( (uint8_t) &_prefs->udpBridge.ipv6 );
+          IPv6Address address( (uint8_t*) &_prefs->udpBridge.ipv6 );
 
           sprintf(reply, "> %s", address.toString().c_str());
         }
@@ -492,7 +492,7 @@ void CommonCLI::handleCommand(uint32_t sender_timestamp, const char* command, ch
 
           if(success){
             uint32_t ip = address;
-            memcpy( _prefs->udpBridge.ipv6, (const uint8_t*)&ip,  4);
+            memcpy( _prefs->udpBridge.ipv4, (const uint8_t*)&ip,  4);
   
             savePrefs();
             strcpy(reply, "OK");

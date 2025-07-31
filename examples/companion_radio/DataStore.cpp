@@ -1,6 +1,12 @@
 #include <Arduino.h>
 #include "DataStore.h"
 
+#if defined(EXTRAFS)
+  #define MAX_BLOBRECS 100
+#else
+  #define MAX_BLOBRECS 20
+#endif
+
 DataStore::DataStore(FILESYSTEM& fs, mesh::RTCClock& clock) : _fs(&fs), _clock(&clock),
 #if defined(NRF52_PLATFORM) || defined(STM32_PLATFORM)
     identity_store(fs, "")
@@ -338,7 +344,7 @@ void DataStore::checkAdvBlobFile() {
     if (file) {
       BlobRec zeroes;
       memset(&zeroes, 0, sizeof(zeroes));
-      for (int i = 0; i < 20; i++) {     // pre-allocate to fixed size
+      for (int i = 0; i < MAX_BLOBRECS; i++) {     // pre-allocate to fixed size
         file.write((uint8_t *) &zeroes, sizeof(zeroes));
       }
       file.close();

@@ -259,7 +259,7 @@ void CommonCLI::handleCommand(uint32_t sender_timestamp, const char* command, ch
       
 #if defined(ESP_PLATFORM)
       
-      else if (memcmp(config, "wifi.info", 7) == 0) {
+      else if (memcmp(config, "wifi.info", 9) == 0) {
 
 
         sprintf(reply, "> %s %s %s %s",

@@ -37,7 +37,7 @@ bool ESP32Board::startOTAUpdate(const char* id, char reply[]) {
 }
 
 void WiFiEvent(WiFiEvent_t event){
-  //Serial.printf("WiFi event %i\n", event);
+  Serial.printf("WiFi event %i\n", event);
 
   switch(event){
     case ARDUINO_EVENT_WIFI_STA_CONNECTED:

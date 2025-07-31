@@ -14,11 +14,11 @@ class UdpBridge : public mesh::Bridge {
 protected:
   bool _listening;
   AsyncUDP _udp;
-  UDPBridgePrefs* _prefs;
+  mesh::UDPBridgePrefs* _prefs;
   mesh::Dispatcher* _dispatcher;
 
 public:
-  UdpBridge(UDPBridgePrefs* prefs);
+  UdpBridge(mesh::UDPBridgePrefs* prefs);
   void start() override;
   void loop() override;
   void stop();

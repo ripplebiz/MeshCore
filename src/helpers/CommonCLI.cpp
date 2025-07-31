@@ -4,7 +4,7 @@
 #include <RTClib.h>
 #include <bridges/UdpBridgeDetails.h>
 
-#ifdef ESP32
+#if defined(ESP_PLATFORM)
 #include <IPAddress.h>
 #include <WiFi.h>
 #include <IPv6Address.h>
@@ -259,7 +259,7 @@ void CommonCLI::handleCommand(uint32_t sender_timestamp, const char* command, ch
         sprintf(reply, "> %s", _prefs->wifi_password);
       }
       
-#if defined(ESP32)
+#if defined(ESP_PLATFORM)
       
       else if (memcmp(config, "wifi.info", 9) == 0) {
 

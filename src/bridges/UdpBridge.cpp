@@ -61,10 +61,25 @@ void UdpBridge::stop(){
 
 void UdpBridge::onMeshPacketRx(mesh::Packet* packet){
     Serial.println("onMeshPacketRx");
+
+    if(!_waitingForNetwork && this->_prefs->flags.rx_bridge){
+        uint8_t pktBuffer[256];
+        uint8_t pktLen = packet->writeTo(pktBuffer);
+        
+        _udp.broadcastTo( pktBuffer, pktLen, _prefs->port);
+    }
 }
 
 void UdpBridge::onMeshPacketTx(mesh::Packet* packet){
     Serial.println("onMeshPacketTx");
+
+    if(!_waitingForNetwork && this->_prefs->flags.tx_bridge){
+        Serial.println(" udp tx packet sent to network");
+        uint8_t pktBuffer[256];
+        uint8_t pktLen = packet->writeTo(pktBuffer);
+        
+        _udp.broadcastTo( pktBuffer, packet->getRawLength(), _prefs->port);
+    }
 }
 
 

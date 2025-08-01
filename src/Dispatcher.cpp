@@ -173,6 +173,9 @@ void Dispatcher::checkRecv() {
     }
   }
   if (pkt) {
+
+    onPacketRx(pkt);
+
     #if MESH_PACKET_LOGGING
     Serial.print(getLogDateTime());
     Serial.printf(": RX, len=%d (type=%d, route=%s, payload_len=%d) SNR=%d RSSI=%d score=%d", 

@@ -12,10 +12,13 @@ namespace mesh {
 class UdpBridge : public mesh::Bridge {
 
 protected:
-  bool _listening;
+  //bool _listening;
+  bool _waitingForNetwork;
   AsyncUDP _udp;
   mesh::UDPBridgePrefs* _prefs;
   mesh::Dispatcher* _dispatcher;
+
+  bool setupListener();
 
 public:
   UdpBridge(mesh::UDPBridgePrefs* prefs);

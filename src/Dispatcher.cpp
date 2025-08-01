@@ -221,7 +221,9 @@ void Dispatcher::setBridge(Bridge* bridge){
 }
 
 void Dispatcher::checkBridge() {
-  
+  if(_bridge){
+    _bridge->loop();
+  }
 }
 
 void Dispatcher::onPacketRx(Packet* pkt) {

@@ -35,6 +35,7 @@ void DataStore::begin() {
 #endif
 
 #if defined(NRF52_PLATFORM) || defined(STM32_PLATFORM)
+  MESH_DEBUG_PRINTLN("testFLash: %d", _fs->testFlash());
   checkAdvBlobFile();
 #else
   // init 'blob store' support
@@ -49,6 +50,7 @@ void DataStore::begin() {
 #elif defined(NRF52_PLATFORM) || defined(STM32_PLATFORM)
   // #include <InternalFileSystem.h> // disabled for now, leaving here for dual fs branch
   #include <../lib/nrf52/CustomLFS/src/CustomLFS.h>
+  #include <../lib/nrf52/CustomLFS/src/CustomLFS_SPIFlash.h>
 #endif
 
 #if defined(NRF52_PLATFORM) || defined(STM32_PLATFORM)

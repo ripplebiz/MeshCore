@@ -14,6 +14,14 @@ static uint32_t _atoi(const char* sp) {
 
 #if defined(NRF52_PLATFORM) || defined(STM32_PLATFORM)
   #include <InternalFileSystem.h>
+  #if defined(XIAO_NRF52)
+    #include "../lib/nrf52/CustomLFS/src/CustomLFS_SPIFlash.h"
+    const int chipSelect = PIN_QSPI_CS;
+    SPIClass SPI_2(NRF_SPIM2, PIN_QSPI_IO1, PIN_QSPI_SCK, PIN_QSPI_IO0);
+
+    CustomLFS_SPIFlash myfs;
+    DataStore store(myfs, rtc_clock);
+  #else
   #if defined(EXTRAFS)
     #include <../lib/nrf52/CustomLFS/src/CustomLFS.h>
     CustomLFS ExtraFS(0xD4000, 0x19000, 128);
@@ -21,6 +29,7 @@ static uint32_t _atoi(const char* sp) {
   #else
     DataStore store(InternalFS, rtc_clock);
   #endif
+#endif
 #elif defined(RP2040_PLATFORM)
   #include <LittleFS.h>
   DataStore store(LittleFS, rtc_clock);
@@ -28,6 +37,7 @@ static uint32_t _atoi(const char* sp) {
   #include <SPIFFS.h>
   DataStore store(SPIFFS, rtc_clock);
 #endif
+
 
 #ifdef ESP32
   #ifdef WIFI_SSID
@@ -115,9 +125,23 @@ void setup() {
   fast_rng.begin(radio_get_rng_seed());
 
 #if defined(NRF52_PLATFORM) || defined(STM32_PLATFORM)
-  InternalFS.begin();
-  #if defined(EXTRAFS)
-    ExtraFS.begin();
+  #if defined(XIAO_NRF52)
+    
+    if (!myfs.begin(chipSelect, SPI_2)) {
+      MESH_DEBUG_PRINTLN("CustomLFS_SPIFlash: failed to initialize");
+    } else {
+      MESH_DEBUG_PRINTLN("CustomLFS_SPIFlash: initialized successfully");
+    }
+  #else
+    InternalFS.begin();
+    #if defined(EXTRAFS)
+      ExtraFS.begin();
+      if (!myfs.begin(chipSelect, SPI_2)) {
+        MESH_DEBUG_PRINTLN("CustomLFS_SPIFlash: failed to initialize");
+      } else {
+        MESH_DEBUG_PRINTLN("CustomLFS_SPIFlash: initialized successfully");
+      }
+    #endif
   #endif
   store.begin();
   the_mesh.begin(

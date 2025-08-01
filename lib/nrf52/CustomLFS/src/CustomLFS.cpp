@@ -102,6 +102,22 @@ CustomLFS::CustomLFS(uint32_t flash_addr, uint32_t flash_size, uint32_t block_si
   _configure_lfs();
 }
 
+CustomLFS::CustomLFS(bool auto_configure)
+  : Adafruit_LittleFS(&_lfs_config)
+  , _flash_addr(0)
+  , _flash_total_size(0)
+  , _block_size(0)
+{
+  // Clear the config but don't configure if auto_configure is false
+  memset(&_lfs_config, 0, sizeof(_lfs_config));
+  if (auto_configure) {
+    _flash_addr = LFS_DEFAULT_FLASH_ADDR;
+    _flash_total_size = LFS_DEFAULT_FLASH_TOTAL_SIZE;
+    _block_size = LFS_DEFAULT_BLOCK_SIZE;
+    _configure_lfs();
+  }
+}
+
 void CustomLFS::_configure_lfs()
 {
   // Clear the configuration structure

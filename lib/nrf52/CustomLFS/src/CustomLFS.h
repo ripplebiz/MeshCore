@@ -43,13 +43,13 @@ using namespace Adafruit_LittleFS_Namespace;
 
 class CustomLFS : public Adafruit_LittleFS
 {
-private:
-  // Flash region configuration
+protected:
+  // Flash region configuration - now protected for derived classes
   uint32_t _flash_addr;
   uint32_t _flash_total_size;
   uint32_t _block_size;
   
-  // LFS configuration structure (one per instance)
+  // LFS configuration structure (one per instance) - now protected
   struct lfs_config _lfs_config;
   
   // Helper function to convert block to address
@@ -57,6 +57,10 @@ private:
     return _flash_addr + block * _block_size;
   }
   
+  // Configure the LFS config structure - now protected for derived classes
+  virtual void _configure_lfs();
+
+private:
   // Static callback functions for LittleFS operations
   static int _flash_read(const struct lfs_config *c, lfs_block_t block, 
                          lfs_off_t off, void *buffer, lfs_size_t size);
@@ -65,8 +69,6 @@ private:
   static int _flash_erase(const struct lfs_config *c, lfs_block_t block);
   static int _flash_sync(const struct lfs_config *c);
   
-  // Configure the LFS config structure
-  void _configure_lfs();
   bool _begun = false;
 
 public:
@@ -76,6 +78,9 @@ public:
   // Constructor with custom flash region
   CustomLFS(uint32_t flash_addr, uint32_t flash_size, 
             uint32_t block_size = LFS_DEFAULT_BLOCK_SIZE);
+  
+  // Protected constructor for derived classes (doesn't auto-configure)
+  CustomLFS(bool auto_configure);
   
   // Set flash region (must be called before begin())
   bool setFlashRegion(uint32_t flash_addr, uint32_t flash_size, 
@@ -87,7 +92,7 @@ public:
   uint32_t getBlockSize(void) const { return _block_size; }
   
   // Begin to handle custom flash regions
-  bool begin(void);
+  virtual bool begin(void);
   
   // Format the specific flash region
   bool formatRegion(void);

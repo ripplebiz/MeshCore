@@ -3,9 +3,13 @@
 
 namespace mesh {
 
-UdpBridge::UdpBridge(UDPBridgePrefs* prefs){
+UdpBridge::UdpBridge(NodePrefs* prefs, mesh::LocalIdentity* identity, mesh::Dispatcher* dispatcher, mesh::RTCClock* clock){
     //_listening = false;
-    _prefs = prefs;
+    _nodePrefs = prefs;
+    _prefs = &prefs->udpBridge;
+    _identity = identity;
+    _dispatcher = dispatcher;
+    _clock = clock;
     _waitingForNetwork = false;
 }
 
@@ -26,6 +30,10 @@ void UdpBridge::start(){
             Serial.println("udp can't start, wait for network");
             _waitingForNetwork = true;
         }
+    }
+
+    if(this->_prefs->flags.tx_bridge || this->_prefs->flags.rx_bridge){
+        this->_outboundPackets = Vector<mesh::BridgePacket>(this->_outboundBuffer);
     }
 }
 
@@ -49,6 +57,17 @@ void UdpBridge::loop(){
                 //_waitingForNetwork = true;
             }
         }
+    } else if(!_inboundPackets.empty()) {
+        // Network is connected
+
+        while(!_inboundPackets.empty()) {
+            mesh::BridgePacket bpacket = _inboundPackets.back();
+
+            _dispatcher->processBridgePacket( bpacket.packet );
+            _dispatcher->releasePacket( bpacket.packet );
+            _inboundPackets.pop_back();
+
+        }
     }
 
 }
@@ -60,40 +79,26 @@ void UdpBridge::stop(){
 }
 
 void UdpBridge::onMeshPacketRx(mesh::Packet* packet){
-    Serial.println("onMeshPacketRx");
 
     if(!_waitingForNetwork && this->_prefs->flags.rx_bridge){
-        uint8_t pktBuffer[256];
-        uint8_t pktLen = packet->writeTo(pktBuffer);
-        
-        if(_prefs->flags.mode == UDP_BRIDGE_MODE_BROADCAST){
-            _udp.broadcastTo( pktBuffer, packet->getRawLength(), _prefs->port);
-        } else {
-            //_udp.sendTo()
-        }
+        Serial.println("onMeshPacketRx - bridging to udp");
+        bridgeMeshPacket(packet, UDP_BRIDGE_MODE_BROADCAST);
     }
 }
 
 void UdpBridge::onMeshPacketTx(mesh::Packet* packet){
-    Serial.println("onMeshPacketTx");
-
+    
     if(!_waitingForNetwork && this->_prefs->flags.tx_bridge){
-        Serial.println(" udp tx packet sent to network");
-        uint8_t pktBuffer[256];
-        uint8_t pktLen = packet->writeTo(pktBuffer);
-        
-        if(_prefs->flags.mode == UDP_BRIDGE_MODE_BROADCAST){
-            _udp.broadcastTo( pktBuffer, packet->getRawLength(), _prefs->port);
-        } else {
-            //_udp.sendTo()
-        }
+        Serial.println("onMeshPacketTx - bridging to udp");
+
+        bridgeMeshPacket(packet, UDP_BRIDGE_MODE_BROADCAST);
     }
 }
 
 
 bool UdpBridge::setupListener(){
 
-    this->_inboundPackets = Vector<mesh::Packet*>(this->_inboundBuffer);
+    this->_inboundPackets = Vector<mesh::BridgePacket>(this->_inboundBuffer);
 
     Serial.println("UDP starting network listner");        
     this->_udp.listen( this->_prefs->port );
@@ -117,19 +122,9 @@ bool UdpBridge::setupListener(){
             Serial.print(packet.length());
             Serial.println();
 
-            mesh::Packet* pkt = this->_dispatcher->obtainNewPacket();
-            pkt->readFrom(packet.data(), packet.length());
+            bufferRawBridgePacket( packet.data(), packet.length(), PACKET_SOURCE_UDP_BRIDGE);
 
-            Serial.printf("Size: %d max: %d\n", _inboundPackets.size(), _inboundPackets.max_size());
-
-            if(!_inboundPackets.full()){
-
-                _inboundPackets.push_back(pkt);
-                Serial.println("queued udp packet");
-
-            } else {
-                this->_dispatcher->releasePacket(pkt);
-            }
+            Serial.printf("UDP queue Size: %d max: %d\n", _inboundPackets.size(), _inboundPackets.max_size());
         });
 
         return true;
@@ -137,6 +132,108 @@ bool UdpBridge::setupListener(){
         Serial.println("UDP failed to start network listener");
 
         return false;
+    }
+}
+
+
+
+void UdpBridge::bufferRawBridgePacket(const uint8_t* data, const uint8_t length, uint8_t source){
+
+    if(_inboundPackets.full()){ Serial.println("\tDROPPING - inbound udp queue full"); return; }
+    
+
+    mesh::Packet* pkt = this->_dispatcher->obtainNewPacket();
+
+    if(pkt){
+
+        pkt->_source = source;
+    
+        mesh::Identity bsender(&data[BP_NODE_PUB_OFFSET]);
+        bool verified = bsender.verify( &data[length-32], data, length-32 );
+
+        if(!verified){
+            _dispatcher->releasePacket(pkt);
+            Serial.println("\tDROPPING - DANGER inbound udp packet is forged or corrupt");
+            return;
+        }
+        
+
+        mesh::BridgePacket bpacket;
+    
+        uint8_t idx = 0;
+        bpacket.version = data[idx++];
+        bpacket.frequency = *((float*) &data[idx+=sizeof(float)]);
+        bpacket.sf = data[idx++];
+        bpacket.bw = *((float*) &data[idx+=sizeof(float)]);
+        bpacket.rssi = *((float*) &data[idx+=sizeof(float)]);
+        bpacket.snr = *((float*) &data[idx+=sizeof(float)]);
+        bpacket.timestamp = *((uint32_t*) &data[idx+=sizeof(uint32_t)]);
+        
+        memcpy( bpacket.node, bsender.pub_key, sizeof(bpacket.node) );
+        idx+=32;
+
+        bpacket.packetLength = data[idx++];
+    
+        pkt->readFrom( &data[idx+=bpacket.packetLength], bpacket.packetLength);
+        bpacket.packet = pkt;
+    
+        memcpy( bpacket.signature, &data[length-32], sizeof(bpacket.signature) );
+
+        
+        if(!_inboundPackets.full()){
+            _inboundPackets.push_back(bpacket);
+            Serial.println("ACCEPTING inbound udp packet");
+        } else {
+            Serial.println("\tDROPPING - inbound udp queue full");
+            _dispatcher->releasePacket(pkt);
+        }
+    } else {
+        Serial.println("\tDROPPING inbound udp packet. mesh packet queue full");
+    }
+
+}
+
+
+
+void UdpBridge::bridgeMeshPacket(mesh::Packet* packet, uint8_t source){
+
+    if(packet->_source == source){
+        Serial.println(" dropping from this bridge");
+        return;
+    }
+
+    //if(!_outboundPackets.full()){ return; }
+
+    mesh::BridgePacket bpacket;
+
+
+    Serial.println(" udp tx packet sent to network");
+    uint8_t pktBuffer[BP_PACKET_MAX_SIZE];
+
+    
+    uint8_t idx = 0;
+    pktBuffer[idx++] = 0x0;                                 // version
+    *((float*) (&pktBuffer[idx+=sizeof(float)])) = _nodePrefs->freq;    // freq
+    pktBuffer[idx+=sizeof(uint8_t)] = _nodePrefs->sf;
+    *((float*) (&pktBuffer[idx+=sizeof(float)])) = _nodePrefs->bw;
+    *((float*) (&pktBuffer[idx+=sizeof(float)])) = 0.0f;    //rssi
+    *((float*) (&pktBuffer[idx+=sizeof(float)])) = packet->getSNR();
+    *((uint32_t*) (&pktBuffer[idx+=sizeof(uint32_t)])) = _clock->getCurrentTime();
+
+    memcpy( &pktBuffer[idx], _identity->pub_key, 32 );
+    idx += 32;
+
+    uint8_t packetLen = packet->getRawLength();
+    pktBuffer[idx+=sizeof(uint8_t)] = packetLen;
+    packet->writeTo( &pktBuffer[idx+=packetLen] );
+
+    _identity->sign( &pktBuffer[idx], pktBuffer, idx );
+    idx+=32;
+    
+    if(_prefs->flags.mode == UDP_BRIDGE_MODE_BROADCAST){
+        _udp.broadcastTo( pktBuffer, idx, _prefs->port);
+    } else {
+        //_udp.sendTo()
     }
 }
 

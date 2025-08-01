@@ -4,17 +4,24 @@
 #include <Vector.h>
 
 
-#define BRIDGE_PACKET_BUFFER_SIZE 10
+#define BRIDGE_PACKET_BUFFER_SIZE 5
 
 namespace mesh {
 
-class BridgePacket{
-  uint8_t version;
-  float frequency;
-  float rssi;
-  float snr;
-  uint32_t timestamp;
-  uint32_t node[32];
+#define BP_PACKET_HEADER_SIZE ( 22 + 32 + 1)
+#define BP_NODE_PUB_OFFSET ( 22 )
+#define BP_PACKET_MAX_SIZE ( MAX_TRANS_UNIT + BP_PACKET_HEADER_SIZE )
+
+struct BridgePacket{
+  uint8_t version;  //0
+  float frequency;  //1
+  uint8_t sf;       //5
+  float bw;         //6
+  float rssi;       //10
+  float snr;        //14
+  uint32_t timestamp; //18
+  uint8_t node[32];   //22
+  uint8_t packetLength;
   mesh::Packet* packet;
   uint8_t signature[32];
 };
@@ -26,8 +33,11 @@ protected:
   //bool _bridge_all;
   //bool _is_running;
   
-  mesh::Packet* _inboundBuffer[BRIDGE_PACKET_BUFFER_SIZE];
-  Vector<mesh::Packet*> _inboundPackets;
+  mesh::BridgePacket _inboundBuffer[BRIDGE_PACKET_BUFFER_SIZE];
+  Vector<mesh::BridgePacket> _inboundPackets;
+
+  mesh::BridgePacket _outboundBuffer[BRIDGE_PACKET_BUFFER_SIZE];
+  Vector<mesh::BridgePacket> _outboundPackets;
 
   public:
   //Bridge(bool bridge_all=false);

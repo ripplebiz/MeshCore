@@ -182,6 +182,7 @@ public:
   }
 
   void setBridge(Bridge* bridge);
+  void processBridgePacket(Packet* pkt);
 
   // helper methods
   bool millisHasNowPassed(unsigned long timestamp) const;

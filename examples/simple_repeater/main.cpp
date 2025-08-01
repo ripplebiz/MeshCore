@@ -648,7 +648,7 @@ public:
                       _prefs.udpBridge.flags.tx_bridge;
 
     if(udpEnabled){
-      mesh::UdpBridge* udpBridge = new mesh::UdpBridge( &_prefs.udpBridge );
+      mesh::UdpBridge* udpBridge = new mesh::UdpBridge( &_prefs, &this->self_id, this, getRTCClock() );
       setBridge( udpBridge );
     }
 

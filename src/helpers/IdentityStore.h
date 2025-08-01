@@ -4,9 +4,12 @@
   #include <FS.h>
   #define FILESYSTEM  fs::FS
 #elif defined(NRF52_PLATFORM) || defined(STM32_PLATFORM)
-  #if defined(XIAO_NRF52)
-    #include "../lib/nrf52/CustomLFS/src/CustomLFS_SPIFlash.h"
+  #if defined(SPIFLASH)
+    #include <CustomLFS_SPIFlash.h>
     #define FILESYSTEM CustomLFS_SPIFlash
+  #elif defined(EXTRAFS)
+    #include <CustomLFS.h>
+    #define FILESYSTEM CustomLFS
   #else
     #include <Adafruit_LittleFS.h>
     #define FILESYSTEM  Adafruit_LittleFS

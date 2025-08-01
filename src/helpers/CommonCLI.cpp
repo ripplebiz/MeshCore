@@ -457,21 +457,21 @@ void CommonCLI::handleCommand(uint32_t sender_timestamp, const char* command, ch
         strcpy(reply, "OK - Reboot to apply");
       } else if (memcmp(config, "udp.network_bridge ", 19) == 0) {
         
-        _prefs->udpBridge.flags.network_bridge = memcmp(&config[19], "off", 3) == 0;
+        _prefs->udpBridge.flags.network_bridge = memcmp(&config[19], "on", 2) == 0;
         savePrefs();
-        strcpy(reply, _prefs->udpBridge.flags.network_bridge ? "OK - udp network_bridge is now OFF" : "OK - udp network_bridge is now ON");
+        strcpy(reply, _prefs->udpBridge.flags.network_bridge ? "OK - udp network_bridge is now ON" : "OK - udp network_bridge is now OFF");
 
       } else if (memcmp(config, "udp.rx_bridge ", 14) == 0) {
         
-        _prefs->udpBridge.flags.rx_bridge = memcmp(&config[14], "off", 3) == 0;
+        _prefs->udpBridge.flags.rx_bridge = memcmp(&config[14], "on", 2) == 0;
         savePrefs();
-        strcpy(reply, _prefs->udpBridge.flags.rx_bridge ? "OK - udp rx_bridge is now OFF" : "OK - udp rx_bridge is now ON");
+        strcpy(reply, _prefs->udpBridge.flags.rx_bridge ? "OK - udp rx_bridge is now ON" : "OK - udp rx_bridge is now OFF");
       
       } else if (memcmp(config, "udp.tx_bridge ", 14) == 0) {
 
-        _prefs->udpBridge.flags.tx_bridge = memcmp(&config[14], "off", 3) == 0;
+        _prefs->udpBridge.flags.tx_bridge = memcmp(&config[14], "on", 2) == 0;
         savePrefs();
-        strcpy(reply, _prefs->udpBridge.flags.tx_bridge ? "OK - udp tx_bridge is now OFF" : "OK - udp tx_bridge is now ON");
+        strcpy(reply, _prefs->udpBridge.flags.tx_bridge ? "OK - udp tx_bridge is now ON" : "OK - udp tx_bridge is now OFF");
       
       } else if (memcmp(config, "udp.ip_version ", 15) == 0) {
 

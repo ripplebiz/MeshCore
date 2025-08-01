@@ -15,11 +15,12 @@ void UdpBridge::start(){
 
         if(WiFi.status() == WL_CONNECTED){
             Serial.println("udp can start, connected");
-            //if(setupListener()){
+            if(setupListener()){
                 _waitingForNetwork = false;
-            /*} else {
+            } else {
+                Serial.println("udp failed to start");
                 _waitingForNetwork = true;
-            }*/
+            }
 
         } else {
             Serial.println("udp can't start, wait for network");
@@ -31,18 +32,23 @@ void UdpBridge::start(){
 void UdpBridge::loop(){
 
     if(_waitingForNetwork){
-        /*if(this->_prefs->flags.network_bridge){
+        if(this->_prefs->flags.network_bridge){
             if(WiFi.status() == WL_CONNECTED){
+                Serial.println("udp can start now");
+                _waitingForNetwork = false;
                 if(setupListener()){
+                    Serial.println("udp listener success");
                     _waitingForNetwork = false;
                 } else {
                     _waitingForNetwork = true;
+                    Serial.println("udp failed to start");
                 }
 
             } else {
-                _waitingForNetwork = true;
+                //Serial.println("Still waiting");
+                //_waitingForNetwork = true;
             }
-        }*/
+        }
     }
 
 }
@@ -112,5 +118,3 @@ bool UdpBridge::setupListener(){
 }
 
 }
-
-

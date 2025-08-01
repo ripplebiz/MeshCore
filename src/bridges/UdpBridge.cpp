@@ -66,7 +66,11 @@ void UdpBridge::onMeshPacketRx(mesh::Packet* packet){
         uint8_t pktBuffer[256];
         uint8_t pktLen = packet->writeTo(pktBuffer);
         
-        _udp.broadcastTo( pktBuffer, pktLen, _prefs->port);
+        if(_prefs->flags.mode == UDP_BRIDGE_MODE_BROADCAST){
+            _udp.broadcastTo( pktBuffer, packet->getRawLength(), _prefs->port);
+        } else {
+            //_udp.sendTo()
+        }
     }
 }
 
@@ -78,7 +82,11 @@ void UdpBridge::onMeshPacketTx(mesh::Packet* packet){
         uint8_t pktBuffer[256];
         uint8_t pktLen = packet->writeTo(pktBuffer);
         
-        _udp.broadcastTo( pktBuffer, packet->getRawLength(), _prefs->port);
+        if(_prefs->flags.mode == UDP_BRIDGE_MODE_BROADCAST){
+            _udp.broadcastTo( pktBuffer, packet->getRawLength(), _prefs->port);
+        } else {
+            //_udp.sendTo()
+        }
     }
 }
 

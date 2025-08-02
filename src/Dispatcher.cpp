@@ -23,9 +23,11 @@ void Dispatcher::begin() {
   _radio->begin();
   prev_isrecv_mode = _radio->isInRecvMode();
 
+  #ifdef ENABLE_BRIDGES
   if(_bridge){
     _bridge->start();
   }
+  #endif
 }
 
 float Dispatcher::getAirtimeBudgetFactor() const {
@@ -110,7 +112,10 @@ void Dispatcher::loop() {
   }
   checkRecv();
   checkSend();
+
+  #ifdef ENABLE_BRIDGES
   checkBridge();
+  #endif
 }
 
 void Dispatcher::checkRecv() {
@@ -217,6 +222,7 @@ void Dispatcher::checkRecv() {
   }
 }
 
+#ifdef ENABLE_BRIDGES
 void Dispatcher::setBridge(Bridge* bridge){
 
   this->_bridge = bridge;
@@ -228,32 +234,30 @@ void Dispatcher::checkBridge() {
     _bridge->loop();
   }
 }
+#endif
 
 void Dispatcher::onPacketRx(Packet* pkt) {
+  #ifdef ENABLE_BRIDGES
   if(this->_bridge){
     this->_bridge->onMeshPacketRx(pkt);
   }
+  #endif
 }
 
 
 void Dispatcher::onPacketTx(Packet* pkt) {
+  #ifdef ENABLE_BRIDGES
   if(this->_bridge){
     this->_bridge->onMeshPacketTx(pkt);
   }
+  #endif
 }
 
 void Dispatcher::processBridgePacket(Packet* pkt) {
-  DispatcherAction action = onRecvPacket(pkt);
-  if (action == ACTION_RELEASE) {
-    _mgr->free(pkt);
-  } else if (action == ACTION_MANUAL_HOLD) {
-    // sub-class is wanting to manually hold Packet instance, and call releasePacket() at appropriate time
-  } else {   // ACTION_RETRANSMIT*
-    uint8_t priority = (action >> 24) - 1;
-    uint32_t _delay = action & 0xFFFFFF;
 
-    _mgr->queueOutbound(pkt, priority, futureMillis(_delay));
-  }
+  #ifdef ENABLE_BRIDGES
+  processRecvPacket(pkt);
+  #endif
 }
 
 

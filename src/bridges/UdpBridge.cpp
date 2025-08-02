@@ -82,7 +82,7 @@ void UdpBridge::onMeshPacketRx(mesh::Packet* packet){
 
     if(!_waitingForNetwork && this->_prefs->flags.rx_bridge){
         Serial.println("onMeshPacketRx - bridging to udp");
-        bridgeMeshPacket(packet, UDP_BRIDGE_MODE_BROADCAST);
+        bridgeMeshPacket(packet, PACKET_SOURCE_UDP_BRIDGE);
     }
 }
 
@@ -91,7 +91,7 @@ void UdpBridge::onMeshPacketTx(mesh::Packet* packet){
     if(!_waitingForNetwork && this->_prefs->flags.tx_bridge){
         Serial.println("onMeshPacketTx - bridging to udp");
 
-        bridgeMeshPacket(packet, UDP_BRIDGE_MODE_BROADCAST);
+        bridgeMeshPacket(packet, PACKET_SOURCE_UDP_BRIDGE);
     }
 }
 

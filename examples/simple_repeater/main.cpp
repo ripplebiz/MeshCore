@@ -8,13 +8,17 @@
   #include <LittleFS.h>
 #elif defined(ESP32)
   #include <SPIFFS.h>
-  #include <WiFi.h>
   #include <AsyncUDP.h>
-  #include <Vector.h>
   #include <Packet.h>
   #include <Dispatcher.h>
+  #endif
+  
+  
+  #if defined(ESP32) && ENABLE_BRIDGES
+  #include <Vector.h>
   #include <bridges/UdpBridge.h>
 #endif
+
 
 #include <helpers/ArduinoHelpers.h>
 #include <helpers/StaticPoolPacketManager.h>
@@ -633,7 +637,7 @@ public:
     StrHelper::strncpy(_prefs.wifi_ssid, WIFI_BRIDGE_SSID, sizeof(_prefs.wifi_ssid));
     StrHelper::strncpy(_prefs.wifi_password, WIFI_BRIDGE_PASSWORD, sizeof(_prefs.wifi_password));
 
-    #if defined(ESP32)
+    #if defined(ESP32) && ENABLE_BRIDGES
     
     _prefs.udpBridge.flags.network_bridge = true;
     _prefs.udpBridge.flags.rx_bridge = false;

@@ -5,7 +5,10 @@
 #include <Packet.h>
 #include <Utils.h>
 #include <string.h>
+
+#ifdef ENABLE_BRIDGES
 #include <Bridge.h>
+#endif
 
 namespace mesh {
 
@@ -130,8 +133,11 @@ protected:
   PacketManager* _mgr;
   Radio* _radio;
   MillisecondClock* _ms;
-  Bridge* _bridge;
   uint16_t _err_flags;
+
+  #ifdef ENABLE_BRIDGES
+  Bridge* _bridge;
+  #endif
 
   Dispatcher(Radio& radio, MillisecondClock& ms, PacketManager& mgr)
     : _radio(&radio), _ms(&ms), _mgr(&mgr)
@@ -181,9 +187,12 @@ public:
     _err_flags = 0;
   }
 
+  #ifdef ENABLE_BRIDGES
   void setBridge(Bridge* bridge);
+  #endif
+  
   void processBridgePacket(Packet* pkt);
-
+  
   // helper methods
   bool millisHasNowPassed(unsigned long timestamp) const;
   unsigned long futureMillis(int millis_from_now) const;
@@ -191,7 +200,10 @@ public:
 private:
   void checkRecv();
   void checkSend();
+
+  #ifdef ENABLE_BRIDGES
   void checkBridge();
+  #endif
 };
 
 }

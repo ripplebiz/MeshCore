@@ -21,9 +21,9 @@ struct BridgePacket{
   float snr;        //14
   uint32_t timestamp; //18
   uint8_t node[32];   //22
-  uint8_t packetLength;
+  uint8_t packetLength; //34
   mesh::Packet* packet;
-  uint8_t signature[32];
+  uint8_t signature[64];
 };
 
 class Bridge {

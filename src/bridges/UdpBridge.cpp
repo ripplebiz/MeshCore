@@ -306,6 +306,27 @@ void UdpBridge::bridgeMeshPacket(mesh::Packet* packet, uint8_t source){
     if(_prefs->flags.mode == UDP_BRIDGE_MODE_BROADCAST){
         _udp.broadcastTo( pktBuffer, idx, _prefs->port);
     } else {
+
+        AsyncUDPMessage msg(idx);
+
+        msg.write( pktBuffer, idx );
+
+
+        if(_prefs->flags.ip_version == UDP_BRIDGE_IPV4){
+
+            // ipv4
+            IPAddress addr4( _prefs->ipv4 );
+            _udp.sendTo(msg, addr4, _prefs->port);
+
+        } else {
+
+            // ipv6
+            IPv6Address addr6( _prefs->ipv6 );
+            _udp.sendTo(msg, addr6, _prefs->port);
+
+        }
+
+
         //_udp.sendTo()
     }
 

@@ -167,19 +167,10 @@ void UdpBridge::bufferRawBridgePacket(const uint8_t* data, const uint8_t length,
 
     if(_inboundPackets.full()){ Serial.println("\tDROPPING - inbound udp queue full"); return; }
 
-    Serial.printf("Got packet len = %i\n\r", length);
+    Serial.printf("Got udp packet len = %i\n\r", length);
 
     Serial.print("0x");
-    int col = 0;
-    for (int i = 0; i < length; i++){
-        Serial.print(data[i], HEX);
-        col++;
-        if(col == 20){
-            col = 0;
-            Serial.println();
-        }
-    }
-        
+    mesh::Utils::printHex(Serial, data, length);
     Serial.println();
     
 
@@ -202,25 +193,25 @@ void UdpBridge::bufferRawBridgePacket(const uint8_t* data, const uint8_t length,
 
         mesh::BridgePacket bpacket;
     
-        uint8_t idx = 0;
-        bpacket.version = data[idx]; idx++;
-        bpacket.frequency = *((float*) (data+idx)); idx+=sizeof(float);
-        bpacket.sf = data[idx]; idx++;
-        bpacket.bw = *((float*) (data+idx)); idx+=sizeof(float);
-        bpacket.rssi = *((float*) (data+idx)); idx+=sizeof(float);
-        bpacket.snr = *((float*) (data+idx)); idx+=sizeof(float);
-        bpacket.timestamp = *((uint32_t*) (data+idx)); idx+=sizeof(uint32_t);
+        uint8_t* idx = (uint8_t*) data;
+        bpacket.version = *idx; idx++;
+        bpacket.frequency = *((float*) idx); idx+=sizeof(float);
+        bpacket.sf = *idx; idx++;
+        bpacket.bw = *((float*) idx); idx+=sizeof(float);
+        bpacket.rssi = *((float*) idx); idx+=sizeof(float);
+        bpacket.snr = *((float*) idx); idx+=sizeof(float);
+        bpacket.timestamp = *((uint32_t*) idx); idx+=sizeof(uint32_t);
         
         memcpy( bpacket.node, bsender.pub_key, PUB_KEY_SIZE );
         idx+=PUB_KEY_SIZE;
 
-        bpacket.packetLength = *((uint16_t*) (data+idx)); idx+=sizeof(uint16_t);
+        bpacket.packetLength = *((uint16_t*) idx); idx+=sizeof(uint16_t);
     
-        pkt->readFrom( data+idx, bpacket.packetLength);
+        pkt->readFrom( idx, bpacket.packetLength);
         bpacket.packet = pkt;
         idx+=bpacket.packetLength;
     
-        memcpy( bpacket.signature, data+(length-SIGNATURE_SIZE), SIGNATURE_SIZE );
+        memcpy( bpacket.signature, idx, SIGNATURE_SIZE );
 
         
         if(!_inboundPackets.full()){
@@ -254,33 +245,33 @@ void UdpBridge::bridgeMeshPacket(mesh::Packet* packet, uint8_t source){
 
     Serial.println(" mesh packet sent to udp network");
     uint8_t* pktBuffer = (uint8_t*) malloc(BP_PACKET_MAX_SIZE);
+    uint8_t* idx = pktBuffer;
 
-    size_t idx = 0;
-    pktBuffer[idx] = 0x0;                                 // version
+    //size_t idx = 0;
+    *(idx) = 0x0;                                 // version
     idx++;
 
     //Serial.printf("2   idx = %i\n", idx);
 
-    memcpy( pktBuffer+idx, (void*) &_nodePrefs->freq, sizeof(float)  );
+    *((float*) idx) = _nodePrefs->freq;
     idx+=sizeof(float);
     
     ///Serial.printf("3   idx = %i\n", idx);
 
-    pktBuffer[idx] = _nodePrefs->sf;
+    *idx = _nodePrefs->sf;
     idx+=sizeof(uint8_t);
     
     ///Serial.printf("4   idx = %i\n", idx);
 
     // *((float*) (&pktBuffer[idx+=sizeof(float)])) = _nodePrefs->bw;
 
-    memcpy( pktBuffer+idx, (void*) &_nodePrefs->bw, sizeof(float)  );
+    *((float*) idx) = _nodePrefs->bw;
     idx+=sizeof(float);
     
     //Serial.printf("5   idx = %i\n", idx);
 
-    // *((float*) (&pktBuffer[idx+=sizeof(float)])) = 0.0f;    //rssi
     float rssi = 0.0f;
-    memcpy( pktBuffer+idx, (void*) &rssi, sizeof(float)  );
+    *((float*) idx) = rssi;
     idx+=sizeof(float);
     
     //Serial.printf("6   idx = %i\n", idx);
@@ -288,72 +279,53 @@ void UdpBridge::bridgeMeshPacket(mesh::Packet* packet, uint8_t source){
     float snr = packet->getSNR();
 
     // *((float*) (&pktBuffer[idx+=sizeof(float)])) = packet->getSNR();
-    memcpy( pktBuffer+idx, (void*) &snr, sizeof(float)  );
+    *((float*) idx) = snr;
     idx+=sizeof(float);
     
     //Serial.printf("7   idx = %i\n", idx);
 
     uint32_t time = _clock->getCurrentTime();
-    //*((uint32_t*) (&pktBuffer[idx+=sizeof(uint32_t)])) = _clock->getCurrentTime();
-    memcpy( pktBuffer+idx, (void*) &time, sizeof(uint32_t)  );
+    *((uint32_t*) idx) = time;
     idx+=sizeof(uint32_t);
     
-    //Serial.printf("8   idx = %i\n", idx);
 
-
-    memcpy( pktBuffer+idx, _identity->pub_key, PUB_KEY_SIZE );
+    memcpy( idx, _identity->pub_key, PUB_KEY_SIZE );
     idx += PUB_KEY_SIZE;
     
     //Serial.printf("9   idx = %i\n", idx);
 
 
     uint16_t packetLen = (uint16_t) packet->getRawLength();
-    memcpy( pktBuffer+idx, (void*) &packetLen, sizeof(uint16_t)  );
+    *((uint16_t*) idx) = packetLen;
     idx+=sizeof(uint16_t);
-    //pktBuffer[idx] = (uint8_t) packetLen;
-    //idx++;
 
-    //memcpy( pktBuffer+(idx+=sizeof(int)), (void*) &packetLen, sizeof(int)  );
-    
     //Serial.printf("10   idx = %i\n", idx);
 
-    uint8_t written = packet->writeTo( pktBuffer+idx);
+    uint8_t written = packet->writeTo( idx);
     idx+=written;
 
-    Serial.printf("   wrote = %i vs expected = %i\n", written, packetLen);
+    //Serial.printf("   wrote = %i vs expected = %i\n", written, packetLen);
     
     //Serial.printf("11   idx = %i\n", idx);
 
 
-    _identity->sign( pktBuffer+idx, pktBuffer, idx );
+    _identity->sign( idx, pktBuffer, idx - pktBuffer );
     idx+=SIGNATURE_SIZE;
     
-    //Serial.printf("12   idx = %i\n", idx);
-
-    //Serial.printf("   buffer.maxlen = %i\n", sizeof(pktBuffer));
-
-    Serial.printf("Sending packet len = %i\r\n", idx);
+    Serial.println("got mesh packet");
 
     Serial.print("0x");
-    int col = 0;
-    for (int i = 0; i < idx; i++){
-        Serial.print(pktBuffer[i], HEX);
-        col++;
-        if(col == 20){
-            col = 0;
-            Serial.println();
-        }
-    }
+    mesh::Utils::printHex(Serial, pktBuffer, idx-pktBuffer);
     Serial.println();
 
     
     if(_prefs->flags.mode == UDP_BRIDGE_MODE_BROADCAST){
-        _udp.broadcastTo( pktBuffer, idx, _prefs->port);
+        _udp.broadcastTo( pktBuffer, idx-pktBuffer, _prefs->port);
     } else {
 
-        AsyncUDPMessage msg(idx);
+        AsyncUDPMessage msg(idx-pktBuffer);
 
-        msg.write( pktBuffer, idx );
+        msg.write( pktBuffer, idx-pktBuffer );
 
         if(_prefs->flags.ip_version == UDP_BRIDGE_IPV4){
 

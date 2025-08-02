@@ -208,7 +208,7 @@ void UdpBridge::bridgeMeshPacket(mesh::Packet* packet, uint8_t source){
 
 
     Serial.println(" mesh packet sent to udp network");
-    uint8_t* pktBuffer = malloc(BP_PACKET_MAX_SIZE);
+    uint8_t* pktBuffer = (uint8_t*) malloc(BP_PACKET_MAX_SIZE);
 
     
     size_t idx = 0;
@@ -273,7 +273,7 @@ void UdpBridge::bridgeMeshPacket(mesh::Packet* packet, uint8_t source){
         //_udp.sendTo()
     }
 
-    free(pktBuffer);
+    free( (void*) pktBuffer);
 }
 
 }

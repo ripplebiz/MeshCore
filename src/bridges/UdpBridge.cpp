@@ -167,10 +167,19 @@ void UdpBridge::bufferRawBridgePacket(const uint8_t* data, const uint8_t length,
 
     if(_inboundPackets.full()){ Serial.println("\tDROPPING - inbound udp queue full"); return; }
 
-    Serial.printf("Got packet len = %i\r\n", length);
+    Serial.printf("Got packet len = %i\n\r", length);
 
     Serial.print("0x");
-    for (int i = 0; i < length; i++) Serial.print(data[i], HEX);
+    int col = 0;
+    for (int i = 0; i < length; i++){
+        Serial.print(data[i], HEX);
+        col++;
+        if(col == 20){
+            col = 0;
+            Serial.println();
+        }
+    }
+        
     Serial.println();
     
 
@@ -326,7 +335,15 @@ void UdpBridge::bridgeMeshPacket(mesh::Packet* packet, uint8_t source){
     Serial.printf("Sending packet len = %i\r\n", idx);
 
     Serial.print("0x");
-    for (int i = 0; i < idx; i++) Serial.print(pktBuffer[i], HEX);
+    int col = 0;
+    for (int i = 0; i < length; i++){
+        Serial.print(data[i], HEX);
+        col++;
+        if(col == 20){
+            col = 0;
+            Serial.println();
+        }
+    }
     Serial.println();
 
     

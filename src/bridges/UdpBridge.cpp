@@ -166,6 +166,12 @@ bool UdpBridge::setupListener(){
 void UdpBridge::bufferRawBridgePacket(const uint8_t* data, const uint8_t length, uint8_t source){
 
     if(_inboundPackets.full()){ Serial.println("\tDROPPING - inbound udp queue full"); return; }
+
+    Serial.printf("Got packet len = %i\r\n", length);
+
+        Serial.print("0x");
+        for (int i = 0; i < length; i++) Serial.print(data[i], HEX);
+        Serial.println();
     
 
     mesh::Packet* pkt = this->_dispatcher->obtainNewPacket();
@@ -325,6 +331,12 @@ void UdpBridge::bridgeMeshPacket(mesh::Packet* packet, uint8_t source){
         AsyncUDPMessage msg(idx);
 
         msg.write( pktBuffer, idx );
+
+        Serial.printf("Sending packet len = %i\r\n", idx);
+
+        Serial.print("0x");
+        for (int i = 0; i < idx; i++) Serial.print(pktBuffer[i], HEX);
+        Serial.println();
 
 
         if(_prefs->flags.ip_version == UDP_BRIDGE_IPV4){

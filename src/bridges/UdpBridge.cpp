@@ -60,6 +60,8 @@ void UdpBridge::loop(){
     } else if(!_inboundPackets.empty()) {
         // Network is connected
 
+        Serial.printf("udp bridge has packets %i", _inboundPackets.size());
+
         while(!_inboundPackets.empty()) {
             mesh::BridgePacket bpacket = _inboundPackets.back();
 

@@ -256,7 +256,21 @@ void Dispatcher::onPacketTx(Packet* pkt) {
 void Dispatcher::processBridgePacket(Packet* pkt) {
 
   #ifdef ENABLE_BRIDGES
-  processRecvPacket(pkt);
+  mesh::DispatcherAction action = onRecvPacket(pkt);
+    if (action == ACTION_RELEASE) {
+      Serial.println("release udp packet");
+      _mgr->free(pkt);
+    } else if (action == ACTION_MANUAL_HOLD) {
+      Serial.println("hold");
+      // sub-class is wanting to manually hold Packet instance, and call releasePacket() at appropriate time
+    } else {   // ACTION_RETRANSMIT*
+      uint8_t priority = (action >> 24) - 1;
+      uint32_t _delay = action & 0xFFFFFF;
+
+      Serial.println("bridging udp packet to mesh");
+
+      _mgr->queueOutbound(pkt, priority, futureMillis(_delay));
+    }
   #endif
 }
 

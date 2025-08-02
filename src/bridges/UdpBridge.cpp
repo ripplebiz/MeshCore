@@ -188,20 +188,20 @@ void UdpBridge::bufferRawBridgePacket(const uint8_t* data, const uint8_t length,
         mesh::BridgePacket bpacket;
     
         uint8_t idx = 0;
-        bpacket.version = data[idx++];
-        bpacket.frequency = *((float*) &data[idx+=sizeof(float)]);
-        bpacket.sf = data[idx++];
-        bpacket.bw = *((float*) &data[idx+=sizeof(float)]);
-        bpacket.rssi = *((float*) &data[idx+=sizeof(float)]);
-        bpacket.snr = *((float*) &data[idx+=sizeof(float)]);
-        bpacket.timestamp = *((uint32_t*) &data[idx+=sizeof(uint32_t)]);
+        bpacket.version = data[idx]; idx++;
+        bpacket.frequency = *((float*) (data+idx)); idx+=sizeof(float);
+        bpacket.sf = data[idx]; idx++;
+        bpacket.bw = *((float*) (data+idx)); idx+=sizeof(float);
+        bpacket.rssi = *((float*) (data+idx)); idx+=sizeof(float);
+        bpacket.snr = *((float*) (data+idx)); idx+=sizeof(float);
+        bpacket.timestamp = *((uint32_t*) (data+idx)); idx+=sizeof(uint32_t);
         
         memcpy( bpacket.node, bsender.pub_key, PUB_KEY_SIZE );
         idx+=PUB_KEY_SIZE;
 
-        bpacket.packetLength = *((uint16_t*) &data[idx+=sizeof(uint16_t)]);
+        bpacket.packetLength = *((uint16_t*) (data+idx)); idx+=sizeof(uint16_t);
     
-        pkt->readFrom( data + (idx), bpacket.packetLength);
+        pkt->readFrom( data+idx, bpacket.packetLength);
         bpacket.packet = pkt;
         idx+=bpacket.packetLength;
     

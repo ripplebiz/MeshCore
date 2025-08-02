@@ -336,8 +336,8 @@ void UdpBridge::bridgeMeshPacket(mesh::Packet* packet, uint8_t source){
 
     Serial.print("0x");
     int col = 0;
-    for (int i = 0; i < length; i++){
-        Serial.print(data[i], HEX);
+    for (int i = 0; i < idx; i++){
+        Serial.print(pktBuffer[i], HEX);
         col++;
         if(col == 20){
             col = 0;

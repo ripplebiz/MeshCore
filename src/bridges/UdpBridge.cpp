@@ -252,7 +252,7 @@ void UdpBridge::bridgeMeshPacket(mesh::Packet* packet, uint8_t source){
     ///Serial.printf("3   idx = %i\n", idx);
 
     pktBuffer[idx] = _nodePrefs->sf;
-    idx+=sizeof(uint8_t)
+    idx+=sizeof(uint8_t);
     
     ///Serial.printf("4   idx = %i\n", idx);
 

@@ -211,7 +211,7 @@ void UdpBridge::bridgeMeshPacket(mesh::Packet* packet, uint8_t source){
     uint8_t pktBuffer[BP_PACKET_MAX_SIZE];
 
     
-    uint8_t idx = 0;
+    size_t idx = 0;
     pktBuffer[idx++] = 0x0;                                 // version
 
     Serial.printf("2   idx = %i\n", idx);
@@ -252,7 +252,9 @@ void UdpBridge::bridgeMeshPacket(mesh::Packet* packet, uint8_t source){
     
     Serial.printf("10   idx = %i\n", idx);
 
-    packet->writeTo( &pktBuffer[idx+=packetLen] );
+    uint8_t written = packet->writeTo( &pktBuffer[idx+=packetLen] );
+
+    Serial.printf("   wrote = %i vs expected = %i\n", written, packetLen);
     
     Serial.printf("11   idx = %i\n", idx);
 
@@ -261,6 +263,8 @@ void UdpBridge::bridgeMeshPacket(mesh::Packet* packet, uint8_t source){
     idx+=32;
     
     Serial.printf("12   idx = %i\n", idx);
+
+    Serial.printf("   buffer.maxlen = %i\n", sizeof(pktBuffer));
 
     
     if(_prefs->flags.mode == UDP_BRIDGE_MODE_BROADCAST){

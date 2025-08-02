@@ -204,6 +204,8 @@ void UdpBridge::bridgeMeshPacket(mesh::Packet* packet, uint8_t source){
 
     //if(!_outboundPackets.full()){ return; }
 
+    Serial.printf("free heap %i\n", ESP.getFreeHeap());
+
     mesh::BridgePacket bpacket;
 
 

@@ -69,18 +69,18 @@ bool NanoG2UltraSensorManager::begin()
 
   pinMode(PIN_GPS_STANDBY, OUTPUT);
   digitalWrite(PIN_GPS_STANDBY, HIGH); // Wake GPS from standby
-  delay(500);
+  delay(700);
 
   // We'll consider GPS detected if we see any data on Serial1
   if (Serial1.available() > 0)
   {
+    gps_active = true; // set to enabled if powered on with gps switched on
     MESH_DEBUG_PRINTLN("GPS detected");
   }
   else
   {
     MESH_DEBUG_PRINTLN("No GPS detected");
   }
-  digitalWrite(GPS_EN, LOW); // Put GPS back into standby mode
   return true;
 }
 
@@ -96,17 +96,23 @@ bool NanoG2UltraSensorManager::querySensors(uint8_t requester_permissions, Cayen
 void NanoG2UltraSensorManager::loop()
 {
   static long next_gps_update = 0;
+  gps_active = (Serial1.available() > 0); // get gps active state by checking power to module
   _location->loop();
-  if (millis() > next_gps_update && gps_active) // don't bother if gps position is not enabled
+  if (millis() > next_gps_update && gps_active) // don't bother checking location if gps is not enabled
   {
+    MESH_DEBUG_PRINTLN("Checking for location..");
     if (_location->isValid())
     {
+      MESH_DEBUG_PRINTLN("Valid location found..");
       node_lat = ((double)_location->getLatitude()) / 1000000.;
       node_lon = ((double)_location->getLongitude()) / 1000000.;
       node_altitude = ((double)_location->getAltitude()) / 1000.0;
       MESH_DEBUG_PRINTLN("lat %f lon %f", node_lat, node_lon);
+    } else {
+      MESH_DEBUG_PRINTLN("INVALID location found..");
+      MESH_DEBUG_PRINTLN("lat %f lon %f", ((double)_location->getLatitude()) / 1000000, ((double)_location->getLongitude()) / 1000000);
     }
-    next_gps_update = millis() + (1000 * 60); // after initial update, only check every minute TODO: should be configurable
+    next_gps_update = millis() + (1000 * 10); // after initial update, only check every 10s TODO: should be configurable
   }
 }
 

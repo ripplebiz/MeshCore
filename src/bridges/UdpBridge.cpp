@@ -204,7 +204,7 @@ void UdpBridge::bridgeMeshPacket(mesh::Packet* packet, uint8_t source){
 
     //if(!_outboundPackets.full()){ return; }
 
-    Serial.printf("free heap %i and max alloc %i\n", ESP.getFreeHeap(), ESP.getMaxAllocHeap());
+    //Serial.printf("free heap %i and max alloc %i\n", ESP.getFreeHeap(), ESP.getMaxAllocHeap());
 
     mesh::BridgePacket bpacket;
 
@@ -215,46 +215,46 @@ void UdpBridge::bridgeMeshPacket(mesh::Packet* packet, uint8_t source){
     size_t idx = 0;
     pktBuffer[idx++] = 0x0;                                 // version
 
-    Serial.printf("2   idx = %i\n", idx);
+    //Serial.printf("2   idx = %i\n", idx);
 
     memcpy( pktBuffer+(idx+=sizeof(float)), (void*) &_nodePrefs->freq, sizeof(float)  );
     
-    Serial.printf("3   idx = %i\n", idx);
+    ///Serial.printf("3   idx = %i\n", idx);
 
     pktBuffer[idx+=sizeof(uint8_t)] = _nodePrefs->sf;
     
-    Serial.printf("4   idx = %i\n", idx);
+    ///Serial.printf("4   idx = %i\n", idx);
 
     // *((float*) (&pktBuffer[idx+=sizeof(float)])) = _nodePrefs->bw;
 
     memcpy( pktBuffer+(idx+=sizeof(float)), (void*) &_nodePrefs->bw, sizeof(float)  );
     
-    Serial.printf("5   idx = %i\n", idx);
+    //Serial.printf("5   idx = %i\n", idx);
 
     // *((float*) (&pktBuffer[idx+=sizeof(float)])) = 0.0f;    //rssi
     float rssi = 0.0f;
     memcpy( pktBuffer+(idx+=sizeof(float)), (void*) &rssi, sizeof(float)  );
     
-    Serial.printf("6   idx = %i\n", idx);
+    //Serial.printf("6   idx = %i\n", idx);
 
     float snr = packet->getSNR();
 
     // *((float*) (&pktBuffer[idx+=sizeof(float)])) = packet->getSNR();
     memcpy( pktBuffer+(idx+=sizeof(float)), (void*) &snr, sizeof(float)  );
     
-    Serial.printf("7   idx = %i\n", idx);
+    //Serial.printf("7   idx = %i\n", idx);
 
     uint32_t time = _clock->getCurrentTime();
     //*((uint32_t*) (&pktBuffer[idx+=sizeof(uint32_t)])) = _clock->getCurrentTime();
     memcpy( pktBuffer+(idx+=sizeof(uint32_t)), (void*) &time, sizeof(uint32_t)  );
     
-    Serial.printf("8   idx = %i\n", idx);
+    //Serial.printf("8   idx = %i\n", idx);
 
 
     memcpy( &pktBuffer[idx], _identity->pub_key, 32 );
     idx += 32;
     
-    Serial.printf("9   idx = %i\n", idx);
+    //Serial.printf("9   idx = %i\n", idx);
 
 
     int packetLen = packet->getRawLength();
@@ -262,21 +262,21 @@ void UdpBridge::bridgeMeshPacket(mesh::Packet* packet, uint8_t source){
 
     //memcpy( pktBuffer+(idx+=sizeof(int)), (void*) &packetLen, sizeof(int)  );
     
-    Serial.printf("10   idx = %i\n", idx);
+    //Serial.printf("10   idx = %i\n", idx);
 
     uint8_t written = packet->writeTo( pktBuffer+ (idx+=packetLen) );
 
-    Serial.printf("   wrote = %i vs expected = %i\n", written, packetLen);
+    //Serial.printf("   wrote = %i vs expected = %i\n", written, packetLen);
     
-    Serial.printf("11   idx = %i\n", idx);
+    //Serial.printf("11   idx = %i\n", idx);
 
 
     _identity->sign( pktBuffer+idx, pktBuffer, idx );
     idx+=32;
     
-    Serial.printf("12   idx = %i\n", idx);
+    //Serial.printf("12   idx = %i\n", idx);
 
-    Serial.printf("   buffer.maxlen = %i\n", sizeof(pktBuffer));
+    //Serial.printf("   buffer.maxlen = %i\n", sizeof(pktBuffer));
 
     
     if(_prefs->flags.mode == UDP_BRIDGE_MODE_BROADCAST){

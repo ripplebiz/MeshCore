@@ -210,25 +210,59 @@ void UdpBridge::bridgeMeshPacket(mesh::Packet* packet, uint8_t source){
     Serial.println(" mesh packet sent to udp network");
     uint8_t pktBuffer[BP_PACKET_MAX_SIZE];
 
+    Serial.printf("1   idx = %i\n", idx);
     
     uint8_t idx = 0;
     pktBuffer[idx++] = 0x0;                                 // version
+
+    Serial.printf("2   idx = %i\n", idx);
+
     *((float*) (&pktBuffer[idx+=sizeof(float)])) = _nodePrefs->freq;    // freq
+    
+    Serial.printf("3   idx = %i\n", idx);
+
     pktBuffer[idx+=sizeof(uint8_t)] = _nodePrefs->sf;
+    
+    Serial.printf("4   idx = %i\n", idx);
+
     *((float*) (&pktBuffer[idx+=sizeof(float)])) = _nodePrefs->bw;
+    
+    Serial.printf("5   idx = %i\n", idx);
+
     *((float*) (&pktBuffer[idx+=sizeof(float)])) = 0.0f;    //rssi
+    
+    Serial.printf("6   idx = %i\n", idx);
+
     *((float*) (&pktBuffer[idx+=sizeof(float)])) = packet->getSNR();
+    
+    Serial.printf("7   idx = %i\n", idx);
+
     *((uint32_t*) (&pktBuffer[idx+=sizeof(uint32_t)])) = _clock->getCurrentTime();
+    
+    Serial.printf("8   idx = %i\n", idx);
+
 
     memcpy( &pktBuffer[idx], _identity->pub_key, 32 );
     idx += 32;
+    
+    Serial.printf("9   idx = %i\n", idx);
+
 
     uint8_t packetLen = packet->getRawLength();
     pktBuffer[idx+=sizeof(uint8_t)] = packetLen;
+    
+    Serial.printf("10   idx = %i\n", idx);
+
     packet->writeTo( &pktBuffer[idx+=packetLen] );
+    
+    Serial.printf("11   idx = %i\n", idx);
+
 
     _identity->sign( &pktBuffer[idx], pktBuffer, idx );
     idx+=32;
+    
+    Serial.printf("12   idx = %i\n", idx);
+
     
     if(_prefs->flags.mode == UDP_BRIDGE_MODE_BROADCAST){
         _udp.broadcastTo( pktBuffer, idx, _prefs->port);

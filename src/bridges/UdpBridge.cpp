@@ -143,11 +143,11 @@ bool UdpBridge::setupListener(){
             Serial.print(packet.localPort());
             Serial.print(", Length: ");
             Serial.print(packet.length());
-            Serial.println();
+            Serial.printf("\r\n");
 
             bufferRawBridgePacket( packet.data(), packet.length(), PACKET_SOURCE_UDP_BRIDGE);
 
-            Serial.printf("UDP queue Size: %d max: %d\n", _inboundPackets.size(), _inboundPackets.max_size());
+            Serial.printf("UDP queue Size: %d max: %d\r\n", _inboundPackets.size(), _inboundPackets.max_size());
         });
 
         return true;
@@ -172,12 +172,13 @@ void UdpBridge::bufferRawBridgePacket(const uint8_t* data, const uint8_t length,
 
         pkt->_source = source;
     
-        mesh::Identity bsender(&data[BP_NODE_PUB_OFFSET]);
-        bool verified = bsender.verify( &data[length-32], data, length-32 );
+        mesh::Identity bsender(data+BP_NODE_PUB_OFFSET);
+        bool verified = bsender.verify( data+(length-32), data, length-32 );
 
         if(!verified){
             _dispatcher->releasePacket(pkt);
             Serial.println("\tDROPPING - DANGER inbound udp packet is forged or corrupt");
+            
             return;
         }
         
@@ -201,7 +202,7 @@ void UdpBridge::bufferRawBridgePacket(const uint8_t* data, const uint8_t length,
         pkt->readFrom( &data[idx+=bpacket.packetLength], bpacket.packetLength);
         bpacket.packet = pkt;
     
-        memcpy( bpacket.signature, &data[length-32], sizeof(bpacket.signature) );
+        memcpy( bpacket.signature, &data[length-SIGNATURE_SIZE], sizeof(bpacket.signature) );
 
         
         if(!_inboundPackets.full()){
@@ -296,7 +297,7 @@ void UdpBridge::bridgeMeshPacket(mesh::Packet* packet, uint8_t source){
 
 
     _identity->sign( pktBuffer+idx, pktBuffer, idx );
-    idx+=32;
+    idx+=SIGNATURE_SIZE;
     
     //Serial.printf("12   idx = %i\n", idx);
 

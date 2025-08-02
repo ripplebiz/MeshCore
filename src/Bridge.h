@@ -8,7 +8,7 @@
 
 namespace mesh {
 
-#define BP_PACKET_HEADER_SIZE ( 22 + 32 + 1 +32)
+#define BP_PACKET_HEADER_SIZE ( 22 + 32 + 1 + SIGNATURE_SIZE)
 #define BP_NODE_PUB_OFFSET ( 22 )
 #define BP_PACKET_MAX_SIZE ( MAX_TRANS_UNIT + BP_PACKET_HEADER_SIZE )
 

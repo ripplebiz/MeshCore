@@ -36,7 +36,7 @@ protected:
   mesh::BridgePacket _inboundBuffer[BRIDGE_PACKET_BUFFER_SIZE];
   Vector<mesh::BridgePacket> _inboundPackets;
 
-  mesh::BridgePacket _outboundBuffer[BRIDGE_PACKET_BUFFER_SIZE];
+  mesh::BridgePacket _outboundBuffer[0];
   Vector<mesh::BridgePacket> _outboundPackets;
 
   public:

@@ -32,9 +32,9 @@ void UdpBridge::start(){
         }
     }
 
-    if(this->_prefs->flags.tx_bridge || this->_prefs->flags.rx_bridge){
+    /*if(this->_prefs->flags.tx_bridge || this->_prefs->flags.rx_bridge){
         this->_outboundPackets = Vector<mesh::BridgePacket>(this->_outboundBuffer);
-    }
+    }*/
 }
 
 void UdpBridge::loop(){

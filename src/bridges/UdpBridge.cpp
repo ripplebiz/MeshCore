@@ -173,7 +173,7 @@ void UdpBridge::bufferRawBridgePacket(const uint8_t* data, const uint8_t length,
         pkt->_source = source;
     
         mesh::Identity bsender(data+BP_NODE_PUB_OFFSET);
-        bool verified = bsender.verify( data+(length-32), data, length-32 );
+        bool verified = bsender.verify( data+(length-SIGNATURE_SIZE), data, length-SIGNATURE_SIZE );
 
         if(!verified){
             _dispatcher->releasePacket(pkt);
@@ -195,7 +195,7 @@ void UdpBridge::bufferRawBridgePacket(const uint8_t* data, const uint8_t length,
         bpacket.timestamp = *((uint32_t*) &data[idx+=sizeof(uint32_t)]);
         
         memcpy( bpacket.node, bsender.pub_key, sizeof(bpacket.node) );
-        idx+=32;
+        idx+=PUB_KEY_SIZE;
 
         bpacket.packetLength = data[idx++];
     
@@ -276,8 +276,8 @@ void UdpBridge::bridgeMeshPacket(mesh::Packet* packet, uint8_t source){
     //Serial.printf("8   idx = %i\n", idx);
 
 
-    memcpy( &pktBuffer[idx], _identity->pub_key, 32 );
-    idx += 32;
+    memcpy( &pktBuffer[idx], _identity->pub_key, PUB_KEY_SIZE );
+    idx += PUB_KEY_SIZE;
     
     //Serial.printf("9   idx = %i\n", idx);
 

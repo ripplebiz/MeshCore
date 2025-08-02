@@ -210,7 +210,6 @@ void UdpBridge::bridgeMeshPacket(mesh::Packet* packet, uint8_t source){
     Serial.println(" mesh packet sent to udp network");
     uint8_t pktBuffer[BP_PACKET_MAX_SIZE];
 
-    Serial.printf("1   idx = %i\n", idx);
     
     uint8_t idx = 0;
     pktBuffer[idx++] = 0x0;                                 // version

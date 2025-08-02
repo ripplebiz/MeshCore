@@ -60,7 +60,7 @@ void UdpBridge::loop(){
     } else if(!_inboundPackets.empty()) {
         // Network is connected
 
-        Serial.printf("udp bridge has packets %i", _inboundPackets.size());
+        Serial.printf("udp bridge has packets %i \r\n", _inboundPackets.size());
 
         while(!_inboundPackets.empty()) {
             mesh::BridgePacket bpacket = _inboundPackets.back();
@@ -196,15 +196,16 @@ void UdpBridge::bufferRawBridgePacket(const uint8_t* data, const uint8_t length,
         bpacket.snr = *((float*) &data[idx+=sizeof(float)]);
         bpacket.timestamp = *((uint32_t*) &data[idx+=sizeof(uint32_t)]);
         
-        memcpy( bpacket.node, bsender.pub_key, sizeof(bpacket.node) );
+        memcpy( bpacket.node, bsender.pub_key, PUB_KEY_SIZE );
         idx+=PUB_KEY_SIZE;
 
         bpacket.packetLength = data[idx++];
     
-        pkt->readFrom( &data[idx+=bpacket.packetLength], bpacket.packetLength);
+        pkt->readFrom( data + (idx), bpacket.packetLength);
         bpacket.packet = pkt;
+        idx+=bpacket.packetLength;
     
-        memcpy( bpacket.signature, &data[length-SIGNATURE_SIZE], sizeof(bpacket.signature) );
+        memcpy( bpacket.signature, data+(length-SIGNATURE_SIZE), SIGNATURE_SIZE );
 
         
         if(!_inboundPackets.full()){
@@ -285,15 +286,18 @@ void UdpBridge::bridgeMeshPacket(mesh::Packet* packet, uint8_t source){
 
 
     int packetLen = packet->getRawLength();
-    pktBuffer[idx+=sizeof(uint8_t)] = (uint8_t) packetLen;
+    pktBuffer[idx] = (uint8_t) packetLen;
+    idx+=sizeof(uint8_t);
 
     //memcpy( pktBuffer+(idx+=sizeof(int)), (void*) &packetLen, sizeof(int)  );
     
     //Serial.printf("10   idx = %i\n", idx);
 
-    uint8_t written = packet->writeTo( pktBuffer+ (idx+=packetLen) );
+    uint8_t written = packet->writeTo( pktBuffer+idx);
 
-    //Serial.printf("   wrote = %i vs expected = %i\n", written, packetLen);
+    idx+=written;
+
+    Serial.printf("   wrote = %i vs expected = %i\n", written, packetLen);
     
     //Serial.printf("11   idx = %i\n", idx);
 

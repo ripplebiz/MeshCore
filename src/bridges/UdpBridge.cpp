@@ -100,8 +100,31 @@ bool UdpBridge::setupListener(){
 
     this->_inboundPackets = Vector<mesh::BridgePacket>(this->_inboundBuffer);
 
-    Serial.println("UDP starting network listner");        
-    this->_udp.listen( this->_prefs->port );
+    Serial.println("UDP starting network listner");
+
+    if(_prefs->flags.mode == UDP_BRIDGE_MODE_BROADCAST || _prefs->flags.mode == UDP_BRIDGE_MODE_DIRECT){
+
+        Serial.println("    mode = broadcast || direct");
+        this->_udp.listen( this->_prefs->port );
+    
+    } else if( _prefs->flags.mode == UDP_BRIDGE_MODE_MULTICAST ){
+
+        if(_prefs->flags.ip_version == UDP_BRIDGE_IPV4){
+
+            // ipv4
+            IPAddress addr4( _prefs->ipv4 );
+            _udp.listenMulticast( addr4, _prefs->port );
+
+            Serial.println("    mode = multicast(ipv4)");
+
+        } else {
+            // ipv6
+            IPv6Address addr6( _prefs->ipv6 );
+            _udp.listenMulticast( addr6, _prefs->port );
+            Serial.println("    mode = multicast(ipv6)");
+        }
+
+    }
 
     if(this->_udp.connected()){
         //setup udp handler
@@ -133,6 +156,7 @@ bool UdpBridge::setupListener(){
 
         return false;
     }
+
 }
 
 

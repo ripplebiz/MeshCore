@@ -497,7 +497,7 @@ void CommonCLI::handleCommand(uint32_t sender_timestamp, const char* command, ch
         }
 
         savePrefs();
-        strcpy(reply, "OK");
+        strcpy(reply, "OK - reboor required");
 
       } else if (memcmp(config, "udp.port ", 9) == 0) {
 

@@ -14,11 +14,9 @@ static uint32_t _atoi(const char* sp) {
 
 #if defined(NRF52_PLATFORM) || defined(STM32_PLATFORM)
   #include <InternalFileSystem.h>
-  #if defined(SPIFLASH)
-    #include <CustomLFS_SPIFlash.h>
-    const int chipSelect = PIN_QSPI_CS;
-    SPIClass SPI_2(NRF_SPIM2, PIN_QSPI_IO1, PIN_QSPI_SCK, PIN_QSPI_IO0);
-    DataStore store(FlashFS, rtc_clock);
+  #if defined(QSPIFLASH)
+    #include <CustomLFS_QSPIFlash.h>
+    DataStore store(QSPIFlash, rtc_clock);
   #else
   #if defined(EXTRAFS)
     #include <CustomLFS.h>
@@ -123,12 +121,12 @@ void setup() {
   fast_rng.begin(radio_get_rng_seed());
 
 #if defined(NRF52_PLATFORM) || defined(STM32_PLATFORM)
-  #if defined(SPIFLASH)
-    if (!FlashFS.begin(chipSelect, SPI_2)) {
+  #if defined(QSPIFLASH)
+    if (!QSPIFlash.begin()) {
       // debug output might not be available at this point, might be too early. maybe should fall back to InternalFS here?
-      MESH_DEBUG_PRINTLN("CustomLFS_SPIFlash: failed to initialize");
+      MESH_DEBUG_PRINTLN("CustomLFS_QSPIFlash: failed to initialize");
     } else {
-      MESH_DEBUG_PRINTLN("CustomLFS_SPIFlash: initialized successfully");
+      MESH_DEBUG_PRINTLN("CustomLFS_QSPIFlash: initialized successfully");
     }
   #else
     InternalFS.begin();

@@ -1,7 +1,7 @@
 #include <Arduino.h>
 #include "DataStore.h"
 
-#if defined(EXTRAFS) || defined(SPIFLASH)
+#if defined(EXTRAFS) || defined(QSPIFLASH)
   #define MAX_BLOBRECS 100
 #else
   #define MAX_BLOBRECS 20
@@ -49,7 +49,7 @@ void DataStore::begin() {
 #elif defined(NRF52_PLATFORM) || defined(STM32_PLATFORM)
   // #include <InternalFileSystem.h> // disabled for now, leaving here for dual fs branch
   #include <CustomLFS.h>
-  #include <CustomLFS_SPIFlash.h>
+  #include <CustomLFS_QSPIFlash.h>
 #endif
 
 #if defined(NRF52_PLATFORM) || defined(STM32_PLATFORM)

@@ -6,10 +6,12 @@
 // Button timing configuration
 #define BUTTON_DEBOUNCE_TIME_MS    50      // Debounce time in ms
 #define BUTTON_CLICK_TIMEOUT_MS    500     // Max time between clicks for multi-click
-#define BUTTON_LONG_PRESS_TIME_MS  3000    // Time to trigger long press (3 seconds)
+#define BUTTON_LONG_PRESS_TIME_MS  5000    // Time to trigger long press (5 seconds)
 #define BUTTON_READ_INTERVAL_MS    10      // How often to read the button
 
 class Button {
+private:
+    uint32_t _longPressTime = BUTTON_LONG_PRESS_TIME_MS;
 public:
     enum EventType {
         NONE,
@@ -34,7 +36,11 @@ public:
     void onDoublePress(EventCallback callback) { _onDoublePress = callback; }
     void onTriplePress(EventCallback callback) { _onTriplePress = callback; }
     void onQuadruplePress(EventCallback callback) { _onQuadruplePress = callback; }
-    void onLongPress(EventCallback callback) { _onLongPress = callback; }
+    void onLongPress(EventCallback callback, uint32_t duration) {
+        _onLongPress = callback;
+        _longPressTime = duration;
+    }
+    void onLongPress(EventCallback callback) { onLongPress(callback, BUTTON_LONG_PRESS_TIME_MS); }
     void onAnyPress(EventCallback callback) { _onAnyPress = callback; }
     
     // State getters

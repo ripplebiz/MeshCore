@@ -2,6 +2,7 @@
 
 #include <MeshCore.h>
 #include <Arduino.h>
+#include "Adafruit_TinyUSB.h"
 
 // LoRa and SPI pins
 #define  P_LORA_DIO_1   (32 + 1)  // P1.1
@@ -67,6 +68,12 @@ public:
   }
 
   void powerOff() override {
+    // If connected to USB, a true power-off is not possible.
+    // The device will just restart. So, we'll just reboot.
+    if (TinyUSBDevice.mounted()) {
+        reboot();
+        return; // reboot() should not return, but just in case.
+    }
     #ifdef HAS_GPS
         digitalWrite(GPS_VRTC_EN, LOW);
         digitalWrite(GPS_RESET, LOW);

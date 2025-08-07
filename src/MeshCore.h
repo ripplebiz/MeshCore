@@ -1,6 +1,7 @@
 #pragma once
 
 #include <stdint.h>
+#include "helpers/Battery.h"
 
 #define MAX_HASH_SIZE        8
 #define PUB_KEY_SIZE        32
@@ -36,6 +37,11 @@ namespace mesh {
 class MainBoard {
 public:
   virtual uint16_t getBattMilliVolts() = 0;
+  uint16_t getBattPercent() {
+    uint16_t mv = getBattMilliVolts();
+    return batt_percent(getBattType(), mv);
+  }
+  uint8_t getBattType() { return BATT_LIPO; };
   virtual const char* getManufacturerName() const = 0;
   virtual void onBeforeTransmit() { }
   virtual void onAfterTransmit() { }

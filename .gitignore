@@ -9,5 +9,7 @@ out/
 .DS_Store
 .vscode/settings.json
 .vscode/extensions.json
-.idea
-cmake-*
+.cache
+.ccls
+compile_commands.json
+compile_flags.txt

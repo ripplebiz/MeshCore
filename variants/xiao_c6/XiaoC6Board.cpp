@@ -1,7 +1,7 @@
 #include <Arduino.h>
 #include "target.h"
 
-ESP32Board board;
+XiaoC6Board board;
 
 #if defined(P_LORA_SCLK)
   static SPIClass spi(0);
@@ -47,3 +47,5 @@ mesh::LocalIdentity radio_new_identity() {
   RadioNoiseListener rng(radio);
   return mesh::LocalIdentity(&rng);  // create new random identity
 }
+
+

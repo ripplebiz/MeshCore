@@ -293,10 +293,24 @@ void UITask::shutdown(bool restart){
 
   #endif // PIN_BUZZER
 
-  if (restart)
+  if (restart) {
     _board->reboot();
-  else
+  } else {
+    // Show power-off message on display
+    if (_display != NULL) {
+      _display->startFrame();
+      _display->setCursor(0, 0);
+      _display->setTextSize(2);
+      _display->print("Power Off");
+      _display->setCursor(0, 20);
+      _display->setTextSize(1);
+      _display->print("Sleeping...");
+      _display->endFrame();
+      delay(2000);  // Show message for 2 seconds
+    }
+    
     _board->powerOff();
+  }
 }
 
 void UITask::loop() {

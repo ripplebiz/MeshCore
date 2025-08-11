@@ -84,9 +84,18 @@ public:
     esp_deep_sleep_start();   // CPU halts here and never returns!
   }
 
+  void enterPowerOffSleep() {
+    // Simple power-off sleep, wake only with reset button
+    esp_deep_sleep_start();  // Never returns
+  }
+
+
   void powerOff() override {
-    // TODO: re-enable this when there is a definite wake-up source pin:
-    //  enterDeepSleep(0);
+    // Simple power-off, wake only with reset button
+    Serial.println("Entering deep sleep...");
+    Serial.flush();  // Ensure message is sent before sleep
+    
+    enterPowerOffSleep();  // Simple deep sleep, no wake sources
   }
 
   uint16_t getBattMilliVolts() override {

@@ -87,6 +87,7 @@ public:
   const char *getNodeName();
   NodePrefs *getNodePrefs();
   uint32_t getBLEPin();
+  BaseSerialInterface* getSerialInterface() { return _serial; }
 
   void loop();
   void handleCmdFrame(size_t len);

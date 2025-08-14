@@ -49,7 +49,9 @@ void DataStore::begin() {
 #elif defined(NRF52_PLATFORM) || defined(STM32_PLATFORM)
   // #include <InternalFileSystem.h> // disabled for now, leaving here for dual fs branch
   #include <CustomLFS.h>
-  #include <CustomLFS_QSPIFlash.h>
+  #if defined(QSPIFLASH)
+    #include <CustomLFS_QSPIFlash.h>
+  #endif
 #endif
 
 #if defined(NRF52_PLATFORM) || defined(STM32_PLATFORM)

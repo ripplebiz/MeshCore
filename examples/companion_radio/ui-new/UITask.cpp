@@ -14,6 +14,10 @@
 
 #define LONG_PRESS_MILLIS   1200
 
+#ifndef UI_RECENT_LIST_SIZE
+  #define UI_RECENT_LIST_SIZE 4
+#endif
+
 #define PRESS_LABEL "long press"
 
 #include "icons.h"
@@ -156,10 +160,10 @@ public:
         display.drawTextCentered(display.width() / 2, 43, tmp);
       }
     } else if (_page == HomePage::RECENT) {
-      the_mesh.getRecentlyHeard(recent, 4);
+      the_mesh.getRecentlyHeard(recent, UI_RECENT_LIST_SIZE);
       display.setColor(DisplayDriver::GREEN);
       int y = 20;
-      for (int i = 0; i < 4; i++, y += 11) {
+      for (int i = 0; i < UI_RECENT_LIST_SIZE; i++, y += 11) {
         auto a = &recent[i];
         if (a->name[0] == 0) continue;  // empty slot
         display.setCursor(0, y);

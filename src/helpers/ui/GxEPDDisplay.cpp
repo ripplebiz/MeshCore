@@ -29,8 +29,8 @@ void GxEPDDisplay::turnOn() {
   if (!_init) begin();
 #if DISP_BACKLIGHT
   digitalWrite(DISP_BACKLIGHT, HIGH);
-  _isOn = true;
 #endif
+  _isOn = true;
 }
 
 void GxEPDDisplay::turnOff() {
@@ -132,7 +132,7 @@ uint16_t GxEPDDisplay::getTextWidth(const char* str) {
   int16_t x1, y1;
   uint16_t w, h;
   display.getTextBounds(str, 0, 0, &x1, &y1, &w, &h);
-  return w / SCALE_X;
+  return ceil((w + 1) / SCALE_X);
 }
 
 void GxEPDDisplay::endFrame() {

@@ -352,6 +352,11 @@ void UITask::begin(DisplayDriver* display, SensorManager* sensors, NodePrefs* no
   user_btn.begin();
 #endif
 
+#if defined(WIO_TRACKER_L1)
+  joystick_left.begin();
+  joystick_right.begin();
+#endif
+
   _node_prefs = node_prefs;
   if (_display != NULL) {
     _display->turnOn();
@@ -489,6 +494,20 @@ void UITask::loop() {
     c = checkDisplayOn(KEY_SELECT);
   } else if (ev == BUTTON_EVENT_LONG_PRESS) {
     c = handleLongPress(KEY_ENTER);
+  }
+#endif
+#if defined(WIO_TRACKER_L1)
+  ev = joystick_left.check();
+  if (ev == BUTTON_EVENT_CLICK) {
+    c = checkDisplayOn(KEY_LEFT);
+  } else if (ev == BUTTON_EVENT_LONG_PRESS) {
+    c = handleLongPress(KEY_LEFT);
+  }
+  ev = joystick_right.check();
+  if (ev == BUTTON_EVENT_CLICK) {
+    c = checkDisplayOn(KEY_RIGHT);
+  } else if (ev == BUTTON_EVENT_LONG_PRESS) {
+    c = handleLongPress(KEY_RIGHT);
   }
 #endif
 

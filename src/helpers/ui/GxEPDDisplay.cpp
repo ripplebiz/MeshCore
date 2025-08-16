@@ -132,7 +132,7 @@ uint16_t GxEPDDisplay::getTextWidth(const char* str) {
   int16_t x1, y1;
   uint16_t w, h;
   display.getTextBounds(str, 0, 0, &x1, &y1, &w, &h);
-  return w / SCALE_X + 1;
+  return ceil((w + 1) / SCALE_X);
 }
 
 void GxEPDDisplay::endFrame() {

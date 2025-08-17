@@ -115,6 +115,20 @@ void SerialBLEInterface::enable() {
 void SerialBLEInterface::disable() {
   _isEnabled = false;
   BLE_DEBUG_PRINTLN("SerialBLEInterface::disable");
+
+#ifdef RAK_BOARD
+  Bluefruit.disconnect(Bluefruit.connHandle());
+#else
+  uint16_t conn_id;
+  if (Bluefruit.getConnectedHandles(&conn_id, 1) > 0) {
+    Bluefruit.disconnect(conn_id);
+  }
+#endif
+
+  Bluefruit.Advertising.restartOnDisconnect(false);
+  Bluefruit.Advertising.stop();
+  Bluefruit.Advertising.clearData();
+
   stopAdv();
 }
 

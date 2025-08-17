@@ -98,6 +98,7 @@ struct RepeaterStats {
   uint16_t err_events;                // was 'n_full_events'
   int16_t  last_snr;   // x 4
   uint16_t n_direct_dups, n_flood_dups;
+  uint32_t total_rx_air_time_secs;
 };
 
 struct ClientInfo {
@@ -208,16 +209,19 @@ class MyMesh : public mesh::Mesh, public CommonCLICallbacks {
         stats.last_snr = (int16_t)(radio_driver.getLastSNR() * 4);
         stats.n_direct_dups = ((SimpleMeshTables *)getTables())->getNumDirectDups();
         stats.n_flood_dups = ((SimpleMeshTables *)getTables())->getNumFloodDups();
+        stats.total_rx_air_time_secs = getReceiveAirTime() / 1000;
 
         memcpy(&reply_data[4], &stats, sizeof(stats));
 
         return 4 + sizeof(stats);  //  reply_len
       }
       case REQ_TYPE_GET_TELEMETRY_DATA: {
+        uint8_t perm_mask = ~(payload[1]);    // NEW: first reserved byte (of 4), is now inverse mask to apply to permissions
+
         telemetry.reset();
         telemetry.addVoltage(TELEM_CHANNEL_SELF, (float)board.getBattMilliVolts() / 1000.0f);
         // query other sensors -- target specific
-        sensors.querySensors(sender->is_admin ? 0xFF : 0x00, telemetry);
+        sensors.querySensors((sender->is_admin ? 0xFF : 0x00) & perm_mask, telemetry);
 
         uint8_t tlen = telemetry.getSize();
         memcpy(&reply_data[4], telemetry.getBuffer(), tlen);
@@ -715,7 +719,7 @@ public:
     *dp = 0;  // null terminator
   }
 
-  const uint8_t* getSelfIdPubKey() override { return self_id.pub_key; }
+  mesh::LocalIdentity& getSelfId() override { return self_id; }
 
   void clearStats() override {
     radio_driver.resetStats();
@@ -778,7 +782,7 @@ void halt() {
   while (1) ;
 }
 
-static char command[80];
+static char command[160];
 
 void setup() {
   Serial.begin(115200);

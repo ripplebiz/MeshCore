@@ -88,7 +88,7 @@ public:
   void formatNeighborsReply(char *reply) override {
     strcpy(reply, "not supported");
   }
-  const uint8_t* getSelfIdPubKey() override { return self_id.pub_key; }
+  mesh::LocalIdentity& getSelfId() override { return self_id; }
   void clearStats() override { }
   void applyTempRadioParams(float freq, float bw, uint8_t sf, uint8_t cr, int timeout_mins) override;
 

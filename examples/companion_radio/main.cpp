@@ -87,14 +87,19 @@ static uint32_t _atoi(const char* sp) {
 #endif
 
 /* GLOBAL OBJECTS */
-StdRNG fast_rng;
-SimpleMeshTables tables;
-MyMesh the_mesh(radio_driver, fast_rng, rtc_clock, tables, store);
-
 #ifdef DISPLAY_CLASS
   #include "UITask.h"
-  UITask ui_task(&board);
+  UITask ui_task(&board, &serial_interface);
 #endif
+
+StdRNG fast_rng;
+SimpleMeshTables tables;
+MyMesh the_mesh(radio_driver, fast_rng, rtc_clock, tables, store
+   #ifdef DISPLAY_CLASS
+      , &ui_task
+   #endif
+);
+
 /* END GLOBAL OBJECTS */
 
 void halt() {
@@ -111,7 +116,10 @@ void setup() {
   if (display.begin()) {
     disp = &display;
     disp->startFrame();
-    disp->print("Please wait...");
+  #ifdef ST7789
+    disp->setTextSize(2);
+  #endif
+    disp->drawTextCentered(disp->width() / 2, 28, "Loading...");
     disp->endFrame();
   }
 #endif

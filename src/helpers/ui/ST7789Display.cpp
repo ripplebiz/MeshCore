@@ -62,6 +62,9 @@ void ST7789Display::clear() {
 
 void ST7789Display::startFrame(Color bkg) {
   display.clear();
+  _color = ST77XX_WHITE;
+  display.setRGB(_color);
+  display.setFont(ArialMT_Plain_16);
 }
 
 void ST7789Display::setTextSize(int sz) {
@@ -81,7 +84,9 @@ void ST7789Display::setColor(Color c) {
   switch (c) {
     case DisplayDriver::DARK :
       _color = ST77XX_BLACK;
+      display.setColor(OLEDDISPLAY_COLOR::BLACK);
       break;
+#if 0
     case DisplayDriver::LIGHT : 
       _color = ST77XX_WHITE;
       break;
@@ -100,8 +105,10 @@ void ST7789Display::setColor(Color c) {
     case DisplayDriver::ORANGE : 
       _color = ST77XX_ORANGE;
       break;
+#endif
     default:
       _color = ST77XX_WHITE;
+      display.setColor(OLEDDISPLAY_COLOR::WHITE);
       break;
   }
   display.setRGB(_color);
@@ -114,6 +121,10 @@ void ST7789Display::setCursor(int x, int y) {
 
 void ST7789Display::print(const char* str) {
   display.drawString(_x, _y, str);
+}
+
+void ST7789Display::printWordWrap(const char* str, int max_width) {
+  display.drawStringMaxWidth(_x, _y, max_width*SCALE_X, str);
 }
 
 void ST7789Display::fillRect(int x, int y, int w, int h) {

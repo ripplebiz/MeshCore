@@ -28,6 +28,7 @@ class GxEPDDisplay : public DisplayDriver {
   GxEPD2_BW<GxEPD2_150_BN, 200> display;
   bool _init = false;
   bool _isOn = false;
+  uint16_t _curr_color;
 
 public:
   // there is a margin in y...

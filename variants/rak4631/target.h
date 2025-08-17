@@ -11,6 +11,8 @@
 #ifdef DISPLAY_CLASS
   #include <helpers/ui/SSD1306Display.h>
   extern DISPLAY_CLASS display;
+  #include <helpers/ui/MomentaryButton.h>
+  extern MomentaryButton user_btn;
 #endif
 
 extern RAK4631Board board;

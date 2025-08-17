@@ -29,8 +29,8 @@ void GxEPDDisplay::turnOn() {
   if (!_init) begin();
 #if DISP_BACKLIGHT
   digitalWrite(DISP_BACKLIGHT, HIGH);
-  _isOn = true;
 #endif
+  _isOn = true;
 }
 
 void GxEPDDisplay::turnOff() {
@@ -47,6 +47,7 @@ void GxEPDDisplay::clear() {
 
 void GxEPDDisplay::startFrame(Color bkg) {
   display.fillScreen(GxEPD_WHITE);
+  display.setTextColor(_curr_color = GxEPD_BLACK);
 }
 
 void GxEPDDisplay::setTextSize(int sz) {
@@ -67,7 +68,12 @@ void GxEPDDisplay::setTextSize(int sz) {
 }
 
 void GxEPDDisplay::setColor(Color c) {
-  display.setTextColor(GxEPD_BLACK);
+  // colours need to be inverted for epaper displays
+  if (c == DARK) {
+    display.setTextColor(_curr_color = GxEPD_WHITE);
+  } else {
+    display.setTextColor(_curr_color = GxEPD_BLACK);
+  }
 }
 
 void GxEPDDisplay::setCursor(int x, int y) {
@@ -79,11 +85,11 @@ void GxEPDDisplay::print(const char* str) {
 }
 
 void GxEPDDisplay::fillRect(int x, int y, int w, int h) {
-  display.fillRect(x*SCALE_X, y*SCALE_Y, w*SCALE_X, h*SCALE_Y, GxEPD_BLACK);
+  display.fillRect(x*SCALE_X, y*SCALE_Y, w*SCALE_X, h*SCALE_Y, _curr_color);
 }
 
 void GxEPDDisplay::drawRect(int x, int y, int w, int h) {
-  display.drawRect(x*SCALE_X, y*SCALE_Y, w*SCALE_X, h*SCALE_Y, GxEPD_BLACK);
+  display.drawRect(x*SCALE_X, y*SCALE_Y, w*SCALE_X, h*SCALE_Y, _curr_color);
 }
 
 void GxEPDDisplay::drawXbm(int x, int y, const uint8_t* bits, int w, int h) {
@@ -116,7 +122,7 @@ void GxEPDDisplay::drawXbm(int x, int y, const uint8_t* bits, int w, int h) {
       // If the bit is set, draw a block of pixels
       if (bitSet) {
         // Draw the block as a filled rectangle
-        display.fillRect(x1, y1, block_w, block_h, GxEPD_BLACK);
+        display.fillRect(x1, y1, block_w, block_h, _curr_color);
       }
     }
   }
@@ -126,7 +132,7 @@ uint16_t GxEPDDisplay::getTextWidth(const char* str) {
   int16_t x1, y1;
   uint16_t w, h;
   display.getTextBounds(str, 0, 0, &x1, &y1, &w, &h);
-  return w / SCALE_X;
+  return ceil((w + 1) / SCALE_X);
 }
 
 void GxEPDDisplay::endFrame() {

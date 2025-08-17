@@ -21,6 +21,8 @@
 #define BUTTON_PIN PIN_BUTTON1
 #define PIN_USER_BTN BUTTON_PIN
 
+// GPS
+#define GPS_EN PIN_GPS_STANDBY
 // built-ins
 #define VBAT_MV_PER_LSB (0.73242188F) // 3.0V ADC range and 12-bit ADC resolution = 3000mV/4096
 

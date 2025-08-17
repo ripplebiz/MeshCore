@@ -244,10 +244,12 @@ uint8_t SensorMesh::handleRequest(uint8_t perms, uint32_t sender_timestamp, uint
   memcpy(reply_data, &sender_timestamp, 4);   // reflect sender_timestamp back in response packet (kind of like a 'tag')
 
   if (req_type == REQ_TYPE_GET_TELEMETRY_DATA) {  // allow all
+    uint8_t perm_mask = ~(payload[0]);    // NEW: first reserved byte (of 4), is now inverse mask to apply to permissions
+
     telemetry.reset();
     telemetry.addVoltage(TELEM_CHANNEL_SELF, (float)board.getBattMilliVolts() / 1000.0f);
     // query other sensors -- target specific
-    sensors.querySensors(0xFF, telemetry);  // allow all telemetry permissions for admin or guest
+    sensors.querySensors(0xFF & perm_mask, telemetry);  // allow all telemetry permissions for admin or guest
     // TODO: let requester know permissions they have:  telemetry.addPresence(TELEM_CHANNEL_SELF, perms);
 
     uint8_t tlen = telemetry.getSize();
@@ -545,7 +547,26 @@ void SensorMesh::handleCommand(uint32_t sender_timestamp, char* command, char* r
       Serial.printf("\n");
     }
     reply[0] = 0;
-  } else {
+  } else if (memcmp(command, "io ", 2) == 0) { // io {value}: write, io: read 
+    if (command[2] == ' ') { // it's a write
+      uint32_t val;
+      uint32_t g = board.getGpio();
+      if (command[3] == 'r') { // reset bits
+        sscanf(&command[4], "%x", &val);
+        val = g & ~val;    
+      } else if (command[3] == 's') { // set bits
+        sscanf(&command[4], "%x", &val);
+        val |= g;    
+      } else if (command[3] == 't') { // toggle bits
+        sscanf(&command[4], "%x", &val);
+        val ^= g;    
+      } else { // set value
+        sscanf(&command[3], "%x", &val);
+      }
+      board.setGpio(val);
+    }
+    sprintf(reply, "%x", board.getGpio());
+  } else{
     _cli.handleCommand(sender_timestamp, command, reply);  // common CLI commands
   }
 }

@@ -9,28 +9,18 @@
   #include <helpers/ui/buzzer.h>
 #endif
 
-#include "NodePrefs.h"
+#include "../AbstractUITask.h"
+#include "../NodePrefs.h"
+
 #include "Button.h"
 
- enum class UIEventType
-{
-    none,
-    contactMessage,
-    channelMessage,
-    roomMessage,
-    newContactMessage,
-    ack
-};
-
-class UITask {
+class UITask : public AbstractUITask {
   DisplayDriver* _display;
-  mesh::MainBoard* _board;
   SensorManager* _sensors;
 #ifdef PIN_BUZZER
   genericBuzzer buzzer;
 #endif
   unsigned long _next_refresh, _auto_off;
-  bool _connected;
   NodePrefs* _node_prefs;
   char _version_info[32];
   char _origin[62];
@@ -64,19 +54,20 @@ class UITask {
  
 public:
 
-  UITask(mesh::MainBoard* board) : _board(board), _display(NULL), _sensors(NULL) {
+  UITask(mesh::MainBoard* board, BaseSerialInterface* serial) : AbstractUITask(board, serial), _display(NULL), _sensors(NULL) {
       _next_refresh = 0;
       ui_started_at = 0;
-      _connected = false;
   }
   void begin(DisplayDriver* display, SensorManager* sensors, NodePrefs* node_prefs);
 
-  void setHasConnection(bool connected) { _connected = connected; }
   bool hasDisplay() const { return _display != NULL; }
   void clearMsgPreview();
-  void msgRead(int msgcount);
-  void newMsg(uint8_t path_len, const char* from_name, const char* text, int msgcount);
-  void soundBuzzer(UIEventType bet = UIEventType::none);
+
+  // from AbstractUITask
+  void msgRead(int msgcount) override;
+  void newMsg(uint8_t path_len, const char* from_name, const char* text, int msgcount) override;
+  void soundBuzzer(UIEventType bet = UIEventType::none) override;
+  void loop() override;
+
   void shutdown(bool restart = false);
-  void loop();
 };

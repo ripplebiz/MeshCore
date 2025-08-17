@@ -206,6 +206,11 @@ void CommonCLI::handleCommand(uint32_t sender_timestamp, const char* command, ch
         sprintf(reply, "> %d", ((uint32_t) _prefs->advert_interval) * 2);
       } else if (memcmp(config, "guest.password", 14) == 0) {
         sprintf(reply, "> %s", _prefs->guest_password);
+      } else if (sender_timestamp == 0 && memcmp(config, "prv.key", 7) == 0) {  // from serial command line only
+        uint8_t prv_key[PRV_KEY_SIZE];
+        int len = _callbacks->getSelfId().writeTo(prv_key, PRV_KEY_SIZE);
+        mesh::Utils::toHex(tmp, prv_key, len);
+        sprintf(reply, "> %s", tmp);
       } else if (memcmp(config, "name", 4) == 0) {
         sprintf(reply, "> %s", _prefs->node_name);
       } else if (memcmp(config, "repeat", 6) == 0) {
@@ -233,7 +238,7 @@ void CommonCLI::handleCommand(uint32_t sender_timestamp, const char* command, ch
         sprintf(reply, "> %s", StrHelper::ftoa(_prefs->freq));
       } else if (memcmp(config, "public.key", 10) == 0) {
         strcpy(reply, "> ");
-        mesh::Utils::toHex(&reply[2], _callbacks->getSelfIdPubKey(), PUB_KEY_SIZE);
+        mesh::Utils::toHex(&reply[2], _callbacks->getSelfId().pub_key, PUB_KEY_SIZE);
       } else if (memcmp(config, "role", 4) == 0) {
         sprintf(reply, "> %s", _callbacks->getRole());
       } else {
@@ -285,6 +290,15 @@ void CommonCLI::handleCommand(uint32_t sender_timestamp, const char* command, ch
         StrHelper::strncpy(_prefs->guest_password, &config[15], sizeof(_prefs->guest_password));
         savePrefs();
         strcpy(reply, "OK");
+      } else if (sender_timestamp == 0 && memcmp(config, "prv.key ", 8) == 0) {  // from serial command line only
+        uint8_t prv_key[PRV_KEY_SIZE];
+        bool success = mesh::Utils::fromHex(prv_key, PRV_KEY_SIZE, &config[8]);
+        if (success) {
+          _callbacks->getSelfId().readFrom(prv_key, PRV_KEY_SIZE);
+          strcpy(reply, "OK");
+        } else {
+          strcpy(reply, "Error, invalid key");
+        }
       } else if (memcmp(config, "name ", 5) == 0) {
         StrHelper::strncpy(_prefs->node_name, &config[5], sizeof(_prefs->node_name));
         savePrefs();

@@ -61,10 +61,11 @@ void Button::update() {
     }
     
     // Handle long press while button is held
-    if (_state == PRESSED && (now - _pressTime) > BUTTON_LONG_PRESS_TIME_MS) {
-        triggerEvent(LONG_PRESS);
-        _state = IDLE;  // Prevent multiple press events
-        _clickCount = 0;
+    if (_state == PRESSED && (now - _pressTime) > _longPressTime) {
+        if (_clickCount == 0) { // only trigger long press if no multi-clicks are pending
+            triggerEvent(LONG_PRESS);
+            _state = IDLE;  // Prevent multiple press events
+        }
     }
 }
 
@@ -89,7 +90,7 @@ void Button::handleStateChange() {
         if (_state == PRESSED) {
             uint32_t pressDuration = now - _pressTime;
             
-            if (pressDuration < BUTTON_LONG_PRESS_TIME_MS) {
+            if (pressDuration < _longPressTime) {
                 // Short press detected
                 _clickCount++;
                 _releaseTime = now;

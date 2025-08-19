@@ -87,4 +87,42 @@ class CustomSX1276 : public SX1276 {
       }
       return 0; // timed out
     }
+
+    // IRQ polling helpers for SX127x when DIO0 is not connected
+    // RegIrqFlags address (SX127x): 0x12
+    // Bit masks for key IRQ flags
+    #ifndef SX127X_IRQ_TX_DONE
+      #define SX127X_IRQ_TX_DONE             0x08
+    #endif
+    #ifndef SX127X_IRQ_RX_DONE
+      #define SX127X_IRQ_RX_DONE             0x40
+    #endif
+    #ifndef SX127X_IRQ_PAYLOAD_CRC_ERROR
+      #define SX127X_IRQ_PAYLOAD_CRC_ERROR   0x20
+    #endif
+    #ifndef SX127X_IRQ_VALID_HEADER
+      #define SX127X_IRQ_VALID_HEADER        0x10
+    #endif
+    #ifndef SX127X_IRQ_RX_TIMEOUT
+      #define SX127X_IRQ_RX_TIMEOUT          0x80
+    #endif
+    #ifndef SX127X_IRQ_CAD_DONE
+      #define SX127X_IRQ_CAD_DONE            0x04
+    #endif
+    #ifndef SX127X_IRQ_CAD_DETECTED
+      #define SX127X_IRQ_CAD_DETECTED        0x01
+    #endif
+    #ifndef SX127X_IRQ_FHSS_CHANGE_CHANNEL
+      #define SX127X_IRQ_FHSS_CHANGE_CHANNEL 0x02
+    #endif
+
+    // Read RegIrqFlags (0x12)
+    uint8_t getIRQFlags() {
+      return this->mod->SPIreadRegister(0x12);
+    }
+
+    // Clear specific IRQ bits by writing 1s to RegIrqFlags
+    void clearIrqFlags(uint8_t mask) {
+      this->mod->SPIwriteRegister(0x12, mask);
+    }
 };

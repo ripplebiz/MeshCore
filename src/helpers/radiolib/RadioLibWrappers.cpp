@@ -1,6 +1,9 @@
 
 #define RADIOLIB_STATIC_ONLY 1
 #include "RadioLibWrappers.h"
+#if defined(RF95_USE_POLLING)
+#include "CustomSX1276.h"
+#endif
 
 #define STATE_IDLE       0
 #define STATE_RX         1
@@ -80,6 +83,39 @@ void RadioLibWrapper::loop() {
 
     MESH_DEBUG_PRINTLN("RadioLibWrapper: noise_floor = %d", (int)_noise_floor);
   }
+
+#if defined(RF95_USE_POLLING)
+  // Poll SX127x IRQ flags when DIO0 is not connected
+  {
+    CustomSX1276* sx127x = (CustomSX1276*) _radio;
+    uint8_t irq = sx127x->getIRQFlags();
+    if (irq) {
+      bool txDone = (irq & SX127X_IRQ_TX_DONE) != 0;
+      bool rxDone = (irq & SX127X_IRQ_RX_DONE) != 0;
+
+      if (txDone && (state == STATE_TX_WAIT)) {
+        sx127x->clearIrqFlags(SX127X_IRQ_TX_DONE);
+        state |= STATE_INT_READY;   // signal TX complete
+      }
+
+      if (rxDone) {
+        // Do not clear RX_DONE here; let readData() consume/clear it
+        state |= STATE_INT_READY;   // signal RX available
+      }
+
+      uint8_t cleanup = 0;
+      if (irq & SX127X_IRQ_PAYLOAD_CRC_ERROR) cleanup |= SX127X_IRQ_PAYLOAD_CRC_ERROR;
+      if (irq & SX127X_IRQ_RX_TIMEOUT)        cleanup |= SX127X_IRQ_RX_TIMEOUT;
+      if (irq & SX127X_IRQ_CAD_DONE)          cleanup |= SX127X_IRQ_CAD_DONE;
+      if (irq & SX127X_IRQ_CAD_DETECTED)      cleanup |= SX127X_IRQ_CAD_DETECTED;
+      if (irq & SX127X_IRQ_FHSS_CHANGE_CHANNEL) cleanup |= SX127X_IRQ_FHSS_CHANGE_CHANNEL;
+      if (cleanup) {
+        sx127x->clearIrqFlags(cleanup);
+      }
+    }
+  }
+#endif
+
 }
 
 void RadioLibWrapper::startRecv() {

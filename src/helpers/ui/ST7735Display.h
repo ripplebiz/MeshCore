@@ -12,6 +12,8 @@ class ST7735Display : public DisplayDriver {
   bool _isOn;
   uint16_t _color;
   RefCountedDigitalPin* _peripher_power;
+  int16_t _offsetX;
+  int16_t _offsetY;
 
   bool i2c_probe(TwoWire& wire, uint8_t addr);
 public:
@@ -21,6 +23,8 @@ public:
       _peripher_power(peripher_power)
   {
     _isOn = false;
+    _offsetX = 0;
+    _offsetY = 0;
   }
 #else
   ST7735Display(RefCountedDigitalPin* peripher_power=NULL) : DisplayDriver(128, 64),
@@ -28,6 +32,8 @@ public:
       _peripher_power(peripher_power)
   {
     _isOn = false;
+    _offsetX = 0;
+    _offsetY = 0;
   }
 #endif
   bool begin();

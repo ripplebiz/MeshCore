@@ -14,7 +14,7 @@ protected:
 
   void idle();
   void startRecv();
-  float packetScoreInt(float snr, int sf, int packet_len);
+  float packetScoreByAirtime(float snr, int sf, uint32_t airtime_ms);
   virtual bool isReceivingPacket() =0;
 
 public:
@@ -50,7 +50,9 @@ public:
   virtual float getLastRSSI() const override;
   virtual float getLastSNR() const override;
 
-  float packetScore(float snr, int packet_len) override { return packetScoreInt(snr, 10, packet_len); }  // assume sf=10
+  // Default assumed SF=10, kept as fallback for backward compatibility.
+  virtual int getCurrentSF() const { return 10; }
+  float packetScore(float snr, int packet_len) override { return packetScoreByAirtime(snr, getCurrentSF(), getEstAirtimeFor(packet_len)); }
 };
 
 /**

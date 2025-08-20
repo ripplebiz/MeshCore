@@ -599,14 +599,7 @@ void Mesh::sendFlood(Packet* packet, uint32_t delay_millis) {
 
   _tables->hasSeen(packet); // mark this packet as already sent in case it is rebroadcast back to us
 
-  uint8_t pri;
-  if (packet->getPayloadType() == PAYLOAD_TYPE_PATH) {
-    pri = 2;
-  } else if (packet->getPayloadType() == PAYLOAD_TYPE_ADVERT) {
-    pri = 3;   // de-prioritie these
-  } else {
-    pri = 1;
-  }
+  uint8_t pri = getPriorityFor(packet);
   sendPacket(packet, pri, delay_millis);
 }
 
@@ -624,11 +617,7 @@ void Mesh::sendDirect(Packet* packet, const uint8_t* path, uint8_t path_len, uin
     pri = 5;   // maybe make this configurable
   } else {
     memcpy(packet->path, path, packet->path_len = path_len);
-    if (packet->getPayloadType() == PAYLOAD_TYPE_PATH) {
-      pri = 1;   // slightly less priority
-    } else {
-      pri = 0;
-    }
+    pri = getPriorityFor(packet);
   }
   _tables->hasSeen(packet); // mark this packet as already sent in case it is rebroadcast back to us
   sendPacket(packet, pri, delay_millis);
@@ -642,7 +631,7 @@ void Mesh::sendZeroHop(Packet* packet, uint32_t delay_millis) {
 
   _tables->hasSeen(packet); // mark this packet as already sent in case it is rebroadcast back to us
 
-  sendPacket(packet, 0, delay_millis);
+  sendPacket(packet, getPriorityFor(packet), delay_millis);
 }
 
 }

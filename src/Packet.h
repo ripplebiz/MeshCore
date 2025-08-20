@@ -75,6 +75,11 @@ public:
    */
   uint8_t getPayloadVer() const { return (header >> PH_VER_SHIFT) & PH_VER_MASK; }
 
+  bool isControlPayload() const {
+    uint8_t t = getPayloadType();
+    return t == PAYLOAD_TYPE_ACK || t == PAYLOAD_TYPE_ADVERT || t == PAYLOAD_TYPE_PATH;
+  }
+
   void markDoNotRetransmit() { header = 0xFF; }
   bool isMarkedDoNotRetransmit() const { return header == 0xFF; }
 

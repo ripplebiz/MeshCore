@@ -154,6 +154,8 @@ protected:
   virtual const char* getLogDateTime() { return ""; }
 
   virtual float getAirtimeBudgetFactor() const;
+  virtual float getControlAirtimeBudgetFactor() const { return 1.0f; }
+  virtual float getDataAirtimeBudgetFactor() const { return 2.0f; }
   virtual int calcRxDelay(float score, uint32_t air_time) const;
   virtual uint32_t getCADFailRetryDelay() const;
   virtual uint32_t getCADFailMaxDuration() const;

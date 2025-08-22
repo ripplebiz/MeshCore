@@ -61,18 +61,14 @@
 ////////////////////////////////////////////////////////////////////////////////
 // Builtin LEDs
 
-#define LED_RED                 (34)
-#define LED_GREEN               (33)
+#define LED_RED                 (13)
 #define LED_BLUE                (14)
+#define LED_GREEN               (15)
 
-#define PIN_STATUS_LED          LED_GREEN
-#define LED_BUILTIN             LED_GREEN
-#define PIN_LED                 LED_BUILTIN
+//#define PIN_STATUS_LED          LED_BLUE
+#define LED_BUILTIN             (-1)
 #define LED_PIN                 LED_BUILTIN
 #define LED_STATE_ON            LOW
-
-#define PIN_NEOPIXEL            (14)
-#define NEOPIXEL_NUM            (2)
 
 ////////////////////////////////////////////////////////////////////////////////
 // Builtin buttons

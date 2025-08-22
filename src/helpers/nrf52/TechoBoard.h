@@ -43,6 +43,25 @@ public:
     return "LilyGo T-Echo";
   }
 
+  void powerOff() override {
+    #ifdef LED_RED
+    digitalWrite(LED_RED, LOW);
+    #endif
+    #ifdef LED_GREEN
+    digitalWrite(LED_GREEN, LOW);
+    #endif
+    #ifdef LED_BLUE
+    digitalWrite(LED_BLUE, LOW);
+    #endif
+    #ifdef DISP_BACKLIGHT
+    digitalWrite(DISP_BACKLIGHT, LOW);
+    #endif
+    #ifdef PIN_PWR_EN
+    digitalWrite(PIN_PWR_EN, LOW);
+    #endif
+    sd_power_system_off();
+  }
+
   void reboot() override {
     NVIC_SystemReset();
   }

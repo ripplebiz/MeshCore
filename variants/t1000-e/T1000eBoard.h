@@ -84,12 +84,21 @@ public:
         digitalWrite(PIN_3V3_EN, LOW);
     #endif
 
+    // set led on and wait for button release before poweroff
+    #ifdef LED_PIN
+    digitalWrite(LED_PIN, HIGH);
+    #endif
+    #ifdef BUTTON_PIN
+    while(digitalRead(BUTTON_PIN));
+    #endif
     #ifdef LED_PIN
     digitalWrite(LED_PIN, LOW);
     #endif
+
     #ifdef BUTTON_PIN
     nrf_gpio_cfg_sense_input(digitalPinToInterrupt(BUTTON_PIN), NRF_GPIO_PIN_NOPULL, NRF_GPIO_PIN_SENSE_HIGH);
     #endif
+
     sd_power_system_off();
   }
 

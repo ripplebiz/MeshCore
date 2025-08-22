@@ -159,7 +159,7 @@ class MyMesh : public mesh::Mesh, public CommonCLICallbacks {
   }
 
   void putNeighbour(const mesh::Identity& id, uint32_t timestamp, float snr) {
-  #if MAX_NEIGHBOURS    // check if neighbours enabled    
+  #if MAX_NEIGHBOURS    // check if neighbours enabled
     // find existing neighbour, else use least recently updated
     uint32_t oldest_timestamp = 0xFFFFFFFF;
     NeighbourInfo* neighbour = &neighbours[0];
@@ -589,7 +589,7 @@ public:
     _prefs.cr = LORA_CR;
     _prefs.tx_power_dbm = LORA_TX_POWER;
     _prefs.advert_interval = 1;  // default to 2 minutes for NEW installs
-    _prefs.flood_advert_interval = 3;   // 3 hours
+    _prefs.flood_advert_interval = 12;   // 12 hours
     _prefs.flood_max = 64;
     _prefs.interference_threshold = 0;  // disabled
   }
@@ -611,8 +611,8 @@ public:
   const char* getBuildDate() override { return FIRMWARE_BUILD_DATE; }
   const char* getRole() override { return FIRMWARE_ROLE; }
   const char* getNodeName() { return _prefs.node_name; }
-  NodePrefs* getNodePrefs() { 
-    return &_prefs; 
+  NodePrefs* getNodePrefs() {
+    return &_prefs;
   }
 
   void savePrefs() override {

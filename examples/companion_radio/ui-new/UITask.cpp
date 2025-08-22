@@ -494,6 +494,20 @@ void UITask::loop() {
     c = handleLongPress(KEY_ENTER);
   }
 #endif
+#if defined(WIO_TRACKER_L1)
+  ev = joystick_left.check();
+  if (ev == BUTTON_EVENT_CLICK) {
+    c = checkDisplayOn(KEY_LEFT);
+  } else if (ev == BUTTON_EVENT_LONG_PRESS) {
+    c = handleLongPress(KEY_LEFT);
+  }
+  ev = joystick_right.check();
+  if (ev == BUTTON_EVENT_CLICK) {
+    c = checkDisplayOn(KEY_RIGHT);
+  } else if (ev == BUTTON_EVENT_LONG_PRESS) {
+    c = handleLongPress(KEY_RIGHT);
+  }
+#endif
 
   if (c != 0 && curr) {
     curr->handleInput(c);

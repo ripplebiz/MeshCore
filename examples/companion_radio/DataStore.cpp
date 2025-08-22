@@ -18,14 +18,28 @@ DataStore::DataStore(FILESYSTEM& fs, mesh::RTCClock& clock) : _fs(&fs), _clock(&
 {
 }
 
-static File openWrite(FILESYSTEM* _fs, const char* filename) {
+#if defined(EXTRAFS) || defined(QSPIFLASH)
+
+DataStore::DataStore(FILESYSTEM& fs, FILESYSTEM& fsExtra, mesh::RTCClock& clock) : _fs(&fs), _fsExtra(&fsExtra), _clock(&clock),
 #if defined(NRF52_PLATFORM) || defined(STM32_PLATFORM)
-  _fs->remove(filename);
-  return _fs->open(filename, FILE_O_WRITE);
+    identity_store(fs, "")
 #elif defined(RP2040_PLATFORM)
-  return _fs->open(filename, "w");
+    identity_store(fs, "/identity")
 #else
-  return _fs->open(filename, "w", true);
+    identity_store(fs, "/identity")
+#endif
+{
+}
+#endif
+
+static File openWrite(FILESYSTEM* fs, const char* filename) {
+#if defined(NRF52_PLATFORM) || defined(STM32_PLATFORM)
+  fs->remove(filename);
+  return fs->open(filename, FILE_O_WRITE);
+#elif defined(RP2040_PLATFORM)
+  return fs->open(filename, "w");
+#else
+  return fs->open(filename, "w", true);
 #endif
 }
 
@@ -36,6 +50,9 @@ void DataStore::begin() {
 
 #if defined(NRF52_PLATFORM) || defined(STM32_PLATFORM)
   checkAdvBlobFile();
+  #if defined(EXTRAFS) || defined(QSPIFLASH)
+  migrateToSecondaryFS();
+  #endif
 #else
   // init 'blob store' support
   _fs->mkdir("/bl");
@@ -77,8 +94,13 @@ uint32_t DataStore::getStorageUsedKb() const {
   _fs->info(info);
   return info.usedBytes / 1024;
 #elif defined(NRF52_PLATFORM) || defined(STM32_PLATFORM)
+#if defined(EXTRAFS) || defined(QSPIFLASH)
+  const lfs_config* config = _fsExtra->_getFS()->cfg;
+  int usedBlockCount = _getLfsUsedBlockCount(_fsExtra);
+#else
   const lfs_config* config = _fs->_getFS()->cfg;
   int usedBlockCount = _getLfsUsedBlockCount(_fs);
+#endif
   int usedBytes = config->block_size * usedBlockCount;
   return usedBytes / 1024;
 #else
@@ -95,7 +117,11 @@ uint32_t DataStore::getStorageTotalKb() const {
   _fs->info(info);
   return info.totalBytes / 1024;
 #elif defined(NRF52_PLATFORM) || defined(STM32_PLATFORM)
+#if defined(EXTRAFS) || defined(QSPIFLASH)
+  const lfs_config* config = _fsExtra->_getFS()->cfg;
+#else
   const lfs_config* config = _fs->_getFS()->cfg;
+#endif
   int totalBytes = config->block_size * config->block_count;
   return totalBytes / 1024;
 #else
@@ -113,14 +139,31 @@ File DataStore::openRead(const char* filename) {
 #endif
 }
 
+File DataStore::openRead(FILESYSTEM* fs, const char* filename) {
+#if defined(NRF52_PLATFORM) || defined(STM32_PLATFORM)
+  return fs->open(filename, FILE_O_READ);
+#elif defined(RP2040_PLATFORM)
+  return fs->open(filename, "r");
+#else
+  return fs->open(filename, "r", false);
+#endif
+}
+
 bool DataStore::removeFile(const char* filename) {
   return _fs->remove(filename);
 }
 
+bool DataStore::removeFile(FILESYSTEM* fs, const char* filename) {
+  return fs->remove(filename);
+}
+
 bool DataStore::formatFileSystem() {
 #if defined(NRF52_PLATFORM) || defined(STM32_PLATFORM)
-  // InternalFS.format(); // leaving as placeholder to remind for dual fs branch
+#if defined(EXTRAFS) || defined(QSPIFLASH)
+  return _fs->format() && _fsExtra->format(); // in future maybe return an error code based on which format failed?
+#else
   return _fs->format();
+#endif
 #elif defined(RP2040_PLATFORM)
   return LittleFS.format();
 #elif defined(ESP32)
@@ -214,11 +257,20 @@ void DataStore::savePrefs(const NodePrefs& _prefs, double node_lat, double node_
 }
 
 void DataStore::loadContacts(DataStoreHost* host) {
+#if defined(NRF52_PLATFORM) || defined(STM32_PLATFORM)
+#if defined(EXTRAFS) || defined(QSPIFLASH)
+  if (_fsExtra->exists("/contacts3")) {
+    File file = _fsExtra->open("/contacts3");
+#else
   if (_fs->exists("/contacts3")) {
-#if defined(RP2040_PLATFORM)
+    File file = _fs->open("/contacts3");
+#endif
+#elif defined(RP2040_PLATFORM)
+    if (_fs->exists("/contacts3")) {
     File file = _fs->open("/contacts3", "r");
 #else
-    File file = _fs->open("/contacts3");
+    if (_fs->exists("/contacts3")) {
+      File file = _fs->open("/contacts3", "r", false);
 #endif
     if (file) {
       bool full = false;
@@ -251,7 +303,11 @@ void DataStore::loadContacts(DataStoreHost* host) {
 }
 
 void DataStore::saveContacts(DataStoreHost* host) {
+#if defined(EXTRAFS) || defined(QSPIFLASH)
+  File file = openWrite(_fsExtra, "/contacts3");
+#else
   File file = openWrite(_fs, "/contacts3");
+#endif
   if (file) {
     uint32_t idx = 0;
     ContactInfo c;
@@ -280,11 +336,20 @@ void DataStore::saveContacts(DataStoreHost* host) {
 }
 
 void DataStore::loadChannels(DataStoreHost* host) {
+#if defined(NRF52_PLATFORM) || defined(STM32_PLATFORM)
+#if defined(EXTRAFS) || defined(QSPIFLASH)
+  if (_fsExtra->exists("/channels2")) {
+    File file = _fsExtra->open("/channels2");
+#else
   if (_fs->exists("/channels2")) {
-#if defined(RP2040_PLATFORM)
+    File file = _fs->open("/channels2");
+#endif
+#elif defined(RP2040_PLATFORM)
+  if (_fs->exists("/channels2")) {
     File file = _fs->open("/channels2", "r");
 #else
-    File file = _fs->open("/channels2");
+  if (_fs->exists("/channels2")) {
+    File file = _fs->open("/channels2", "r", false);
 #endif
     if (file) {
       bool full = false;
@@ -311,7 +376,11 @@ void DataStore::loadChannels(DataStoreHost* host) {
 }
 
 void DataStore::saveChannels(DataStoreHost* host) {
+#if defined(EXTRAFS) || defined(QSPIFLASH)
+  File file = openWrite(_fsExtra, "/channels2");
+#else
   File file = openWrite(_fs, "/channels2");
+#endif
   if (file) {
     uint8_t channel_idx = 0;
     ChannelDetails ch;
@@ -342,8 +411,13 @@ struct BlobRec {
 };
 
 void DataStore::checkAdvBlobFile() {
+#if defined(EXTRAFS) || defined(QSPIFLASH)
+  if (!_fsExtra->exists("/adv_blobs")) {
+    File file = openWrite(_fsExtra, "/adv_blobs");
+#else
   if (!_fs->exists("/adv_blobs")) {
     File file = openWrite(_fs, "/adv_blobs");
+#endif
     if (file) {
       BlobRec zeroes;
       memset(&zeroes, 0, sizeof(zeroes));
@@ -355,8 +429,117 @@ void DataStore::checkAdvBlobFile() {
   }
 }
 
+void DataStore::migrateToSecondaryFS() {
+  // migrate old adv_blobs, contacts3 and channels2 files to secondary FS if they don't already exist
+  if (!_fsExtra->exists("/adv_blobs")) {
+    if (_fs->exists("/adv_blobs")) {
+    File oldAdvBlobs = openRead(_fs, "/adv_blobs");
+    File newAdvBlobs = openWrite(_fsExtra, "/adv_blobs");
+
+    if (oldAdvBlobs && newAdvBlobs) {
+      BlobRec rec;
+      size_t count = 0;
+
+      // Copy 20 BlobRecs from old to new
+      while (count < 20 && oldAdvBlobs.read((uint8_t *)&rec, sizeof(rec)) == sizeof(rec)) {
+        newAdvBlobs.seek(count * sizeof(BlobRec));
+        newAdvBlobs.write((uint8_t *)&rec, sizeof(rec));
+        count++;
+      }
+    }
+    if (oldAdvBlobs) oldAdvBlobs.close();
+    if (newAdvBlobs) newAdvBlobs.close();
+    _fs->remove("/adv_blobs");
+    }
+  }
+  if (!_fsExtra->exists("/contacts3")) {
+    if (_fs->exists("/contacts3")) {
+      File oldFile = openRead(_fs, "/contacts3");
+      File newFile = openWrite(_fsExtra, "/contacts3");
+
+      if (oldFile && newFile) {
+        uint8_t buf[64];
+        int n;
+        while ((n = oldFile.read(buf, sizeof(buf))) > 0) {
+          newFile.write(buf, n);
+        }
+      }
+      if (oldFile) oldFile.close();
+      if (newFile) newFile.close();
+      _fs->remove("/contacts3");
+    }
+  }
+  if (!_fsExtra->exists("/channels2")) {
+    if (_fs->exists("/contacts2")) {
+      File oldFile = openRead(_fs, "/contacts2");
+      File newFile = openWrite(_fsExtra, "/contacts2");
+
+      if (oldFile && newFile) {
+        uint8_t buf[64];
+        int n;
+        while ((n = oldFile.read(buf, sizeof(buf))) > 0) {
+          newFile.write(buf, n);
+        }
+      }
+      if (oldFile) oldFile.close();
+      if (newFile) newFile.close();
+      _fs->remove("/contacts2");
+    }
+  }
+  // cleanup nodes which have been testing the extra fs, copy _main.id and new_prefs back to primary
+  if (_fsExtra->exists("/_main.id")) {
+      if (_fs->exists("/_main.id")) {_fs->remove("/_main.id");}
+      File oldFile = openRead(_fsExtra, "/_main.id");
+      File newFile = openWrite(_fs, "/_main.id");
+
+      if (oldFile && newFile) {
+        uint8_t buf[64];
+        int n;
+        while ((n = oldFile.read(buf, sizeof(buf))) > 0) {
+          newFile.write(buf, n);
+        }
+      }
+      if (oldFile) oldFile.close();
+      if (newFile) newFile.close();
+      _fsExtra->remove("/_main.id");
+  }
+  if (_fsExtra->exists("/new_prefs")) {
+    if (_fs->exists("/new_prefs")) {_fs->remove("/new_prefs");}
+      File oldFile = openRead(_fsExtra, "/new_prefs");
+      File newFile = openWrite(_fs, "/new_prefs");
+
+      if (oldFile && newFile) {
+        uint8_t buf[64];
+        int n;
+        while ((n = oldFile.read(buf, sizeof(buf))) > 0) {
+          newFile.write(buf, n);
+        }
+      }
+      if (oldFile) oldFile.close();
+      if (newFile) newFile.close();
+      _fsExtra->remove("/new_prefs");
+  }
+  // remove files from where they should not be anymore
+  if (_fs->exists("/adv_blobs")) {
+    _fs->remove("/adv_blobs");
+  }
+  if (_fs->exists("/contacts3")) {
+    _fs->remove("/contacts3");
+  }
+  if (_fsExtra->exists("/_main.id")) {
+    _fsExtra->remove("/_main.id");
+  }
+  if (_fsExtra->exists("/new_prefs")) {
+    _fsExtra->remove("/new_prefs");
+  }
+}
+
 uint8_t DataStore::getBlobByKey(const uint8_t key[], int key_len, uint8_t dest_buf[]) {
+#if defined(EXTRAFS) || defined(QSPIFLASH)
+  File file = _fsExtra->open("/adv_blobs");
+#else
   File file = _fs->open("/adv_blobs");
+#endif
   uint8_t len = 0;  // 0 = not found
 
   if (file) {
@@ -378,7 +561,11 @@ bool DataStore::putBlobByKey(const uint8_t key[], int key_len, const uint8_t src
 
   checkAdvBlobFile();
 
+#if defined(EXTRAFS) || defined(QSPIFLASH)
+  File file = _fsExtra->open("/adv_blobs", FILE_O_WRITE);
+#else
   File file = _fs->open("/adv_blobs", FILE_O_WRITE);
+#endif
   if (file) {
     uint32_t pos = 0, found_pos = 0;
     uint32_t min_timestamp = 0xFFFFFFFF;

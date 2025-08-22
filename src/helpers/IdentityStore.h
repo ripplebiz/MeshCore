@@ -4,18 +4,10 @@
   #include <FS.h>
   #define FILESYSTEM  fs::FS
 #elif defined(NRF52_PLATFORM) || defined(STM32_PLATFORM)
-  #if defined(QSPIFLASH)
-    #include <CustomLFS_QSPIFlash.h>
-    #define FILESYSTEM CustomLFS_QSPIFlash
-  #elif defined(EXTRAFS)
-    #include <CustomLFS.h>
-    #define FILESYSTEM CustomLFS
-  #else
     #include <Adafruit_LittleFS.h>
     #define FILESYSTEM  Adafruit_LittleFS
 
     using namespace Adafruit_LittleFS_Namespace;
-  #endif
 #endif
 #include <Identity.h>
 

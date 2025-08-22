@@ -16,12 +16,12 @@ static uint32_t _atoi(const char* sp) {
   #include <InternalFileSystem.h>
   #if defined(QSPIFLASH)
     #include <CustomLFS_QSPIFlash.h>
-    DataStore store(QSPIFlash, rtc_clock);
+    DataStore store(InternalFS, QSPIFlash, rtc_clock);
   #else
   #if defined(EXTRAFS)
     #include <CustomLFS.h>
     CustomLFS ExtraFS(0xD4000, 0x19000, 128);
-    DataStore store(ExtraFS, rtc_clock);
+    DataStore store(InternalFS, ExtraFS, rtc_clock);
   #else
     DataStore store(InternalFS, rtc_clock);
   #endif
@@ -129,6 +129,7 @@ void setup() {
   fast_rng.begin(radio_get_rng_seed());
 
 #if defined(NRF52_PLATFORM) || defined(STM32_PLATFORM)
+  InternalFS.begin();
   #if defined(QSPIFLASH)
     if (!QSPIFlash.begin()) {
       // debug output might not be available at this point, might be too early. maybe should fall back to InternalFS here?
@@ -137,10 +138,9 @@ void setup() {
       MESH_DEBUG_PRINTLN("CustomLFS_QSPIFlash: initialized successfully");
     }
   #else
-    InternalFS.begin();
-    #if defined(EXTRAFS)
+  #if defined(EXTRAFS)
       ExtraFS.begin();
-    #endif
+  #endif
   #endif
   store.begin();
   the_mesh.begin(

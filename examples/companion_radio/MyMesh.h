@@ -12,7 +12,7 @@
 #endif
 
 #ifndef FIRMWARE_VERSION
-#define FIRMWARE_VERSION "1.7.4-CustomLFSv0.6"
+#define FIRMWARE_VERSION "1.7.4-CustomLFSv0.7"
 #endif
 
 #if defined(NRF52_PLATFORM) || defined(STM32_PLATFORM)

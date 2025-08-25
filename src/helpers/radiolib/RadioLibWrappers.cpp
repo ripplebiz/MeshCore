@@ -178,13 +178,16 @@ static float snr_threshold[] = {
     -20   // SF12 needs at least -20 dB SNR
 };
   
-float RadioLibWrapper::packetScoreInt(float snr, int sf, int packet_len) {
+float RadioLibWrapper::packetScoreByAirtime(float snr, int sf, uint32_t airtime_ms) {
   if (sf < 7) return 0.0f;
-  
-  if (snr < snr_threshold[sf - 7]) return 0.0f;    // Below threshold, no chance of success
+  if (snr < snr_threshold[sf - 7]) return 0.0f;
 
-  auto success_rate_based_on_snr = (snr - snr_threshold[sf - 7]) / 10.0;
-  auto collision_penalty = 1 - (packet_len / 256.0);   // Assuming max packet of 256 bytes
-
-  return max(0.0, min(1.0, success_rate_based_on_snr * collision_penalty));
+  float success = (snr - snr_threshold[sf - 7]) / 10.0f;
+  // Penalize by time-on-air to account for BW/CR/SF.
+  // 0 ms => no penalty, ~300 ms+ => strong penalty (tunable).
+  float airtime_penalty = 1.0f - min(1.0f, (float)airtime_ms / 300.0f);
+  float score = success * airtime_penalty;
+  if (score < 0.0f) score = 0.0f;
+  if (score > 1.0f) score = 1.0f;
+  return score;
 }

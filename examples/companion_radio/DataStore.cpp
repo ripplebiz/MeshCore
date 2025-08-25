@@ -474,9 +474,9 @@ void DataStore::migrateToSecondaryFS() {
     }
   }
   if (!_fsExtra->exists("/channels2")) {
-    if (_fs->exists("/contacts2")) {
-      File oldFile = openRead(_fs, "/contacts2");
-      File newFile = openWrite(_fsExtra, "/contacts2");
+    if (_fs->exists("/channels2")) {
+      File oldFile = openRead(_fs, "/channels2");
+      File newFile = openWrite(_fsExtra, "/channels2");
 
       if (oldFile && newFile) {
         uint8_t buf[64];
@@ -487,7 +487,7 @@ void DataStore::migrateToSecondaryFS() {
       }
       if (oldFile) oldFile.close();
       if (newFile) newFile.close();
-      _fs->remove("/contacts2");
+      _fs->remove("/channels2");
     }
   }
   // cleanup nodes which have been testing the extra fs, copy _main.id and new_prefs back to primary
@@ -529,6 +529,9 @@ void DataStore::migrateToSecondaryFS() {
   }
   if (_fs->exists("/contacts3")) {
     _fs->remove("/contacts3");
+  }
+  if (_fs->exists("/channels2")) {
+    _fs->remove("/channels2");
   }
   if (_fsExtra->exists("/_main.id")) {
     _fsExtra->remove("/_main.id");

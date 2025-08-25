@@ -63,13 +63,16 @@ void DataStore::begin() {
   #include <SPIFFS.h>
 #elif defined(RP2040_PLATFORM)
   #include <LittleFS.h>
-#elif defined(NRF52_PLATFORM)
-  #include <CustomLFS.h>
+#elif defined(NRF52_PLATFORM) || defined(STM32_PLATFORM)
   #if defined(QSPIFLASH)
     #include <CustomLFS_QSPIFlash.h>
+  #else
+  #if defined(EXTRAFS)
+    #include <CustomLFS.h>
+  #else 
+    #include <InternalFileSystem.h>
   #endif
-#elif defined(STM32_PLATFORM)
-  #include <InternalFileSystem.h>
+#endif
 #endif
 
 #if defined(NRF52_PLATFORM) || defined(STM32_PLATFORM)

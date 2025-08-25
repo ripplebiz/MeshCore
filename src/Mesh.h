@@ -4,6 +4,14 @@
 
 namespace mesh {
 
+// Outbound queue priorities (lower value = higher priority)
+#define PRI_CONTROL_HIGH   0   // critical control: ACK, PATH, zero-hop control
+#define PRI_DATA           1   // normal data: REQ/RESPONSE/TXT
+#define PRI_DATA_ALT       2   // secondary data if needed
+#define PRI_BEACON         3   // ADVERT/beacons
+#define PRI_LOW            4   // reserved low priority
+#define PRI_TRACE          5   // TRACE diagnostics
+
 class GroupChannel {
 public:
   uint8_t hash[PATH_HASH_SIZE];
@@ -32,6 +40,15 @@ class Mesh : public Dispatcher {
   void routeDirectRecvAcks(Packet* packet, uint32_t delay_millis);
   //void routeRecvAcks(Packet* packet, uint32_t delay_millis);
   DispatcherAction forwardMultipartDirect(Packet* pkt);
+
+  uint8_t getPriorityFor(const Packet* packet) const {
+    uint8_t type = packet->getPayloadType();
+    if (type == PAYLOAD_TYPE_TRACE) return PRI_TRACE;
+    if (type == PAYLOAD_TYPE_PATH) return PRI_CONTROL_HIGH;
+    if (type == PAYLOAD_TYPE_ADVERT) return PRI_BEACON;
+    if (packet->isRouteDirect() && packet->path_len == 0) return PRI_CONTROL_HIGH;  // zero-hop
+    return PRI_DATA;
+  }
 
 protected:
   DispatcherAction onRecvPacket(Packet* pkt) override;

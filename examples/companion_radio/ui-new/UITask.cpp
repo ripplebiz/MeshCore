@@ -213,10 +213,10 @@ public:
       display.setColor(DisplayDriver::GREEN);
       display.setTextSize(1);
       if (_shutdown_init) {
-        display.drawTextCentered(display.width() / 2, 34, "shutting down...");
+        display.drawTextCentered(display.width() / 2, 34, "hibernating...");
       } else {
         display.drawXbm((display.width() - 32) / 2, 18, power_icon, 32, 32);
-        display.drawTextCentered(display.width() / 2, 64 - 11, "off: " PRESS_LABEL);
+        display.drawTextCentered(display.width() / 2, 64 - 11, "hibernate: " PRESS_LABEL);
       }
     }
     return 5000;   // next render after 5000 ms

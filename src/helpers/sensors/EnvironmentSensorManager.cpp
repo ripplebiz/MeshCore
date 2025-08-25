@@ -65,6 +65,14 @@ static Adafruit_INA219 INA219(TELEM_INA219_ADDRESS);
 static Adafruit_INA260 INA260;
 #endif
 
+#if ENV_INCLUDE_INA226
+#define TELEM_INA226_ADDRESS    0x44 
+#define TELEM_INA226_SHUNT_VALUE 0.100 
+#define TELEM_INA226_MAX_AMP 0.8
+#include <INA226.h>
+static INA226 INA226(TELEM_INA226_ADDRESS);
+#endif
+
 #if ENV_INCLUDE_MLX90614
 #define TELEM_MLX90614_ADDRESS 0x5A      // MLX90614 IR temperature sensor I2C address
 #include <Adafruit_MLX90614.h>
@@ -202,6 +210,17 @@ bool EnvironmentSensorManager::begin() {
   }
   #endif
 
+  #if ENV_INCLUDE_INA226
+  if (INA226.begin()) {
+    MESH_DEBUG_PRINTLN("Found INA226 at address: %02X", TELEM_INA226_ADDRESS);
+    INA226.setMaxCurrentShunt(TELEM_INA226_MAX_AMP, TELEM_INA226_SHUNT_VALUE);
+    INA226_initialized = true;
+  } else {
+    INA226_initialized = false;
+    MESH_DEBUG_PRINTLN("INA226 was not found at I2C address %02X", TELEM_INA226_ADDRESS);
+  }
+  #endif
+
   #if ENV_INCLUDE_MLX90614
   if (MLX90614.begin(TELEM_MLX90614_ADDRESS, TELEM_WIRE)) {
     MESH_DEBUG_PRINTLN("Found MLX90614 at address: %02X", TELEM_MLX90614_ADDRESS);
@@ -319,6 +338,15 @@ bool EnvironmentSensorManager::querySensors(uint8_t requester_permissions, Cayen
       telemetry.addVoltage(next_available_channel, INA260.readBusVoltage() / 1000);
       telemetry.addCurrent(next_available_channel, INA260.readCurrent() / 1000);
       telemetry.addPower(next_available_channel, INA260.readPower() / 1000);
+      next_available_channel++;
+    }
+    #endif
+
+    #if ENV_INCLUDE_INA226
+    if (INA226_initialized) {
+      telemetry.addVoltage(next_available_channel, INA226.getBusVoltage());
+      telemetry.addCurrent(next_available_channel, INA226.getCurrent_mA() / 1000.0);
+      telemetry.addPower(next_available_channel, INA226.getPower_mW() / 1000.0);
       next_available_channel++;
     }
     #endif

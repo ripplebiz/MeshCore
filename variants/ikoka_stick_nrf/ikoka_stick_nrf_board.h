@@ -5,20 +5,6 @@
 
 #ifdef XIAO_NRF52
 
-// redefine lora pins if using the S3 variant of SX1262 board
-#ifdef SX1262_XIAO_S3_VARIANT
-  #undef P_LORA_DIO_1
-  #undef P_LORA_BUSY
-  #undef P_LORA_RESET
-  #undef P_LORA_NSS
-  #undef SX126X_RXEN
-  #define  P_LORA_DIO_1       D0
-  #define  P_LORA_BUSY        D1
-  #define  P_LORA_RESET       D2
-  #define  P_LORA_NSS         D3
-  #define  SX126X_RXEN        D4
-#endif
-
 class ikoka_stick_nrf_board : public mesh::MainBoard {
 protected:
   uint8_t startup_reason;
@@ -29,10 +15,10 @@ public:
 
 #if defined(P_LORA_TX_LED)
   void onBeforeTransmit() override {
-    digitalWrite(P_LORA_TX_LED, HIGH);   // turn TX LED on
+    digitalWrite(P_LORA_TX_LED, LOW);   // turn TX LED on
   }
   void onAfterTransmit() override {
-    digitalWrite(P_LORA_TX_LED, LOW);   // turn TX LED off
+    digitalWrite(P_LORA_TX_LED, HIGH);   // turn TX LED off
   }
 #endif
 
